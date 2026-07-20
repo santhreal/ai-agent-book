@@ -45,11 +45,14 @@ def load_trajectories(path: str = _DATA) -> Dict[str, Dict[str, Any]]:
 
 # ---------------- 断言求值器 ----------------
 
+
 def _tool_turns(traj: Dict[str, Any], tool: str) -> List[Dict[str, Any]]:
     return [t for t in traj.get("turns", []) if t.get("tool") == tool]
 
 
-def _eval_assertion(assertion: Dict[str, Any], traj: Dict[str, Any]) -> Tuple[bool, str]:
+def _eval_assertion(
+    assertion: Dict[str, Any], traj: Dict[str, Any]
+) -> Tuple[bool, str]:
     a_type = assertion.get("type")
     params = assertion.get("params", {})
 
@@ -67,15 +70,36 @@ def _eval_assertion(assertion: Dict[str, Any], traj: Dict[str, Any]) -> Tuple[bo
         last_ok = calls[-1].get("status") == "success"
         # 修复标准：最终成功，且不存在"多次失败后仍误报成功"（>=2 次失败视为未正确处理）
         ok = last_ok and n_err < 2
-        return ok, f"{tool} 调用 {len(calls)} 次, 失败 {n_err} 次, 末次{'成功' if last_ok else '失败'}"
+        return (
+            ok,
+            f"{tool} 调用 {len(calls)} 次, 失败 {n_err} 次, 末次{'成功' if last_ok else '失败'}",
+        )
 
     if a_type == "latency_under":
         tool = params.get("tool")
         thr = params.get("threshold_ms") or params.get("threshold")
+        if thr is None:
+            return False, "latency_under 断言缺失阈值设置"
+        try:
+            thr = float(thr)
+        except (ValueError, TypeError):
+            return False, f"latency_under 阈值非法: {thr!r}"
+
         calls = _tool_turns(traj, tool)
         if not calls:
             return False, f"{tool} 未被调用"
-        worst = max(c.get("latency_ms", 0) for c in calls)
+
+        latencies = []
+        for c in calls:
+            lat = c.get("latency_ms")
+            if lat is None:
+                lat = 0
+            try:
+                latencies.append(float(lat))
+            except (ValueError, TypeError):
+                latencies.append(0.0)
+
+        worst = max(latencies) if latencies else 0.0
         ok = worst < thr
         return ok, f"{tool} 最大延迟 {worst}ms, 阈值 {thr}ms"
 
@@ -87,14 +111,18 @@ def _eval_assertion(assertion: Dict[str, Any], traj: Dict[str, Any]) -> Tuple[bo
     return False, f"未知断言类型: {a_type}"
 
 
-def run_test_case(tc: Dict[str, Any], trajectories: Dict[str, Any],
-                  fixed: bool) -> Dict[str, Any]:
+def run_test_case(
+    tc: Dict[str, Any], trajectories: Dict[str, Any], fixed: bool
+) -> Dict[str, Any]:
     """对单条测试用例：取原始轨迹输入 -> 重放被测系统 -> 求值断言。"""
     tid = tc.get("trajectory_id")
     src = trajectories.get(tid)
     if src is None:
-        return {"test_id": tc.get("test_id"), "passed": False,
-                "detail": f"引用的轨迹 {tid} 不存在"}
+        return {
+            "test_id": tc.get("test_id"),
+            "passed": False,
+            "detail": f"引用的轨迹 {tid} 不存在",
+        }
 
     replayed = sut.run_task(src["task_input"], fixed=fixed)
     passed, detail = _eval_assertion(tc.get("assertion", {}), replayed)
@@ -108,8 +136,9 @@ def run_test_case(tc: Dict[str, Any], trajectories: Dict[str, Any],
     }
 
 
-def run_suite(test_cases: List[Dict[str, Any]], fixed: bool,
-              path: str = _DATA) -> List[Dict[str, Any]]:
+def run_suite(
+    test_cases: List[Dict[str, Any]], fixed: bool, path: str = _DATA
+) -> List[Dict[str, Any]]:
     """跑完整套测试用例，返回结果列表。"""
     trajectories = load_trajectories(path)
     results = []
@@ -117,7 +146,12 @@ def run_suite(test_cases: List[Dict[str, Any]], fixed: bool,
         try:
             results.append(run_test_case(tc, trajectories, fixed))
         except Exception as e:  # 单条用例出错不影响整套
-            results.append({"test_id": tc.get("test_id"), "passed": False,
-                            "detail": f"用例执行异常: {e}",
-                            "replay_mode": "fixed" if fixed else "buggy"})
+            results.append(
+                {
+                    "test_id": tc.get("test_id"),
+                    "passed": False,
+                    "detail": f"用例执行异常: {e}",
+                    "replay_mode": "fixed" if fixed else "buggy",
+                }
+            )
     return results
