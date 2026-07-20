@@ -71,16 +71,16 @@ class Config:
     @classmethod
     def provider_meta(cls) -> dict:
         if cls.PROVIDER not in _PROVIDERS:
-            raise ValueError(
-                f"未知 PROVIDER={cls.PROVIDER}，可选：{list(_PROVIDERS)}"
-            )
+            raise ValueError(f"未知 PROVIDER={cls.PROVIDER}，可选：{list(_PROVIDERS)}")
         return _PROVIDERS[cls.PROVIDER]
 
     @classmethod
     def _use_openrouter(cls) -> bool:
         """所选 provider 的 Key 缺失、但有 OPENROUTER_API_KEY 时，走 OpenRouter 兜底。"""
         meta = cls.provider_meta()
-        return (not os.getenv(meta["key_env"])) and bool(os.getenv("OPENROUTER_API_KEY"))
+        return (not os.getenv(meta["key_env"])) and bool(
+            os.getenv("OPENROUTER_API_KEY")
+        )
 
     @classmethod
     def map_model(cls, model: str) -> str:

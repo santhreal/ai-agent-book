@@ -31,7 +31,7 @@ step 的 action 取值：
   final_answer  {"action":"final_answer","text":str}
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Dict, List, Optional
 
 from config import Config
@@ -64,12 +64,16 @@ class ToolRegistry:
 class Profile:
     name: str
     discovery_quality: str  # "good" | "bad"
-    tool_quality: str       # "good"(调 LLM 生成) | "sloppy"(粗糙 stub)
-    reuse_registry: bool    # 相似任务是否先查注册表复用
+    tool_quality: str  # "good"(调 LLM 生成) | "sloppy"(粗糙 stub)
+    reuse_registry: bool  # 相似任务是否先查注册表复用
 
 
-STRONG = Profile("strong", discovery_quality="good", tool_quality="good", reuse_registry=True)
-WEAK = Profile("weak", discovery_quality="bad", tool_quality="sloppy", reuse_registry=False)
+STRONG = Profile(
+    "strong", discovery_quality="good", tool_quality="good", reuse_registry=True
+)
+WEAK = Profile(
+    "weak", discovery_quality="bad", tool_quality="sloppy", reuse_registry=False
+)
 
 
 _TOOL_GEN_SYSTEM = (
@@ -126,10 +130,14 @@ def _offline_good_tool_code(task: dict, library: str) -> str:
 class SelfEvolutionAgent:
     """可控的自我进化 Agent。同一个 registry 在多次 run 之间共享以支持复用。"""
 
-    def __init__(self, registry: ToolRegistry, model: Optional[str] = None, offline: bool = False):
+    def __init__(
+        self, registry: ToolRegistry, model: Optional[str] = None, offline: bool = False
+    ):
         self.registry = registry
         self.model = Config.resolve_default_model(model)
-        self.offline = offline  # True 时用离线工具模板，不调用 LLM（用于无 Key 演示确定性层）
+        self.offline = (
+            offline  # True 时用离线工具模板，不调用 LLM（用于无 Key 演示确定性层）
+        )
         self._client = None  # 懒加载，只有真正需要生成工具时才建连接
 
     @property
@@ -159,7 +167,7 @@ class SelfEvolutionAgent:
         if code.startswith("```"):
             code = code.split("```", 2)[1]
             if code.startswith("python"):
-                code = code[len("python"):]
+                code = code[len("python") :]
             code = code.strip("`").strip()
         return code
 
@@ -172,14 +180,22 @@ class SelfEvolutionAgent:
             steps.append({"action": "search", "query": f"{query} python library"})
             lib = task["reference_solution"]["libraries"][0]
             top = lib.split("(")[0].strip()
-            steps.append({"action": "read_web", "url": f"https://pypi.org/project/{top}/"})
+            steps.append(
+                {"action": "read_web", "url": f"https://pypi.org/project/{top}/"}
+            )
             steps.append({"action": "select_library", "library": lib})
             return steps, lib
         else:
             # 坏发现：关键词泛泛、且选了一个已废弃/需付费的库
-            steps.append({"action": "search", "query": "how to do this quickly easy python"})
+            steps.append(
+                {"action": "search", "query": "how to do this quickly easy python"}
+            )
             pit = task.get("known_pitfalls", {})
-            bad = (pit.get("deprecated_libraries") or pit.get("paid_or_registration_apis") or ["requests"])[0]
+            bad = (
+                pit.get("deprecated_libraries")
+                or pit.get("paid_or_registration_apis")
+                or ["requests"]
+            )[0]
             steps.append({"action": "select_library", "library": bad})
             return steps, bad
 
@@ -200,13 +216,21 @@ class SelfEvolutionAgent:
 
         # 1) 复用检查：strong 画像先查注册表
         if profile.reuse_registry and self.registry.has(tool_name):
-            traj["steps"].append({"action": "retrieve_tool", "name": tool_name, "source": "registry"})
-            traj["steps"].append({
-                "action": "call_tool", "name": tool_name, "args": {"goal": goal},
-                "result": "(复用已注册工具，直接得到结果)",
-            })
+            traj["steps"].append(
+                {"action": "retrieve_tool", "name": tool_name, "source": "registry"}
+            )
+            traj["steps"].append(
+                {
+                    "action": "call_tool",
+                    "name": tool_name,
+                    "args": {"goal": goal},
+                    "result": "(复用已注册工具，直接得到结果)",
+                }
+            )
             traj["final_answer"] = task["mock_answer"]
-            traj["steps"].append({"action": "final_answer", "text": traj["final_answer"]})
+            traj["steps"].append(
+                {"action": "final_answer", "text": traj["final_answer"]}
+            )
             return traj
 
         # 2) 发现阶段
@@ -230,10 +254,14 @@ class SelfEvolutionAgent:
         traj["steps"].append({"action": "register_tool", "name": tool_name})
 
         # 5) 调用并给出答案
-        traj["steps"].append({
-            "action": "call_tool", "name": tool_name, "args": {"goal": goal},
-            "result": "(工具执行完成)",
-        })
+        traj["steps"].append(
+            {
+                "action": "call_tool",
+                "name": tool_name,
+                "args": {"goal": goal},
+                "result": "(工具执行完成)",
+            }
+        )
         traj["final_answer"] = task["mock_answer"]
         traj["steps"].append({"action": "final_answer", "text": traj["final_answer"]})
         return traj
