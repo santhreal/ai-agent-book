@@ -207,6 +207,9 @@ async def summarize_text(
         TextContent with summary
     """
     try:
+        if max_length is None:
+            max_length = 500
+
         logging.info(f"📝 Summarizing text ({len(text)} characters)")
         
         if use_llm:
