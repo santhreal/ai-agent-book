@@ -46,8 +46,14 @@ class ToolLibrary:
         self.dir.mkdir(parents=True, exist_ok=True)
 
     # ----------------------------- create_tool ----------------------------- #
-    def create_tool(self, name: str, description: str, parameters: dict, code: str,
-                    test_args: dict | None = None) -> dict:
+    def create_tool(
+        self,
+        name: str,
+        description: str,
+        parameters: dict,
+        code: str,
+        test_args: dict | None = None,
+    ) -> dict:
         """
         把一个功能封装为标准工具并持久化。
 
@@ -59,11 +65,19 @@ class ToolLibrary:
         - 若给了 test_args，则在沙箱里**真正执行一次 run(**test_args)**，只有成功返回结果
           才允许注册——从而挡住「封装了却根本跑不通」的坏工具污染工具库、再被后续任务反复复用。
         """
+        if not isinstance(name, str):
+            return {"success": False, "error": "tool name must be a string"}
         name = name.strip()
         if not name.isidentifier():
-            return {"success": False, "error": f"invalid tool name: {name!r} (must be a valid identifier)"}
+            return {
+                "success": False,
+                "error": f"invalid tool name: {name!r} (must be a valid identifier)",
+            }
         if "def run" not in code:
-            return {"success": False, "error": "tool code must define a function `def run(**kwargs)`"}
+            return {
+                "success": False,
+                "error": "tool code must define a function `def run(**kwargs)`",
+            }
         # 存前验证 1：语法编译检查（坏语法直接挡在库外）
         try:
             compile(code, f"<tool {name}>", "exec")
@@ -85,16 +99,22 @@ class ToolLibrary:
                 return {
                     "success": False,
                     "error": "工具注册前验证失败：run(**test_args) 没有成功返回。请修正代码或 test_args"
-                             "后重新提交（未通过验证的工具不会入库，以免坏工具被后续任务复用）。",
+                    "后重新提交（未通过验证的工具不会入库，以免坏工具被后续任务复用）。",
                     "validation": val,
                 }
             validated = True
 
-        (self.dir / f"{name}.json").write_text(json.dumps(record, ensure_ascii=False, indent=2))
+        (self.dir / f"{name}.json").write_text(
+            json.dumps(record, ensure_ascii=False, indent=2)
+        )
         return {
             "success": True,
             "message": f"tool '{name}' created and saved to tool_library/"
-                       + ("（已通过存前验证）" if validated else "（未提供 test_args，跳过运行验证）"),
+            + (
+                "（已通过存前验证）"
+                if validated
+                else "（未提供 test_args，跳过运行验证）"
+            ),
             "name": name,
             "validated": validated,
         }
@@ -102,7 +122,9 @@ class ToolLibrary:
     # ----------------------------- search_tools ---------------------------- #
     def search_tools(self, query: str) -> dict:
         """按名称/描述做关键词检索，返回命中的工具（用于复用）。"""
-        query = (query or "").strip().lower()
+        if not isinstance(query, str):
+            query = str(query or "")
+        query = query.strip().lower()
         terms = [t for t in query.replace(",", " ").split() if t]
         hits = []
         for rec in self.list_tools():
@@ -116,7 +138,11 @@ class ToolLibrary:
             "query": query,
             "count": len(hits),
             "tools": [
-                {"name": r["name"], "description": r["description"], "parameters": r["parameters"]}
+                {
+                    "name": r["name"],
+                    "description": r["description"],
+                    "parameters": r["parameters"],
+                }
                 for _, r in hits
             ],
         }
@@ -126,7 +152,14 @@ class ToolLibrary:
         recs = []
         for p in sorted(self.dir.glob("*.json")):
             try:
-                recs.append(json.loads(p.read_text()))
+                data = json.loads(p.read_text())
+                if (
+                    isinstance(data, dict)
+                    and "name" in data
+                    and "description" in data
+                    and "parameters" in data
+                ):
+                    recs.append(data)
             except Exception:  # noqa: BLE001
                 continue
         return recs
@@ -135,7 +168,13 @@ class ToolLibrary:
         p = self.dir / f"{name}.json"
         if not p.exists():
             return None
-        return json.loads(p.read_text())
+        try:
+            data = json.loads(p.read_text())
+            if isinstance(data, dict) and "code" in data:
+                return data
+        except Exception:
+            pass
+        return None
 
     # -------------------------- execute a wrapped tool --------------------- #
     def execute_tool(self, name: str, arguments: dict, timeout: int = 60) -> dict:
@@ -155,30 +194,47 @@ class ToolLibrary:
         """
         SANDBOX_PKG_DIR.mkdir(exist_ok=True)
         driver = (
-            rec["code"]
-            + "\n\nif __name__ == '__main__':\n"
+            rec["code"] + "\n\nif __name__ == '__main__':\n"
             "    import json as _json, sys as _sys\n"
             "    _args = _json.loads(_sys.argv[1])\n"
             "    _out = run(**_args)\n"
             "    print('__TOOL_RESULT__' + _json.dumps(_out, default=str))\n"
         )
         env = os.environ.copy()
-        env["PYTHONPATH"] = str(SANDBOX_PKG_DIR) + os.pathsep + env.get("PYTHONPATH", "")
+        env["PYTHONPATH"] = (
+            str(SANDBOX_PKG_DIR) + os.pathsep + env.get("PYTHONPATH", "")
+        )
 
-        with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False, dir=SANDBOX_PKG_DIR) as f:
+        with tempfile.NamedTemporaryFile(
+            "w", suffix=".py", delete=False, dir=SANDBOX_PKG_DIR
+        ) as f:
             f.write(driver)
             script = f.name
         try:
             r = subprocess.run(
                 [sys.executable, script, json.dumps(arguments)],
-                capture_output=True, text=True, timeout=timeout, env=env,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                env=env,
             )
             if r.returncode != 0:
-                return {"success": False, "error": "tool crashed", "stderr": r.stderr[-3000:]}
+                return {
+                    "success": False,
+                    "error": "tool crashed",
+                    "stderr": r.stderr[-3000:],
+                }
             for line in r.stdout.splitlines():
                 if line.startswith("__TOOL_RESULT__"):
-                    return {"success": True, "result": json.loads(line[len("__TOOL_RESULT__"):])}
-            return {"success": False, "error": "no result marker", "stdout": r.stdout[-2000:]}
+                    return {
+                        "success": True,
+                        "result": json.loads(line[len("__TOOL_RESULT__") :]),
+                    }
+            return {
+                "success": False,
+                "error": "no result marker",
+                "stdout": r.stdout[-2000:],
+            }
         except subprocess.TimeoutExpired:
             return {"success": False, "error": f"timeout after {timeout}s"}
         finally:
