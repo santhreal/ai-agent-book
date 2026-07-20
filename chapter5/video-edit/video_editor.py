@@ -18,6 +18,7 @@ ffmpeg。**无论走哪个后端，都会把 Proposer 生成的 bpy 脚本落盘
   - slowmo    慢动作（放慢到 factor 倍时长）
 所有操作最终产出一个标准 mp4（H.264 + AAC）。
 """
+
 import os
 
 from blender_editor import blender_available, render_with_blender, write_bpy_script
@@ -29,8 +30,13 @@ def _esc(text: str) -> str:
     return text.replace("\\", "\\\\").replace(":", r"\:").replace("'", r"\'")
 
 
-def apply_edit(source: str, plan: dict, out_path: str,
-               backend: str = "auto", script_path: str = None) -> str:
+def apply_edit(
+    source: str,
+    plan: dict,
+    out_path: str,
+    backend: str = "auto",
+    script_path: str = None,
+) -> str:
     """
     按剪辑计划 plan 生成成片。
 
@@ -75,17 +81,24 @@ def _apply_edit_ffmpeg(source: str, plan: dict, out_path: str) -> str:
         raise ValueError(f"剪辑区间非法：start={start} >= end={end}")
 
     effects = plan.get("effects", []) or []
-    vf_chain = []          # 视频滤镜链
-    af_chain = []          # 音频滤镜链
+    vf_chain = []  # 视频滤镜链
+    af_chain = []  # 音频滤镜链
     font = find_font()
 
     for eff in effects:
         etype = eff.get("type")
         if etype == "subtitle":
             txt = _esc(eff.get("text", ""))
-            opts = [f"text='{txt}'", "fontsize=52", "fontcolor=white",
-                    "x=(w-text_w)/2", "y=h-text_h-50",
-                    "box=1", "boxcolor=black@0.6", "boxborderw=16"]
+            opts = [
+                f"text='{txt}'",
+                "fontsize=52",
+                "fontcolor=white",
+                "x=(w-text_w)/2",
+                "y=h-text_h-50",
+                "box=1",
+                "boxcolor=black@0.6",
+                "boxborderw=16",
+            ]
             if font:
                 opts.insert(0, f"fontfile={font}")
             vf_chain.append("drawtext=" + ":".join(opts))
@@ -102,7 +115,9 @@ def _apply_edit_ffmpeg(source: str, plan: dict, out_path: str) -> str:
         cmd += ["-af", ",".join(af_chain)]
     cmd += ["-c:v", "libx264", "-c:a", "aac", "-pix_fmt", "yuv420p", out_path]
 
-    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    out_dir = os.path.dirname(out_path)
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
     run(cmd, desc="ffmpeg 剪辑")
     return out_path
 

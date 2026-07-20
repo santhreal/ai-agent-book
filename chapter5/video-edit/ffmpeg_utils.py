@@ -6,6 +6,7 @@ ffmpeg / ffprobe 薄封装：所有对外部进程的调用都集中在这里，
   - 提供 probe_duration / probe_streams，供 Reviewer 与验证环节读取成片信息；
   - extract_frame 把某一时间点抽成一张 PNG（缩放到 512 宽以节省 Vision token）。
 """
+
 import json
 import os
 import shutil
@@ -49,8 +50,16 @@ def run(cmd, desc="ffmpeg 命令"):
 def probe_duration(path: str) -> float:
     """返回视频时长（秒）。"""
     proc = run(
-        ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-         "-of", "default=noprint_wrappers=1:nokey=1", path],
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
+            path,
+        ],
         desc="ffprobe 读取时长",
     )
     return float(proc.stdout.strip())
@@ -59,8 +68,16 @@ def probe_duration(path: str) -> float:
 def probe_streams(path: str) -> dict:
     """返回 ffprobe 的 JSON（format + streams），用于打印成片信息。"""
     proc = run(
-        ["ffprobe", "-v", "error", "-show_format", "-show_streams",
-         "-of", "json", path],
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-show_format",
+            "-show_streams",
+            "-of",
+            "json",
+            path,
+        ],
         desc="ffprobe 读取流信息",
     )
     return json.loads(proc.stdout)
@@ -93,8 +110,19 @@ def format_probe(path: str) -> str:
 def extract_frame(video: str, t: float, out_png: str, width: int = 512):
     """抽取 t 秒处的一帧，缩放到 width 宽存为 PNG。"""
     run(
-        ["ffmpeg", "-y", "-ss", f"{t:.3f}", "-i", video,
-         "-frames:v", "1", "-vf", f"scale={width}:-1", out_png],
+        [
+            "ffmpeg",
+            "-y",
+            "-ss",
+            f"{t:.3f}",
+            "-i",
+            video,
+            "-frames:v",
+            "1",
+            "-vf",
+            f"scale={width}:-1",
+            out_png,
+        ],
         desc=f"抽帧 t={t:.1f}s",
     )
     return out_png
