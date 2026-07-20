@@ -6,7 +6,8 @@ from logging import Logger
 from aworld.logs.util import trace_logger
 from aworld.trace.context_manager import trace_configure
 from aworld.metrics.context_manager import MetricContext
-from aworld.logs.log import set_log_provider, instrument_logging
+from aworld.logs.log import set_log_provider
+from aworld.logs.instrument.logging_instrument import instrument_logging
 from aworld.trace.instrumentation.uni_llmmodel import LLMModelInstrumentor
 from aworld.trace.instrumentation.eventbus import EventBusInstrumentor
 from aworld.trace.instrumentation.agent import AgentInstrumentor
@@ -16,9 +17,10 @@ from aworld.trace.opentelemetry.memory_storage import TraceStorage
 
 
 class ObservabilityConfig(BaseModel):
-    '''
+    """
     Observability configuration
-    '''
+    """
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     trace_provider: Optional[str] = "otlp"
@@ -72,7 +74,7 @@ def _trace_configure(config: ObservabilityConfig):
         span_consumers=config.trace_span_consumers,
         server_enabled=config.trace_server_enabled,
         server_port=config.trace_server_port,
-        storage=config.trace_storage
+        storage=config.trace_storage,
     )
 
 
@@ -83,7 +85,7 @@ def _metrics_configure(config: ObservabilityConfig):
             backend=config.metrics_backend,
             base_url=config.metrics_base_url,
             write_token=config.metrics_write_token,
-            metrics_system_enabled=config.metrics_system_enabled
+            metrics_system_enabled=config.metrics_system_enabled,
         )
 
 
@@ -91,10 +93,12 @@ def _log_configure(config: ObservabilityConfig):
     if config.logs_provider and config.logs_backend:
         if config.logs_backend == "logfire" and not config.logs_write_token:
             config.logs_write_token = os.getenv("LOGFIRE_WRITE_TOKEN")
-        set_log_provider(provider=config.logs_provider,
-                         backend=config.logs_backend,
-                         base_url=config.logs_base_url,
-                         write_token=config.logs_write_token)
+        set_log_provider(
+            provider=config.logs_provider,
+            backend=config.logs_backend,
+            base_url=config.logs_base_url,
+            write_token=config.logs_write_token,
+        )
 
     if config.logs_trace_instrumented_loggers:
         for logger in config.logs_trace_instrumented_loggers:
