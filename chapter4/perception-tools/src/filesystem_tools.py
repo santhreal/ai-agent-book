@@ -108,6 +108,9 @@ async def grep_search(
     """
     try:
         dir_path = Path(directory).expanduser().resolve()
+
+        if max_results is None:
+            max_results = 100
         
         if not dir_path.exists():
             raise FileNotFoundError(f"Directory not found: {dir_path}")
