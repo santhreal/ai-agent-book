@@ -21,6 +21,7 @@
   python demo.py --quick         # 快速模式：粗采样 + 单轮审查，省时省钱
   python demo.py --smoke         # 冒烟自检：仅剪辑链路 + 生成 bpy 脚本，不调用任何 API
 """
+
 import argparse
 import os
 import shutil
@@ -32,7 +33,7 @@ load_dotenv()
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT_DIR = os.path.join(HERE, "output")
-SOURCE_VIDEO = os.path.join(OUT_DIR, "source.mp4")   # 测试片输出位置
+SOURCE_VIDEO = os.path.join(OUT_DIR, "source.mp4")  # 测试片输出位置
 FINAL_VIDEO = os.path.join(OUT_DIR, "final.mp4")
 MAX_ROUNDS = 3  # Reviewer 反馈后最多重剪次数（默认，可用 --max-rounds 覆盖）
 
@@ -54,32 +55,69 @@ def build_arg_parser() -> argparse.ArgumentParser:
         epilog=(
             "示例：\n"
             "  python demo.py\n"
-            "  python demo.py \"把滑雪部分剪出来，并加上字幕 Winter\"\n"
-            "  python demo.py -i my.mp4 -o out.mp4 \"把演讲开场剪出来\"\n"
+            '  python demo.py "把滑雪部分剪出来，并加上字幕 Winter"\n'
+            '  python demo.py -i my.mp4 -o out.mp4 "把演讲开场剪出来"\n'
             "  python demo.py --backend blender    # 强制用 Blender Python API 渲染\n"
             "  python demo.py --quick    # 更少 Vision 调用，快速验证链路\n"
             "  python demo.py --smoke    # 只跑剪辑链路 + 生成 bpy 脚本，不调用任何 API\n"
         ),
     )
-    p.add_argument("request", nargs="?", default=DEFAULT_REQUEST,
-                   help="中文剪辑需求（默认：%(default)s）")
-    p.add_argument("--input", "-i", metavar="VIDEO", default=None,
-                   help="输入视频路径（不指定则程序化生成 4 场景测试片）")
-    p.add_argument("--output", "-o", metavar="VIDEO", default=FINAL_VIDEO,
-                   help="成片输出路径（默认 output/final.mp4）")
-    p.add_argument("--backend", choices=["auto", "blender", "ffmpeg"], default="auto",
-                   help="剪辑后端：auto=装了 Blender 用 bpy 否则 ffmpeg；"
-                        "blender=强制 Blender Python API；ffmpeg=强制 ffmpeg（默认 auto）")
-    p.add_argument("--text-model", metavar="NAME", default=None,
-                   help="覆盖文本模型（否则用 $TEXT_MODEL，默认 gpt-5.6-luna）")
-    p.add_argument("--vision-model", metavar="NAME", default=None,
-                   help="覆盖视觉模型，须支持图像输入（否则用 $VISION_MODEL，默认 gpt-5.6-luna）")
-    p.add_argument("--quick", action="store_true",
-                   help="快速模式：粗采样（15s/2s）+ 单轮审查，减少 Vision API 调用")
-    p.add_argument("--max-rounds", type=int, default=MAX_ROUNDS, metavar="N",
-                   help="Reviewer 反馈后最多重剪轮数（默认 %(default)s；--quick 时强制为 1）")
-    p.add_argument("--smoke", action="store_true",
-                   help="冒烟自检：仅剪辑链路 + 生成 bpy 脚本，不调用任何 API")
+    p.add_argument(
+        "request",
+        nargs="?",
+        default=DEFAULT_REQUEST,
+        help="中文剪辑需求（默认：%(default)s）",
+    )
+    p.add_argument(
+        "--input",
+        "-i",
+        metavar="VIDEO",
+        default=None,
+        help="输入视频路径（不指定则程序化生成 4 场景测试片）",
+    )
+    p.add_argument(
+        "--output",
+        "-o",
+        metavar="VIDEO",
+        default=FINAL_VIDEO,
+        help="成片输出路径（默认 output/final.mp4）",
+    )
+    p.add_argument(
+        "--backend",
+        choices=["auto", "blender", "ffmpeg"],
+        default="auto",
+        help="剪辑后端：auto=装了 Blender 用 bpy 否则 ffmpeg；"
+        "blender=强制 Blender Python API；ffmpeg=强制 ffmpeg（默认 auto）",
+    )
+    p.add_argument(
+        "--text-model",
+        metavar="NAME",
+        default=None,
+        help="覆盖文本模型（否则用 $TEXT_MODEL，默认 gpt-5.6-luna）",
+    )
+    p.add_argument(
+        "--vision-model",
+        metavar="NAME",
+        default=None,
+        help="覆盖视觉模型，须支持图像输入（否则用 $VISION_MODEL，默认 gpt-5.6-luna）",
+    )
+    p.add_argument(
+        "--quick",
+        action="store_true",
+        help="快速模式：粗采样（15s/2s）+ 单轮审查，减少 Vision API 调用",
+    )
+    p.add_argument(
+        "--max-rounds",
+        type=int,
+        default=MAX_ROUNDS,
+        metavar="N",
+        help="Reviewer 反馈后最多重剪轮数（默认 %(default)s；--quick 时强制为 1）",
+    )
+    p.add_argument(
+        "--smoke",
+        action="store_true",
+        help="冒烟自检：仅剪辑链路 + 生成 bpy 脚本，不调用任何 API",
+    )
     return p
 
 
@@ -103,15 +141,23 @@ def smoke_check():
     make_test_video(SOURCE_VIDEO)
     print(f"[1/3] 生成测试视频 OK：{SOURCE_VIDEO}（场景真值={GROUND_TRUTH}）")
     frame_dir = os.path.join(OUT_DIR, "frames")
-    os.makedirs(frame_dir, exist_ok=True)   # extract_frame 要求目录已存在
+    os.makedirs(frame_dir, exist_ok=True)  # extract_frame 要求目录已存在
     frame = extract_frame(SOURCE_VIDEO, 20.0, os.path.join(frame_dir, "smoke.png"))
     print(f"[2/3] 抽帧 OK：{frame}")
     clip = os.path.join(OUT_DIR, "smoke_cut.mp4")
     script_path = os.path.join(OUT_DIR, "edit.py")
     # backend="auto"：未装 Blender 则用 ffmpeg 实际渲染，但仍生成 bpy 脚本（代码生成产物）。
-    apply_edit(SOURCE_VIDEO, {"start": 15.0, "end": 20.0,
-                              "effects": [{"type": "subtitle", "text": "SMOKE"}]},
-               clip, backend="auto", script_path=script_path)
+    apply_edit(
+        SOURCE_VIDEO,
+        {
+            "start": 15.0,
+            "end": 20.0,
+            "effects": [{"type": "subtitle", "text": "SMOKE"}],
+        },
+        clip,
+        backend="auto",
+        script_path=script_path,
+    )
     used = "Blender bpy" if blender_available() else "ffmpeg（未装 Blender，回退）"
     print(f"[3/3] 剪辑+字幕 OK（后端={used}）：\n{format_probe(clip)}")
     print(f"\n已生成 Proposer 的 Blender 脚本：{script_path}")
@@ -123,11 +169,14 @@ def smoke_check():
 def preflight():
     """启动自检：给出清晰中文报错，而非 traceback。"""
     from ffmpeg_utils import ensure_ffmpeg
+
     if not (os.getenv("OPENAI_API_KEY") or os.getenv("OPENROUTER_API_KEY")):
-        print("\n[错误] 未检测到 OPENAI_API_KEY（或 OPENROUTER_API_KEY 兜底）。\n"
-              "  请复制 env.example 为 .env 并填入有效的 OpenAI Key，或执行：\n"
-              "    export OPENAI_API_KEY=sk-...   # 或 export OPENROUTER_API_KEY=sk-or-...\n"
-              "  本实验用 gpt-5.6-luna 做视觉定位与审查，必须提供有效 Key。")
+        print(
+            "\n[错误] 未检测到 OPENAI_API_KEY（或 OPENROUTER_API_KEY 兜底）。\n"
+            "  请复制 env.example 为 .env 并填入有效的 OpenAI Key，或执行：\n"
+            "    export OPENAI_API_KEY=sk-...   # 或 export OPENROUTER_API_KEY=sk-or-...\n"
+            "  本实验用 gpt-5.6-luna 做视觉定位与审查，必须提供有效 Key。"
+        )
         sys.exit(1)
     try:
         ensure_ffmpeg()
@@ -138,7 +187,7 @@ def preflight():
 
 def main():
     args = build_arg_parser().parse_args()
-    if args.smoke:                       # 仅剪辑链路，不需要 API Key，提前返回。
+    if args.smoke:  # 仅剪辑链路，不需要 API Key，提前返回。
         smoke_check()
         return
 
@@ -156,8 +205,14 @@ def main():
     preflight()
 
     # 延迟导入：确保 preflight 的报错优先于任何 SDK 初始化。
-    from agents import (ProposerAgent, ReviewerAgent, VideoAnalyzerAgent,
-                        TokenMeter, TEXT_MODEL, VISION_MODEL)
+    from agents import (
+        ProposerAgent,
+        ReviewerAgent,
+        VideoAnalyzerAgent,
+        TokenMeter,
+        TEXT_MODEL,
+        VISION_MODEL,
+    )
     from blender_editor import blender_available
     from ffmpeg_utils import format_probe, probe_duration
     from make_test_video import make as make_test_video, GROUND_TRUTH
@@ -201,27 +256,37 @@ def main():
     effects = intent.get("effects", [])
     print(f"解析结果：目标场景='{target_query}'  特效={effects}")
 
-    banner("步骤 2 | 视频分析子 Agent：两步 Vision 定位"
-           + ("（--quick 快速采样）" if args.quick else ""))
+    banner(
+        "步骤 2 | 视频分析子 Agent：两步 Vision 定位"
+        + ("（--quick 快速采样）" if args.quick else "")
+    )
     start, end, trace = analyzer.locate(
-        source_video, target_query,
-        coarse_interval=coarse_interval, fine_interval=fine_interval,
+        source_video,
+        target_query,
+        coarse_interval=coarse_interval,
+        fine_interval=fine_interval,
         frame_dir=os.path.join(OUT_DIR, "frames"),
     )
     c = trace["coarse"]
-    print(f"  [粗粒度] 每 {coarse_interval:.0f}s 采样 {len(c['timestamps'])} 帧 → Vision 得区间 "
-          f"[{c['start']:.0f}, {c['end']:.0f}]s（依据：{c['reason']}）")
+    print(
+        f"  [粗粒度] 每 {coarse_interval:.0f}s 采样 {len(c['timestamps'])} 帧 → Vision 得区间 "
+        f"[{c['start']:.0f}, {c['end']:.0f}]s（依据：{c['reason']}）"
+    )
     f = trace["fine"]
-    print(f"  [细粒度] 窗口 {f['window']} 内每 {fine_interval:.0f}s 采样 {f['timestamps_count']} 帧 → "
-          f"精确边界 [{f['start']:.1f}, {f['end']:.1f}]s（依据：{f['reason']}）")
+    print(
+        f"  [细粒度] 窗口 {f['window']} 内每 {fine_interval:.0f}s 采样 {f['timestamps_count']} 帧 → "
+        f"精确边界 [{f['start']:.1f}, {f['end']:.1f}]s（依据：{f['reason']}）"
+    )
     print(f"  >>> 最终定位：起 {start:.1f}s  止 {end:.1f}s")
 
     # 与真值对比，打印定位误差（验收：误差 ≤ ±3s）。仅测试片有真值。
     key = _match_ground_truth(target_query, ground_truth) if ground_truth else None
     if key:
         gs, ge = ground_truth[key]
-        print(f"  真值 [{gs}, {ge}]s → 起点误差 {abs(start - gs):.1f}s，"
-              f"终点误差 {abs(end - ge):.1f}s（验收要求 ≤ 3s）")
+        print(
+            f"  真值 [{gs}, {ge}]s → 起点误差 {abs(start - gs):.1f}s，"
+            f"终点误差 {abs(end - ge):.1f}s（验收要求 ≤ 3s）"
+        )
 
     banner("步骤 3-4 | Proposer 生成 bpy 脚本剪辑 + Reviewer 审查（迭代）")
     plan = {"start": start, "end": end, "effects": effects}
@@ -230,19 +295,31 @@ def main():
         print(f"\n--- 第 {rnd} 轮 ---")
         clip = os.path.join(OUT_DIR, f"cut_round{rnd}.mp4")
         script_path = os.path.join(OUT_DIR, f"edit_round{rnd}.py")
-        apply_edit(source_video, plan, clip, backend=args.backend,
-                   script_path=script_path)
+        apply_edit(
+            source_video, plan, clip, backend=args.backend, script_path=script_path
+        )
         cdur = probe_duration(clip)
-        used = "Blender bpy" if (args.backend == "blender" or
-                                 (args.backend == "auto" and blender_available())) else "ffmpeg"
+        used = (
+            "Blender bpy"
+            if (
+                args.backend == "blender"
+                or (args.backend == "auto" and blender_available())
+            )
+            else "ffmpeg"
+        )
         print(f"  Proposer 生成 Blender 脚本 → {script_path}")
-        print(f"  剪出片段 [{plan['start']:.1f}, {plan['end']:.1f}]s（后端={used}），"
-              f"成片时长 {cdur:.1f}s")
+        print(
+            f"  剪出片段 [{plan['start']:.1f}, {plan['end']:.1f}]s（后端={used}），"
+            f"成片时长 {cdur:.1f}s"
+        )
 
-        review = reviewer.review(clip, target_query,
-                                 frame_dir=os.path.join(OUT_DIR, "review_frames"))
-        print(f"  Reviewer：pass={review['pass']} score={review.get('score')} "
-              f"检查帧={['%.1f' % t for t in review['frames_checked']]}")
+        review = reviewer.review(
+            clip, target_query, frame_dir=os.path.join(OUT_DIR, "review_frames")
+        )
+        print(
+            f"  Reviewer：pass={review['pass']} score={review.get('score')} "
+            f"检查帧={['%.1f' % t for t in review['frames_checked']]}"
+        )
         print(f"  Reviewer 反馈：{review['feedback']}")
 
         if review.get("pass"):
@@ -254,8 +331,9 @@ def main():
             print("  达到最大轮数，采用当前成片。")
             break
         # 未通过：Proposer 据反馈修正边界后重剪。
-        ns, ne = proposer.revise_bounds(plan["start"], plan["end"],
-                                        review["feedback"], total_dur)
+        ns, ne = proposer.revise_bounds(
+            plan["start"], plan["end"], review["feedback"], total_dur
+        )
         print(f"  Proposer 据反馈修正边界：[{ns:.1f}, {ne:.1f}]s")
         plan["start"], plan["end"] = ns, ne
 
@@ -267,10 +345,14 @@ def main():
     print(format_probe(output_path))
 
     banner("Token 统计（子 Agent 隔离截图，主上下文不被污染）")
-    print(f"  主 Agent（Proposer+Reviewer）：{main_meter.total()} tokens "
-          f"(prompt={main_meter.prompt}, completion={main_meter.completion})")
-    print(f"  子 Agent（两步定位截图）    ：{sub_meter.total()} tokens "
-          f"(prompt={sub_meter.prompt}, completion={sub_meter.completion})")
+    print(
+        f"  主 Agent（Proposer+Reviewer）：{main_meter.total()} tokens "
+        f"(prompt={main_meter.prompt}, completion={main_meter.completion})"
+    )
+    print(
+        f"  子 Agent（两步定位截图）    ：{sub_meter.total()} tokens "
+        f"(prompt={sub_meter.prompt}, completion={sub_meter.completion})"
+    )
     print(f"\n完成：{output_path}")
 
 
@@ -280,8 +362,16 @@ def _match_ground_truth(query, gt):
         if key in q:
             return key
     # 中文关键词兜底映射。
-    zh = {"冲浪": "surfing", "徒步": "hiking", "滑雪": "skiing", "骑": "cycling",
-          "hik": "hiking", "surf": "surfing", "ski": "skiing", "cycl": "cycling"}
+    zh = {
+        "冲浪": "surfing",
+        "徒步": "hiking",
+        "滑雪": "skiing",
+        "骑": "cycling",
+        "hik": "hiking",
+        "surf": "surfing",
+        "ski": "skiing",
+        "cycl": "cycling",
+    }
     for k, v in zh.items():
         if k in q:
             return v

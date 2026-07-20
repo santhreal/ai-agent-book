@@ -16,6 +16,7 @@ Blender Python API 的脚本**，每个编辑操作（导入 / 裁剪 / 字幕 /
 frame_offset_start + frame_final_duration 完成裁剪，TEXT / SPEED 特效条叠加，
 FFMPEG(H.264+AAC) 容器渲染。API 面向 Blender 3.x / 4.x。
 """
+
 import os
 import shutil
 import subprocess
@@ -150,8 +151,9 @@ def generate_bpy_script(source: str, plan: dict, out_video: str, fps: int = 30) 
     )
 
 
-def write_bpy_script(source: str, plan: dict, out_video: str,
-                     script_path: str, fps: int = 30) -> str:
+def write_bpy_script(
+    source: str, plan: dict, out_video: str, script_path: str, fps: int = 30
+) -> str:
     """生成 bpy 脚本并落盘（无论用哪个后端都会产出，作为代码生成产物）。"""
     script = generate_bpy_script(source, plan, out_video, fps=fps)
     os.makedirs(os.path.dirname(script_path) or ".", exist_ok=True)
@@ -160,8 +162,9 @@ def write_bpy_script(source: str, plan: dict, out_video: str,
     return script_path
 
 
-def render_with_blender(source: str, plan: dict, out_video: str,
-                        script_path: str, fps: int = 30) -> str:
+def render_with_blender(
+    source: str, plan: dict, out_video: str, script_path: str, fps: int = 30
+) -> str:
     """写出 bpy 脚本并用 `blender --background --python` 无头执行，产出成片。"""
     if not blender_available():
         raise RuntimeError(
@@ -173,7 +176,8 @@ def render_with_blender(source: str, plan: dict, out_video: str,
     os.makedirs(os.path.dirname(out_video) or ".", exist_ok=True)
     proc = subprocess.run(
         ["blender", "--background", "--python", script_path],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
     if proc.returncode != 0 or not os.path.exists(out_video):
         tail = "\n".join(proc.stderr.strip().splitlines()[-12:])

@@ -8,6 +8,7 @@
 把视频分析封装为独立子 Agent 的意义：大量截图只进入子 Agent 的一次性上下文，
 不会污染主 Agent（Proposer/Reviewer）的对话历史——见 demo.py 打印的 token 统计。
 """
+
 import base64
 import json
 import os
@@ -45,9 +46,14 @@ def map_model_to_openrouter(model: str) -> str:
 
 def _temp_for(model):
     """推理模型（gpt-5 / o 系列等）不接受 temperature=0。"""
-    return (1 if any(k in (model or "").lower()
-                     for k in ("gpt-5", "o1", "o3", "o4", "thinking", "reasoner", "kimi-k3"))
-            else 0)
+    return (
+        1
+        if any(
+            k in (model or "").lower()
+            for k in ("gpt-5", "o1", "o3", "o4", "thinking", "reasoner", "kimi-k3")
+        )
+        else 0
+    )
 
 
 def client() -> OpenAI:
@@ -63,7 +69,8 @@ def client() -> OpenAI:
         base_url = os.getenv("OPENAI_BASE_URL")
         orkey = os.getenv("OPENROUTER_API_KEY")
         prefer_or = bool(orkey) and (
-            (TEXT_MODEL or "").lower().startswith("gpt-5") or (VISION_MODEL or "").lower().startswith("gpt-5")
+            (TEXT_MODEL or "").lower().startswith("gpt-5")
+            or (VISION_MODEL or "").lower().startswith("gpt-5")
         )
         if prefer_or or (not api_key and orkey):
             api_key, base_url = orkey, OPENROUTER_BASE_URL
@@ -81,8 +88,10 @@ def client() -> OpenAI:
 def _img_part(path: str) -> dict:
     with open(path, "rb") as f:
         b64 = base64.b64encode(f.read()).decode()
-    return {"type": "image_url",
-            "image_url": {"url": f"data:image/png;base64,{b64}", "detail": "low"}}
+    return {
+        "type": "image_url",
+        "image_url": {"url": f"data:image/png;base64,{b64}", "detail": "low"},
+    }
 
 
 def _extract_json(text: str) -> dict:
@@ -119,17 +128,19 @@ class VideoAnalyzerAgent:
 
     def _vision_locate(self, video, timestamps, question, frame_dir):
         """抽取给定时间点的帧，连同问题交给 Vision LLM，返回 {start,end}。"""
-        content = [{
-            "type": "text",
-            "text": (
-                f"下面是同一段视频在不同时间点的截图（每张图前标注了该帧的时间，单位秒）。\n"
-                f"目标问题：{question}\n"
-                f"请判断'目标场景'在视频中出现的时间区间。只依据画面内容判断。\n"
-                f"严格输出 JSON：{{\"start\": <起点秒>, \"end\": <终点秒>, "
-                f"\"reason\": \"<简要依据>\"}}。若所有截图都看不到目标场景，"
-                f"令 start=end=-1。"
-            ),
-        }]
+        content = [
+            {
+                "type": "text",
+                "text": (
+                    f"下面是同一段视频在不同时间点的截图（每张图前标注了该帧的时间，单位秒）。\n"
+                    f"目标问题：{question}\n"
+                    f"请判断'目标场景'在视频中出现的时间区间。只依据画面内容判断。\n"
+                    f'严格输出 JSON：{{"start": <起点秒>, "end": <终点秒>, '
+                    f'"reason": "<简要依据>"}}。若所有截图都看不到目标场景，'
+                    f"令 start=end=-1。"
+                ),
+            }
+        ]
         for t in timestamps:
             png = os.path.join(frame_dir, f"f_{t:.1f}.png")
             extract_frame(video, t, png)
@@ -146,8 +157,14 @@ class VideoAnalyzerAgent:
         data = _extract_json(resp.choices[0].message.content)
         return float(data["start"]), float(data["end"]), data.get("reason", "")
 
-    def locate(self, video, question, coarse_interval=10.0, fine_interval=1.0,
-               frame_dir="output/frames"):
+    def locate(
+        self,
+        video,
+        question,
+        coarse_interval=10.0,
+        fine_interval=1.0,
+        frame_dir="output/frames",
+    ):
         """
         两步定位：
           第一步（粗）：每 coarse_interval 秒一帧，Vision 给出大致场景区间。
@@ -162,8 +179,12 @@ class VideoAnalyzerAgent:
         # ---- 第一步：粗粒度 ----
         coarse_ts = [t for t in _frange(0, duration, coarse_interval)]
         cs, ce, creason = self._vision_locate(video, coarse_ts, question, frame_dir)
-        trace["coarse"] = {"timestamps": coarse_ts, "start": cs, "end": ce,
-                           "reason": creason}
+        trace["coarse"] = {
+            "timestamps": coarse_ts,
+            "start": cs,
+            "end": ce,
+            "reason": creason,
+        }
 
         if cs < 0 or ce < 0:
             # 兜底：粗定位失败——退化为全视频精扫（步长放大以控制成本）。
@@ -183,8 +204,13 @@ class VideoAnalyzerAgent:
         hi = min(duration, ce + coarse_interval)
         fine_ts = list(_frange(lo, hi, fine_interval))
         fs, fe, freason = self._vision_locate(video, fine_ts, question, frame_dir)
-        trace["fine"] = {"window": [lo, hi], "timestamps_count": len(fine_ts),
-                         "start": fs, "end": fe, "reason": freason}
+        trace["fine"] = {
+            "window": [lo, hi],
+            "timestamps_count": len(fine_ts),
+            "start": fs,
+            "end": fe,
+            "reason": freason,
+        }
 
         if fs < 0 or fe < 0 or fe <= fs:
             # 兜底：细定位失败——采用粗定位结果，保证流程可继续。
@@ -224,20 +250,22 @@ class ProposerAgent:
             model=TEXT_MODEL,
             temperature=_temp_for(TEXT_MODEL),
             max_tokens=400,
-            messages=[{
-                "role": "user",
-                "content": (
-                    "你是视频剪辑规划器。把用户的中文剪辑需求解析成 JSON。\n"
-                    "字段：\n"
-                    "  target_query: 用于视觉定位的一句话描述（英文更利于匹配画面文字），"
-                    "说明要剪出哪个场景；\n"
-                    "  effects: 特效数组，元素形如 "
-                    "{\"type\":\"subtitle\",\"text\":\"...\"} 或 "
-                    "{\"type\":\"slowmo\",\"factor\":2.0}，无特效则为 []。\n"
-                    f"用户需求：{nl_request}\n"
-                    "只输出 JSON。"
-                ),
-            }],
+            messages=[
+                {
+                    "role": "user",
+                    "content": (
+                        "你是视频剪辑规划器。把用户的中文剪辑需求解析成 JSON。\n"
+                        "字段：\n"
+                        "  target_query: 用于视觉定位的一句话描述（英文更利于匹配画面文字），"
+                        "说明要剪出哪个场景；\n"
+                        "  effects: 特效数组，元素形如 "
+                        '{"type":"subtitle","text":"..."} 或 '
+                        '{"type":"slowmo","factor":2.0}，无特效则为 []。\n'
+                        f"用户需求：{nl_request}\n"
+                        "只输出 JSON。"
+                    ),
+                }
+            ],
         )
         self.meter.add(resp)
         return _extract_json(resp.choices[0].message.content)
@@ -248,15 +276,17 @@ class ProposerAgent:
             model=TEXT_MODEL,
             temperature=_temp_for(TEXT_MODEL),
             max_tokens=200,
-            messages=[{
-                "role": "user",
-                "content": (
-                    f"当前剪辑区间 start={start:.1f}s end={end:.1f}s，视频总长 {duration:.1f}s。\n"
-                    f"审核反馈：{feedback}\n"
-                    "请给出修正后的区间，输出 JSON {\"start\":..,\"end\":..}。"
-                    "若反馈指出包含了无关片段则内收，若指出遗漏内容则外扩，幅度 1~5 秒。"
-                ),
-            }],
+            messages=[
+                {
+                    "role": "user",
+                    "content": (
+                        f"当前剪辑区间 start={start:.1f}s end={end:.1f}s，视频总长 {duration:.1f}s。\n"
+                        f"审核反馈：{feedback}\n"
+                        '请给出修正后的区间，输出 JSON {"start":..,"end":..}。'
+                        "若反馈指出包含了无关片段则内收，若指出遗漏内容则外扩，幅度 1~5 秒。"
+                    ),
+                }
+            ],
         )
         self.meter.add(resp)
         d = _extract_json(resp.choices[0].message.content)
@@ -282,15 +312,17 @@ class ReviewerAgent:
         # 取首/中/尾，并在首尾稍微内缩避开黑帧。
         keyts = [min(0.5, dur * 0.1), dur / 2.0, max(0.0, dur - 0.5)]
 
-        content = [{
-            "type": "text",
-            "text": (
-                f"这是剪辑成片的几个关键帧（首/中/尾）。剪辑目标是：{target_query}。\n"
-                "请检查：(1) 成片是否完整呈现了目标场景；(2) 是否夹带了不该出现的其他场景。\n"
-                "严格输出 JSON：{\"pass\": true/false, \"score\": 0-10, "
-                "\"feedback\": \"<发现的问题或确认无误>\"}。"
-            ),
-        }]
+        content = [
+            {
+                "type": "text",
+                "text": (
+                    f"这是剪辑成片的几个关键帧（首/中/尾）。剪辑目标是：{target_query}。\n"
+                    "请检查：(1) 成片是否完整呈现了目标场景；(2) 是否夹带了不该出现的其他场景。\n"
+                    '严格输出 JSON：{"pass": true/false, "score": 0-10, '
+                    '"feedback": "<发现的问题或确认无误>"}。'
+                ),
+            }
+        ]
         for t in keyts:
             png = os.path.join(frame_dir, f"r_{t:.1f}.png")
             extract_frame(clip_path, t, png)
