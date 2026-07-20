@@ -15,4 +15,7 @@ def test_null_max_results_like_omit():
     out = asyncio.run(grep_search("a", d, max_results=None))
     payload = json.loads(out.text)
     assert payload["success"] is True
-    assert "NoneType" not in str(payload)
+    msg = payload["message"]
+    assert msg["total_found"] >= 1
+    assert msg["truncated"] is False
+    assert any(r.get("line") == "aaa" for r in msg["results"])
