@@ -68,7 +68,10 @@ TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "cabin": {"type": "string", "description": "舱位等级，如 经济舱/商务舱"}
+                    "cabin": {
+                        "type": "string",
+                        "description": "舱位等级，如 经济舱/商务舱",
+                    }
                 },
                 "required": ["cabin"],
             },
@@ -96,9 +99,7 @@ TOOLS = [
             "description": "把对话转接给人工客服。调用后 Agent 不再继续处理本次请求。",
             "parameters": {
                 "type": "object",
-                "properties": {
-                    "reason": {"type": "string", "description": "转接原因"}
-                },
+                "properties": {"reason": {"type": "string", "description": "转接原因"}},
                 "required": ["reason"],
             },
         },
@@ -131,7 +132,11 @@ def _run_tool(name: str, args: dict) -> str:
         )
     if name == "change_flight":
         return json.dumps(
-            {"result": "success", "new_flight": args.get("new_flight"), "fee": "改签费 200 元"},
+            {
+                "result": "success",
+                "new_flight": args.get("new_flight"),
+                "fee": "改签费 200 元",
+            },
             ensure_ascii=False,
         )
     if name == "get_refund_policy":
@@ -211,9 +216,7 @@ def run_agent(system_prompt: str, user_message: str, max_steps: int = 4) -> dict
             else:
                 result = _run_tool(name, args)
 
-            messages.append(
-                {"role": "tool", "tool_call_id": tc.id, "content": result}
-            )
+            messages.append({"role": "tool", "tool_call_id": tc.id, "content": result})
 
         if transferred_now:
             return {
@@ -279,7 +282,6 @@ CASES = [
         "should_transfer": True,  # 紧急安全 —— 本就该转，优化后仍要能转
         "rubric": "涉及紧急人身安全，应当转接人工立即介入。",
     },
-
     # ---------- 边界案例集(boundary)：政策争议，应解释政策而非一转了之 ----------
     {
         "id": "B1-不可退票要退款",

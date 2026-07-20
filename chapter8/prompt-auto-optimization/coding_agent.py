@@ -49,6 +49,8 @@ EDIT_TOOLS = [
 
 def _apply_one(content: str, old_str: str, new_str: str) -> tuple[str, str | None]:
     """尝试应用一条编辑。成功返回(新内容, None)，失败返回(原内容, 错误信息)。"""
+    if not isinstance(old_str, str) or not isinstance(new_str, str):
+        return content, "old_str and new_str must be strings"
     count = content.count(old_str)
     if count == 0:
         return content, f"old_str 在文件中未找到：{old_str[:60]!r}"
@@ -57,7 +59,9 @@ def _apply_one(content: str, old_str: str, new_str: str) -> tuple[str, str | Non
     return content.replace(old_str, new_str, 1), None
 
 
-def optimize_prompt(prompt_path: str, feedback: str, max_rounds: int = 3, verbose: bool = True) -> dict:
+def optimize_prompt(
+    prompt_path: str, feedback: str, max_rounds: int = 3, verbose: bool = True
+) -> dict:
     """
     让 Coding Agent 根据 human feedback 改写 prompt_path 指向的文件（原地覆盖）。
 
@@ -124,19 +128,27 @@ def optimize_prompt(prompt_path: str, feedback: str, max_rounds: int = 3, verbos
         errors = []
         applied = 0
         for e in edits:
-            working, err = _apply_one(working, e.get("old_str", ""), e.get("new_str", ""))
+            working, err = _apply_one(
+                working, e.get("old_str", ""), e.get("new_str", "")
+            )
             if err:
                 errors.append(err)
             else:
                 applied += 1
 
         if verbose:
-            print(f"  [round {round_idx + 1}] 提交 {len(edits)} 条编辑，成功 {applied}，失败 {len(errors)}")
+            print(
+                f"  [round {round_idx + 1}] 提交 {len(edits)} 条编辑，成功 {applied}，失败 {len(errors)}"
+            )
 
         if not errors:
             # 全部编辑成功，落盘
             messages.append(
-                {"role": "tool", "tool_call_id": tc.id, "content": "所有编辑已成功应用。"}
+                {
+                    "role": "tool",
+                    "tool_call_id": tc.id,
+                    "content": "所有编辑已成功应用。",
+                }
             )
             break
         else:
@@ -146,7 +158,9 @@ def optimize_prompt(prompt_path: str, feedback: str, max_rounds: int = 3, verbos
                 "以下编辑未能应用，请修正后重新提交完整的编辑列表（注意 old_str 必须与文件逐字符一致）：\n"
                 + "\n".join(f"- {er}" for er in errors)
             )
-            messages.append({"role": "tool", "tool_call_id": tc.id, "content": feedback_msg})
+            messages.append(
+                {"role": "tool", "tool_call_id": tc.id, "content": feedback_msg}
+            )
 
     # 落盘（原地覆盖 prompt 文件）
     with open(prompt_path, "w", encoding="utf-8") as f:

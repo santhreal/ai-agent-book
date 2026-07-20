@@ -13,10 +13,8 @@ import asyncio
 import json
 import os
 import re
-from pathlib import Path
 from typing import Optional
 
-from tqdm.asyncio import tqdm_asyncio
 
 # 注意：vllm / SamplingParams 在 generate_distillation_data() 内部按需导入，
 # 这样即便未安装 vllm（如离线查看 --help 时）也能正常展示命令行帮助。
@@ -93,16 +91,32 @@ def parse_final_answer(response: str, debug: bool = False) -> Optional[str]:
     # For Thinking models, the response may have <think></think> tags
     # Remove thinking content and focus on the final answer
     response_stripped = response.strip()
-    
+
     # Remove <think>...</think> content if present
-    response_cleaned = re.sub(r'<think>.*?</think>', '', response_stripped, flags=re.DOTALL)
+    response_cleaned = re.sub(
+        r"<think>.*?</think>", "", response_stripped, flags=re.DOTALL
+    )
     response_cleaned = response_cleaned.strip()
-    
+
     # Also try the original response
     candidates = [response_cleaned, response_stripped]
-    
-    valid_labels = {'ar', 'de', 'el', 'en', 'es', 'fr', 'hi', 'ru', 'tr', 'ur', 'vi', 'zh', 'ot'}
-    
+
+    valid_labels = {
+        "ar",
+        "de",
+        "el",
+        "en",
+        "es",
+        "fr",
+        "hi",
+        "ru",
+        "tr",
+        "ur",
+        "vi",
+        "zh",
+        "ot",
+    }
+
     # Try multiple patterns to extract language label
     patterns = [
         r"Final Answer:\s*(\w{2})",  # Standard format
@@ -114,10 +128,10 @@ def parse_final_answer(response: str, debug: bool = False) -> Optional[str]:
         r"is:\s*(\w{2})",  # "is: xx"
         r"→\s*(\w{2})",  # "→ xx"
     ]
-    
+
     for candidate in candidates:
         candidate_lower = candidate.lower()
-        
+
         # Try each pattern
         for pattern in patterns:
             match = re.search(pattern, candidate_lower, re.MULTILINE)
@@ -127,19 +141,21 @@ def parse_final_answer(response: str, debug: bool = False) -> Optional[str]:
                     if debug:
                         print(f"    [DEBUG] Matched pattern '{pattern}' -> '{label}'")
                     return label
-        
+
         # Special case: check if the entire response is just a language code
         if len(candidate) <= 3 and candidate_lower in valid_labels:
             if debug:
-                print(f"    [DEBUG] Matched entire response as label -> '{candidate_lower}'")
+                print(
+                    f"    [DEBUG] Matched entire response as label -> '{candidate_lower}'"
+                )
             return candidate_lower
-    
+
     if debug:
-        print(f"    [DEBUG] No pattern matched.")
+        print("    [DEBUG] No pattern matched.")
         print(f"    [DEBUG] Response length: {len(response_stripped)}")
         print(f"    [DEBUG] Cleaned response: '{response_cleaned[:300]}'")
         print(f"    [DEBUG] Original response: '{response_stripped[:300]}'")
-    
+
     return None
 
 
@@ -154,7 +170,7 @@ async def generate_distillation_data(
 ):
     """
     Generate prompt distillation training data.
-    
+
     Args:
         input_file: Path to file containing sentences to classify (one per line)
         output_file: Path to save the generated training data (JSONL format)
@@ -168,17 +184,18 @@ async def generate_distillation_data(
     print(f"Loading input sentences from {input_file}")
     with open(input_file, "r", encoding="utf-8") as f:
         sentences = [line.strip() for line in f if line.strip()]
-    
+
     print(f"Loaded {len(sentences)} sentences")
-    
+
     # Initialize vLLM model
     print(f"Initializing teacher model: {model_name}")
     print(f"Using tensor parallelism across {tensor_parallel_size} GPU(s)")
-    
+
     # Get tokenizer to use proper chat template
     from transformers import AutoTokenizer
+
     tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
-    
+
     llm = LLM(
         model=model_name,
         tensor_parallel_size=tensor_parallel_size,
@@ -187,7 +204,7 @@ async def generate_distillation_data(
         max_model_len=32768,  # Match training max length
         enable_prefix_caching=True,  # Cache the system prompt
     )
-    
+
     # Set sampling parameters - use Qwen3 recommended settings
     # For Thinking models, we need to allow enough tokens for reasoning
     sampling_params = SamplingParams(
@@ -198,13 +215,13 @@ async def generate_distillation_data(
         # Don't use custom stop sequences - let model finish naturally
         skip_special_tokens=False,  # Keep special tokens for thinking models
     )
-    
+
     # Initial generation
     print("Generating labels with teacher model...")
     results = {}  # sentence -> (response, final_answer)
     failed_indices = []
     failed_examples = []  # Store examples for debugging
-    
+
     # Format prompts using proper chat template
     print("Formatting prompts with Qwen3 chat template...")
     formatted_prompts = []
@@ -212,71 +229,75 @@ async def generate_distillation_data(
         messages = [
             {
                 "role": "user",
-                "content": LANGUAGE_CLASSIFICATION_PROMPT.format(text=sentence)
+                "content": LANGUAGE_CLASSIFICATION_PROMPT.format(text=sentence),
             }
         ]
         # Use tokenizer's chat template
         prompt_text = tokenizer.apply_chat_template(
-            messages,
-            tokenize=False,
-            add_generation_prompt=True
+            messages, tokenize=False, add_generation_prompt=True
         )
         formatted_prompts.append(prompt_text)
-    
-    print(f"Sample formatted prompt:")
+
+    print("Sample formatted prompt:")
     print(formatted_prompts[0])
-    
+
     outputs = llm.generate(formatted_prompts, sampling_params)
-    
+
     for idx, (sentence, output) in enumerate(zip(sentences, outputs)):
         response = output.outputs[0].text
         # Enable debug mode for first few failures
         debug_mode = len(failed_examples) < 3
         final_answer = parse_final_answer(response, debug=debug_mode)
-        
+
         if final_answer:
             results[sentence] = (response, final_answer)
         else:
             failed_indices.append(idx)
             # Store first 10 failed examples for debugging
             if len(failed_examples) < 10:
-                failed_examples.append({
-                    'sentence': sentence,
-                    'response': response,
-                })
-    
-    print(f"\nInitial generation: {len(results)}/{len(sentences)} successful ({len(results)/len(sentences)*100:.2f}%)")
-    
+                failed_examples.append(
+                    {
+                        "sentence": sentence,
+                        "response": response,
+                    }
+                )
+
+    print(
+        f"\nInitial generation: {len(results)}/{len(sentences)} successful ({len(results) / len(sentences) * 100:.2f}%)"
+    )
+
     # Show debugging info for failed samples
     if failed_examples:
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print("DEBUGGING: Examples of FAILED responses")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         for i, example in enumerate(failed_examples, 1):
             print(f"\nFailed Example {i}:")
             print(f"  Input: {example['sentence']}")
             print(f"  Response: {example['response']}")
-            print(f"  Parsed result: None")
-    
+            print("  Parsed result: None")
+
     # Show examples of successful responses
     if results:
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print("DEBUGGING: Examples of SUCCESSFUL responses")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         success_examples = list(results.items())[:3]
         for i, (sentence, (response, label)) in enumerate(success_examples, 1):
             print(f"\nSuccess Example {i}:")
             print(f"  Input: {sentence}")
             print(f"  Response: {response}")
             print(f"  Parsed label: {label}")
-    
+
     # Retry failed generations up to max_retries times
     for retry in range(1, max_retries + 1):
         if not failed_indices:
             break
-            
-        print(f"\nRetry {retry}/{max_retries}: Regenerating {len(failed_indices)} failed samples...")
-        
+
+        print(
+            f"\nRetry {retry}/{max_retries}: Regenerating {len(failed_indices)} failed samples..."
+        )
+
         # Prepare prompts for failed sentences
         retry_sentences = [sentences[idx] for idx in failed_indices]
         retry_formatted_prompts = []
@@ -284,44 +305,48 @@ async def generate_distillation_data(
             messages = [
                 {
                     "role": "user",
-                    "content": LANGUAGE_CLASSIFICATION_PROMPT.format(text=s)
+                    "content": LANGUAGE_CLASSIFICATION_PROMPT.format(text=s),
                 }
             ]
             prompt_text = tokenizer.apply_chat_template(
-                messages,
-                tokenize=False,
-                add_generation_prompt=True
+                messages, tokenize=False, add_generation_prompt=True
             )
             retry_formatted_prompts.append(prompt_text)
-        
+
         # Generate with slightly higher temperature to encourage different outputs
         retry_params = SamplingParams(
-            temperature=min(temperature * (1 + retry * 0.1), 0.5),  # Gradually increase temp
+            temperature=min(
+                temperature * (1 + retry * 0.1), 0.5
+            ),  # Gradually increase temp
             max_tokens=max_tokens,
             top_p=0.8,
             top_k=20,
             skip_special_tokens=False,
         )
-        
+
         retry_outputs = llm.generate(retry_formatted_prompts, retry_params)
-        
+
         # Track newly successful and still-failed indices
         new_failed_indices = []
-        for idx, sentence, output in zip(failed_indices, retry_sentences, retry_outputs):
+        for idx, sentence, output in zip(
+            failed_indices, retry_sentences, retry_outputs
+        ):
             response = output.outputs[0].text
             final_answer = parse_final_answer(response)
-            
+
             if final_answer:
                 results[sentence] = (response, final_answer)
             else:
                 new_failed_indices.append(idx)
-        
+
         newly_successful = len(failed_indices) - len(new_failed_indices)
         print(f"  ✓ {newly_successful} more samples successful")
-        print(f"  Total successful: {len(results)}/{len(sentences)} ({len(results)/len(sentences)*100:.2f}%)")
-        
+        print(
+            f"  Total successful: {len(results)}/{len(sentences)} ({len(results) / len(sentences) * 100:.2f}%)"
+        )
+
         failed_indices = new_failed_indices
-    
+
     # Save results
     print(f"\nSaving results to {output_file}...")
     with open(output_file, "w", encoding="utf-8") as f:
@@ -341,19 +366,21 @@ async def generate_distillation_data(
                     ]
                 }
                 f.write(json.dumps(data, ensure_ascii=False) + "\n")
-    
+
     # Final report
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("DATA GENERATION COMPLETE")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"Total sentences: {len(sentences)}")
     print(f"Valid labels generated: {len(results)}")
     print(f"Failed after {max_retries} retries: {len(failed_indices)}")
-    print(f"Final success rate: {len(results)/len(sentences)*100:.2f}%")
+    print(f"Final success rate: {len(results) / len(sentences) * 100:.2f}%")
     print(f"Saved to: {output_file}")
-    
+
     if failed_indices:
-        print(f"\n⚠️  Warning: {len(failed_indices)} sentences failed to generate valid labels")
+        print(
+            f"\n⚠️  Warning: {len(failed_indices)} sentences failed to generate valid labels"
+        )
         print("Consider inspecting these samples or adjusting the prompt/temperature")
 
 
@@ -404,18 +431,18 @@ def main():
         default=3,
         help="失败样本的最大重试次数",
     )
-    
+
     args = parser.parse_args()
-    
+
     # Create output directory if needed
     output_dir = os.path.dirname(args.output_file)
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
-    
+
     # Check if input file exists
     if not os.path.exists(args.input_file):
         raise FileNotFoundError(f"Input file not found: {args.input_file}")
-    
+
     # Generate data
     asyncio.run(
         generate_distillation_data(
@@ -432,4 +459,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
