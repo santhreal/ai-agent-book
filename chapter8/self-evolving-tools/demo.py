@@ -39,7 +39,13 @@ from tool_manager import LIBRARY_DIR, ToolLibrary
 TASK_1 = "查询 NVIDIA(股票代码 NVDA) 的最新股价，以及与一周前相比的涨跌幅（百分比）。请给出真实数据。"
 TASK_2 = "查询 Apple(股票代码 AAPL) 的最新股价，以及与一周前相比的涨跌幅（百分比）。请给出真实数据。"
 
-_META_TOOLS = {"web_search", "read_webpage", "code_interpreter", "create_tool", "search_tools"}
+_META_TOOLS = {
+    "web_search",
+    "read_webpage",
+    "code_interpreter",
+    "create_tool",
+    "search_tools",
+}
 
 
 def _clear_library():
@@ -51,7 +57,9 @@ def _clear_library():
             removed += 1
         except OSError:
             pass
-    print(f"[--fresh] 已清空 tool_library/（删除 {removed} 个已封装工具），将从零开始进化。\n")
+    print(
+        f"[--fresh] 已清空 tool_library/（删除 {removed} 个已封装工具），将从零开始进化。\n"
+    )
 
 
 def _is_reuse(traj: list) -> bool:
@@ -105,7 +113,10 @@ def run_offline_selftest(output_path: str | None = None) -> int:
         # ---------- 存前验证闸门演示：坏工具应被拒绝入库 ----------
         print("\n[验证闸门] 尝试注册一个运行会崩溃的坏工具（附 test_args）...")
         bad = lib.create_tool(
-            "days_between_bad", "会崩溃的示例工具", _DAYS_TOOL_PARAMS, _BAD_TOOL_CODE,
+            "days_between_bad",
+            "会崩溃的示例工具",
+            _DAYS_TOOL_PARAMS,
+            _BAD_TOOL_CODE,
             test_args={"start": "2020-01-01", "end": "2020-03-01"},
         )
         print(f"  结果: success={bad.get('success')}  ->  {bad.get('error', '')[:60]}")
@@ -115,7 +126,9 @@ def run_offline_selftest(output_path: str | None = None) -> int:
 
         # ---------- 任务一：进化（造工具）----------
         traj1: list = []
-        print("\n########## 离线任务一：计算 2020-01-01 到 2020-03-01 的天数（演示进化）##########")
+        print(
+            "\n########## 离线任务一：计算 2020-01-01 到 2020-03-01 的天数（演示进化）##########"
+        )
         traj1.append("search_tools")
         hit = lib.search_tools("date days between")
         print(f"[step 1] search_tools -> 命中 {hit['count']} 个（工具库为空，未命中）")
@@ -124,27 +137,38 @@ def run_offline_selftest(output_path: str | None = None) -> int:
         created = lib.create_tool(
             "days_between",
             "计算两个 ISO 日期(YYYY-MM-DD)之间相差的天数",
-            _DAYS_TOOL_PARAMS, _DAYS_TOOL_CODE,
+            _DAYS_TOOL_PARAMS,
+            _DAYS_TOOL_CODE,
             test_args={"start": "2020-01-01", "end": "2020-01-11"},
         )
-        print(f"[step 2] create_tool(days_between) -> success={created['success']} "
-              f"validated={created.get('validated')}（存前验证已真跑一次 run()）")
+        print(
+            f"[step 2] create_tool(days_between) -> success={created['success']} "
+            f"validated={created.get('validated')}（存前验证已真跑一次 run()）"
+        )
 
         traj1.append("days_between")
-        r1 = lib.execute_tool("days_between", {"start": "2020-01-01", "end": "2020-03-01"})
+        r1 = lib.execute_tool(
+            "days_between", {"start": "2020-01-01", "end": "2020-03-01"}
+        )
         ans1 = r1.get("result", {}).get("days")
         print(f"[step 3] days_between(...) -> {r1.get('result')}")
         print(f"[离线任务一结论] 2020-01-01 到 2020-03-01 共 {ans1} 天。")
 
         # ---------- 任务二：复用（不再造轮子）----------
         traj2: list = []
-        print("\n########## 离线任务二：计算 2021-01-01 到 2021-12-31 的天数（演示复用）##########")
+        print(
+            "\n########## 离线任务二：计算 2021-01-01 到 2021-12-31 的天数（演示复用）##########"
+        )
         traj2.append("search_tools")
         hit2 = lib.search_tools("date days between")
-        print(f"[step 1] search_tools -> 命中 {hit2['count']} 个：{[t['name'] for t in hit2['tools']]}（复用！）")
+        print(
+            f"[step 1] search_tools -> 命中 {hit2['count']} 个：{[t['name'] for t in hit2['tools']]}（复用！）"
+        )
 
         traj2.append("days_between")
-        r2 = lib.execute_tool("days_between", {"start": "2021-01-01", "end": "2021-12-31"})
+        r2 = lib.execute_tool(
+            "days_between", {"start": "2021-01-01", "end": "2021-12-31"}
+        )
         ans2 = r2.get("result", {}).get("days")
         print(f"[step 2] days_between(...) -> {r2.get('result')}")
         print(f"[离线任务二结论] 2021-01-01 到 2021-12-31 共 {ans2} 天。")
@@ -155,20 +179,34 @@ def run_offline_selftest(output_path: str | None = None) -> int:
         print("=" * 70)
         print(f"任务一轨迹: {traj1}")
         print(f"任务二轨迹: {traj2}")
-        print(f"任务二是否复用了任务一造的工具(未重新 create_tool): {'是 ✅' if reused else '否 ❌'}")
-        print(f"存前验证闸门是否挡住了坏工具: {'是 ✅' if not bad['success'] else '否 ❌'}")
+        print(
+            f"任务二是否复用了任务一造的工具(未重新 create_tool): {'是 ✅' if reused else '否 ❌'}"
+        )
+        print(
+            f"存前验证闸门是否挡住了坏工具: {'是 ✅' if not bad['success'] else '否 ❌'}"
+        )
 
         if output_path:
             payload = {
                 "mode": "offline_selftest",
                 "gate_rejected_bad_tool": (not bad["success"]),
                 "tasks": [
-                    {"task": "2020-01-01→2020-03-01 天数", "answer_days": ans1, "trajectory": traj1},
-                    {"task": "2021-01-01→2021-12-31 天数", "answer_days": ans2, "trajectory": traj2},
+                    {
+                        "task": "2020-01-01→2020-03-01 天数",
+                        "answer_days": ans1,
+                        "trajectory": traj1,
+                    },
+                    {
+                        "task": "2021-01-01→2021-12-31 天数",
+                        "answer_days": ans2,
+                        "trajectory": traj2,
+                    },
                 ],
                 "reused": reused,
             }
-            Path(output_path).write_text(json.dumps(payload, ensure_ascii=False, indent=2))
+            Path(output_path).write_text(
+                json.dumps(payload, ensure_ascii=False, indent=2)
+            )
             print(f"\n[已写入] {output_path}")
 
         return 0 if (reused and not bad["success"]) else 1
@@ -179,7 +217,9 @@ def run_offline_selftest(output_path: str | None = None) -> int:
 # --------------------------------------------------------------------------- #
 # 在线路径：真实 LLM + 真实网络
 # --------------------------------------------------------------------------- #
-def run_online(tasks: list, allow_create: bool, model: str | None, output_path: str | None) -> int:
+def run_online(
+    tasks: list, allow_create: bool, model: str | None, output_path: str | None
+) -> int:
     # 延迟导入：--offline 时无需 openai 依赖也能跑
     from agent import SelfEvolvingAgent
 
@@ -202,7 +242,11 @@ def run_online(tasks: list, allow_create: bool, model: str | None, output_path: 
     runs = []
     for i, task in enumerate(tasks, 1):
         label = {1: "任务一", 2: "任务二"}.get(i, f"任务{i}") if default else f"任务{i}"
-        tag = {1: "（演示 搜索→测试→封装→用）", 2: "（演示 工具复用）"}.get(i, "") if default else ""
+        tag = (
+            {1: "（演示 搜索→测试→封装→用）", 2: "（演示 工具复用）"}.get(i, "")
+            if default
+            else ""
+        )
         print(f"\n########## {label}{tag} ##########")
         agent.trajectory = []
         ans = agent.run(task)
@@ -210,7 +254,9 @@ def run_online(tasks: list, allow_create: bool, model: str | None, output_path: 
         created = [t["name"] for t in agent.library.list_tools()]
         print(f"\n>>> {label}结束。当前工具库已封装工具: {created}")
         print(f">>> {label}动作轨迹: {traj}")
-        runs.append({"task": task, "answer": ans, "trajectory": traj, "reused": _is_reuse(traj)})
+        runs.append(
+            {"task": task, "answer": ans, "trajectory": traj, "reused": _is_reuse(traj)}
+        )
 
     # 复用校验：只要有「非首个」任务发生了复用即算成立
     reused = any(r["reused"] for r in runs[1:])
@@ -221,14 +267,25 @@ def run_online(tasks: list, allow_create: bool, model: str | None, output_path: 
         print(f"[任务{i}] {r['answer']}")
     print("-" * 70)
     if len(runs) >= 2:
-        print(f"后续任务是否复用了已创建工具(未重新搜索/创建): {'是 ✅' if reused else '否 ❌'}")
+        print(
+            f"后续任务是否复用了已创建工具(未重新搜索/创建): {'是 ✅' if reused else '否 ❌'}"
+        )
         print("  证据：复用任务调用了 search_tools 且未出现 web_search/create_tool。")
 
     if output_path:
-        Path(output_path).write_text(json.dumps(
-            {"mode": "online", "model": agent.model, "allow_create": allow_create,
-             "runs": runs, "reused": reused},
-            ensure_ascii=False, indent=2))
+        Path(output_path).write_text(
+            json.dumps(
+                {
+                    "mode": "online",
+                    "model": agent.model,
+                    "allow_create": allow_create,
+                    "runs": runs,
+                    "reused": reused,
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
         print(f"\n[已写入] {output_path}")
 
     if len(runs) < 2:
@@ -241,24 +298,47 @@ def build_parser() -> argparse.ArgumentParser:
         description="实验 8-5：Agent 从网络寻找工具、自我进化的一键演示。",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="示例：\n"
-               "  python demo.py                 跑默认两个任务（进化 + 复用，需 API）\n"
-               "  python demo.py --fresh         先清空工具库再跑（重现从零进化）\n"
-               "  python demo.py --offline       离线机制自检（无需 API/网络）\n"
-               "  python demo.py --task '...'    自定义任务（可重复多次）\n"
-               "  python demo.py --no-create     禁用造工具能力（对照实验）\n")
-    p.add_argument("--task", action="append", metavar="任务描述",
-                   help="要执行的任务（可重复指定多次以按顺序运行多个任务）。"
-                        "不指定则运行默认的 NVDA/AAPL 两个任务。")
-    p.add_argument("--offline", action="store_true",
-                   help="离线机制自检：不调用 LLM/网络，直接驱动『搜索→造工具→存前验证→注册→复用』闭环。")
-    p.add_argument("--fresh", action="store_true",
-                   help="运行前清空 tool_library/，以重现『从零进化』过程（重复演示时推荐）。")
-    p.add_argument("--no-create", dest="allow_create", action="store_false",
-                   help="禁用『造工具(create_tool)』能力，用于对照演示（默认允许造工具）。")
-    p.add_argument("--model", metavar="模型名", default=None,
-                   help="覆盖 LLM 模型名（优先级高于 LLM_MODEL 环境变量），如 gpt-5.6-luna。")
-    p.add_argument("--output", metavar="路径", default=None,
-                   help="把本次运行的任务、答案、动作轨迹与复用结论写入该 JSON 文件。")
+        "  python demo.py                 跑默认两个任务（进化 + 复用，需 API）\n"
+        "  python demo.py --fresh         先清空工具库再跑（重现从零进化）\n"
+        "  python demo.py --offline       离线机制自检（无需 API/网络）\n"
+        "  python demo.py --task '...'    自定义任务（可重复多次）\n"
+        "  python demo.py --no-create     禁用造工具能力（对照实验）\n",
+    )
+    p.add_argument(
+        "--task",
+        action="append",
+        metavar="任务描述",
+        help="要执行的任务（可重复指定多次以按顺序运行多个任务）。"
+        "不指定则运行默认的 NVDA/AAPL 两个任务。",
+    )
+    p.add_argument(
+        "--offline",
+        action="store_true",
+        help="离线机制自检：不调用 LLM/网络，直接驱动『搜索→造工具→存前验证→注册→复用』闭环。",
+    )
+    p.add_argument(
+        "--fresh",
+        action="store_true",
+        help="运行前清空 tool_library/，以重现『从零进化』过程（重复演示时推荐）。",
+    )
+    p.add_argument(
+        "--no-create",
+        dest="allow_create",
+        action="store_false",
+        help="禁用『造工具(create_tool)』能力，用于对照演示（默认允许造工具）。",
+    )
+    p.add_argument(
+        "--model",
+        metavar="模型名",
+        default=None,
+        help="覆盖 LLM 模型名（优先级高于 LLM_MODEL 环境变量），如 gpt-5.6-luna。",
+    )
+    p.add_argument(
+        "--output",
+        metavar="路径",
+        default=None,
+        help="把本次运行的任务、答案、动作轨迹与复用结论写入该 JSON 文件。",
+    )
     return p
 
 
@@ -272,8 +352,9 @@ def main():
         _clear_library()
 
     tasks = args.task if args.task else [TASK_1, TASK_2]
-    return run_online(tasks, allow_create=args.allow_create,
-                      model=args.model, output_path=args.output)
+    return run_online(
+        tasks, allow_create=args.allow_create, model=args.model, output_path=args.output
+    )
 
 
 if __name__ == "__main__":

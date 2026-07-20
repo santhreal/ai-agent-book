@@ -20,6 +20,7 @@ from openai import OpenAI
 
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
 except ImportError:
     pass
@@ -33,7 +34,11 @@ from tool_manager import ToolLibrary, normalize_schema
 _PROVIDERS = {
     "openai": ("OPENAI_API_KEY", None, "gpt-5.6-luna"),
     "moonshot": ("MOONSHOT_API_KEY", "https://api.moonshot.cn/v1", "kimi-k3"),
-    "ark": ("ARK_API_KEY", "https://ark.cn-beijing.volces.com/api/v3", "doubao-seed-1-6-250615"),
+    "ark": (
+        "ARK_API_KEY",
+        "https://ark.cn-beijing.volces.com/api/v3",
+        "doubao-seed-1-6-250615",
+    ),
 }
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
@@ -59,14 +64,20 @@ def build_client():
     api_key = os.environ.get(key_env)
     # 统一兜底：provider 自己的 Key 缺失，但有 OPENROUTER_API_KEY 时改走 OpenRouter
     if not api_key and os.environ.get("OPENROUTER_API_KEY"):
-        client = OpenAI(api_key=os.environ["OPENROUTER_API_KEY"], base_url=OPENROUTER_BASE_URL)
+        client = OpenAI(
+            api_key=os.environ["OPENROUTER_API_KEY"], base_url=OPENROUTER_BASE_URL
+        )
         return client, _to_openrouter_model(model)
     if not api_key:
         raise RuntimeError(
             f"missing {key_env} in environment (provider={provider})；"
             f"也未设置 OPENROUTER_API_KEY（OpenRouter 可作为统一兜底）。"
         )
-    client = OpenAI(api_key=api_key, base_url=base_url) if base_url else OpenAI(api_key=api_key)
+    client = (
+        OpenAI(api_key=api_key, base_url=base_url)
+        if base_url
+        else OpenAI(api_key=api_key)
+    )
     return client, model
 
 
@@ -127,7 +138,11 @@ BASE_TOOL_SCHEMAS = [
                 "type": "object",
                 "properties": {
                     "query": {"type": "string", "description": "搜索关键词"},
-                    "num_results": {"type": "integer", "description": "返回结果数(1-10)", "default": 6},
+                    "num_results": {
+                        "type": "integer",
+                        "description": "返回结果数(1-10)",
+                        "default": 6,
+                    },
                 },
                 "required": ["query"],
             },
@@ -155,7 +170,8 @@ BASE_TOOL_SCHEMAS = [
                 "properties": {
                     "code": {"type": "string", "description": "要执行的 Python 代码"},
                     "pip_install": {
-                        "type": "array", "items": {"type": "string"},
+                        "type": "array",
+                        "items": {"type": "string"},
                         "description": "执行前需要 pip 安装的包名列表，可选",
                     },
                 },
@@ -171,17 +187,26 @@ BASE_TOOL_SCHEMAS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "name": {"type": "string", "description": "工具名(合法 Python 标识符)"},
-                    "description": {"type": "string", "description": "工具用途描述，供日后检索"},
+                    "name": {
+                        "type": "string",
+                        "description": "工具名(合法 Python 标识符)",
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "工具用途描述，供日后检索",
+                    },
                     "parameters": {
                         "type": "object",
                         "description": "该工具的参数 JSON Schema (type=object, properties, required)",
                     },
-                    "code": {"type": "string", "description": "工具实现，必须包含 def run(**kwargs) 并 return 可 JSON 序列化结果"},
+                    "code": {
+                        "type": "string",
+                        "description": "工具实现，必须包含 def run(**kwargs) 并 return 可 JSON 序列化结果",
+                    },
                     "test_args": {
                         "type": "object",
                         "description": "一组用于「存前验证」的示例入参：注册前会用它真跑一次 run(**test_args)，"
-                                       "只有成功返回才准入库。强烈建议提供，以挡住跑不通的坏工具。",
+                        "只有成功返回才准入库。强烈建议提供，以挡住跑不通的坏工具。",
                     },
                 },
                 "required": ["name", "description", "parameters", "code"],
@@ -195,7 +220,12 @@ BASE_TOOL_SCHEMAS = [
             "description": "在工具库中按关键词检索已有工具，用于复用。动手上网前必须先调用它。",
             "parameters": {
                 "type": "object",
-                "properties": {"query": {"type": "string", "description": "检索关键词，如 'stock price'"}},
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "检索关键词，如 'stock price'",
+                    }
+                },
                 "required": ["query"],
             },
         },
@@ -204,7 +234,9 @@ BASE_TOOL_SCHEMAS = [
 
 
 class SelfEvolvingAgent:
-    def __init__(self, verbose: bool = True, allow_create: bool = True, model: str | None = None):
+    def __init__(
+        self, verbose: bool = True, allow_create: bool = True, model: str | None = None
+    ):
         self.client, self.model = build_client()
         if model:  # CLI/调用方可覆盖模型名（优先级高于 LLM_MODEL 环境变量）
             self.model = model
@@ -214,9 +246,11 @@ class SelfEvolvingAgent:
         # 用于对照演示「没有造工具能力时只能复用/无法完成」的差异。
         self.allow_create = allow_create
         self.trajectory = []  # 记录动作轨迹，便于「证明工具复用」
-        self._verified_real_data = False  # 本轮任务是否已用 code_interpreter 打印出真实数据
-        self._created_tool = False         # 本轮是否创建了工具
-        self._used_library_tool = False    # 本轮是否复用了库中已封装的工具
+        self._verified_real_data = (
+            False  # 本轮任务是否已用 code_interpreter 打印出真实数据
+        )
+        self._created_tool = False  # 本轮是否创建了工具
+        self._used_library_tool = False  # 本轮是否复用了库中已封装的工具
         # 已「解锁」的工具库工具：只有经 search_tools 检索命中（或刚 create_tool 新建）后，
         # 才把它暴露为可调用函数。这样能强制「先 search_tools 复用」的流程，而非绕过检索直接调用。
         self._unlocked = set()
@@ -252,37 +286,52 @@ class SelfEvolvingAgent:
         """执行一次工具调用，并记录轨迹。"""
         self.trajectory.append(name)
         if name == "web_search":
-            return base_tools.web_search(args.get("query", ""), args.get("num_results", 6))
+            return base_tools.web_search(
+                args.get("query", ""), args.get("num_results", 6)
+            )
         if name == "read_webpage":
             return base_tools.read_webpage(args.get("url", ""))
         if name == "code_interpreter":
-            res = base_tools.code_interpreter(args.get("code", ""), args.get("pip_install"))
+            res = base_tools.code_interpreter(
+                args.get("code", ""), args.get("pip_install")
+            )
             # 记录：跑通且有真实输出，才认为已完成「真实数据验证」
             if res.get("success") and res.get("stdout", "").strip():
                 self._verified_real_data = True
             return res
         if name == "create_tool":
             if not self.allow_create:
-                return {"success": False, "error": "本次运行禁用了造工具能力（--no-create）。"}
+                return {
+                    "success": False,
+                    "error": "本次运行禁用了造工具能力（--no-create）。",
+                }
             code = args.get("code", "")
+            if not isinstance(code, str):
+                return {"success": False, "error": "code must be a string"}
             # 反幻觉守卫 1：必须先用 code_interpreter 打印出真实数据，才允许封装工具
             if not self._verified_real_data:
                 return {
                     "success": False,
                     "error": "尚未验证真实数据：请先用 code_interpreter 真正调用库并 print 出"
-                             "真实数字，验证通过后再封装工具。不要用未经验证或编造的数据封装工具。",
+                    "真实数字，验证通过后再封装工具。不要用未经验证或编造的数据封装工具。",
                 }
             # 反幻觉守卫 2：拒绝含「模拟/示例/写死数据」气味的工具代码
             lowered = code.lower()
-            if any(k in lowered for k in ("mock", "模拟", "示例数据", "sample data", "fake", "dummy")):
+            if any(
+                k in lowered
+                for k in ("mock", "模拟", "示例数据", "sample data", "fake", "dummy")
+            ):
                 return {
                     "success": False,
                     "error": "工具代码疑似包含模拟/示例/写死数据。工具必须在运行时通过库真正获取"
-                             "数据，请改用真实的库调用后重新提交。",
+                    "数据，请改用真实的库调用后重新提交。",
                 }
             res = self.library.create_tool(
-                args.get("name", ""), args.get("description", ""),
-                args.get("parameters", {}), code, args.get("test_args"),
+                args.get("name", ""),
+                args.get("description", ""),
+                args.get("parameters", {}),
+                code,
+                args.get("test_args"),
             )
             if res.get("success"):
                 self._created_tool = True
@@ -310,12 +359,15 @@ class SelfEvolvingAgent:
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": task},
         ]
-        self._log(f"\n{'='*70}\n[任务] {task}\n{'='*70}")
+        self._log(f"\n{'=' * 70}\n[任务] {task}\n{'=' * 70}")
 
         for step in range(max_steps):
             resp = self.client.chat.completions.create(
-                model=self.model, messages=messages,
-                tools=self._tools(), tool_choice="auto", temperature=0,
+                model=self.model,
+                messages=messages,
+                tools=self._tools(),
+                tool_choice="auto",
+                temperature=0,
             )
             msg = resp.choices[0].message
             messages.append(msg.model_dump(exclude_none=True))
@@ -330,7 +382,9 @@ class SelfEvolvingAgent:
                     and nudges < 2
                 ):
                     nudges += 1
-                    self._log("\n[进化守卫] 已验证真实数据但未封装工具，提醒模型先 create_tool。")
+                    self._log(
+                        "\n[进化守卫] 已验证真实数据但未封装工具，提醒模型先 create_tool。"
+                    )
                     messages.append(
                         {
                             "role": "user",
@@ -349,14 +403,18 @@ class SelfEvolvingAgent:
                     fargs = json.loads(tc.function.arguments or "{}")
                 except json.JSONDecodeError:
                     fargs = {}
-                self._log(f"\n[step {step+1}] 调用工具 -> {fname}  args={_short(fargs)}")
+                self._log(
+                    f"\n[step {step + 1}] 调用工具 -> {fname}  args={_short(fargs)}"
+                )
                 result = self._dispatch(fname, fargs)
                 self._log(f"           结果: {_short(result)}")
                 messages.append(
                     {
                         "role": "tool",
                         "tool_call_id": tc.id,
-                        "content": json.dumps(result, ensure_ascii=False, default=str)[:8000],
+                        "content": json.dumps(result, ensure_ascii=False, default=str)[
+                            :8000
+                        ],
                     }
                 )
 
@@ -365,4 +423,4 @@ class SelfEvolvingAgent:
 
 def _short(obj, n: int = 240) -> str:
     s = json.dumps(obj, ensure_ascii=False, default=str)
-    return s if len(s) <= n else s[:n] + f"...(+{len(s)-n} chars)"
+    return s if len(s) <= n else s[:n] + f"...(+{len(s) - n} chars)"

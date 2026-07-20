@@ -30,18 +30,18 @@ ALL_LAYERS = ("L1", "L2", "L3", "L4")
 # ---------------------------------------------------------------------------
 def layer1_correctness(task: dict, trajectory: dict) -> dict:
     answer = trajectory.get("final_answer", "") or ""
-    crit = task["correctness_criteria"]
-    check = crit["check"]
+    crit = task.get("correctness_criteria") or {}
+    check = crit.get("check")
     passed = False
     if check == "regex":
-        passed = re.search(crit["pattern"], answer) is not None
+        passed = re.search(crit.get("pattern", ""), answer) is not None
     elif check == "contains_any":
         low = answer.lower()
-        passed = any(v.lower() in low for v in crit["values"])
+        passed = any(v.lower() in low for v in crit.get("values", []))
     return {
         "score": 1.0 if passed else 0.0,
         "passed": passed,
-        "detail": f"判据[{check}] -> {'通过' if passed else '未通过'}；{crit['description']}",
+        "detail": f"判据[{check}] -> {'通过' if passed else '未通过'}；{crit.get('description', '')}",
     }
 
 
@@ -49,38 +49,68 @@ def layer1_correctness(task: dict, trajectory: dict) -> dict:
 # L2 工具发现有效性
 # ---------------------------------------------------------------------------
 def _selected_libraries(trajectory: dict):
-    return [s["library"] for s in trajectory["steps"] if s["action"] == "select_library"]
+    return [
+        s["library"]
+        for s in trajectory.get("steps", [])
+        if isinstance(s, dict)
+        and s.get("action") == "select_library"
+        and "library" in s
+    ]
 
 
 def _search_queries(trajectory: dict):
-    return [s["query"] for s in trajectory["steps"] if s["action"] == "search"]
+    return [
+        s["query"]
+        for s in trajectory.get("steps", [])
+        if isinstance(s, dict) and s.get("action") == "search" and "query" in s
+    ]
 
 
 def layer2_discovery(task: dict, trajectory: dict) -> dict:
-    steps = trajectory["steps"]
-    reused = any(s["action"] == "retrieve_tool" for s in steps)
-    did_discovery = any(s["action"] in ("search", "select_library", "create_tool") for s in steps)
+    steps = trajectory.get("steps", [])
+    reused = any(
+        isinstance(s, dict) and s.get("action") == "retrieve_tool" for s in steps
+    )
+    did_discovery = any(
+        isinstance(s, dict)
+        and s.get("action") in ("search", "select_library", "create_tool")
+        for s in steps
+    )
     if reused and not did_discovery:
         # 本次是复用，没有新的发现活动 —— 该层不适用
-        return {"score": None, "detail": "本次直接复用已注册工具，无新发现活动，L2 不适用。"}
+        return {
+            "score": None,
+            "detail": "本次直接复用已注册工具，无新发现活动，L2 不适用。",
+        }
 
     queries = _search_queries(trajectory)
     selected = _selected_libraries(trajectory)
     kws = [k.lower() for k in task.get("discovery_keywords", [])]
-    recommended = [l.lower() for l in task["reference_solution"]["libraries"]]
+    ref_sol = task.get("reference_solution") or {}
+    recommended = [lib.lower() for lib in ref_sol.get("libraries", [])]
     pit = task.get("known_pitfalls", {})
-    bad_libs = [b.lower() for b in (pit.get("deprecated_libraries", []) + pit.get("paid_or_registration_apis", []))]
+    bad_libs = [
+        b.lower()
+        for b in (
+            pit.get("deprecated_libraries", [])
+            + pit.get("paid_or_registration_apis", [])
+        )
+    ]
 
     # 各项启发式指标
-    on_topic = any(any(k in q.lower() for k in kws) for q in queries) if queries else False
-    visited_web = any(s["action"] == "read_web" for s in steps)
+    on_topic = (
+        any(any(k in q.lower() for k in kws) for q in queries) if queries else False
+    )
+    visited_web = any(
+        isinstance(s, dict) and s.get("action") == "read_web" for s in steps
+    )
 
     def _match(lib, pool):
         lo = lib.lower()
         return any(p.split("(")[0].strip() in lo or lo in p for p in pool)
 
-    selected_recommended = any(_match(l, recommended) for l in selected)
-    hit_pitfall = any(_match(l, bad_libs) for l in selected)
+    selected_recommended = any(_match(lib, recommended) for lib in selected)
+    hit_pitfall = any(_match(lib, bad_libs) for lib in selected)
     avoided_pitfalls = not hit_pitfall
 
     score = (
@@ -133,16 +163,26 @@ def _parse_judge_json(text: str) -> Optional[dict]:
     return None
 
 
-def layer3_tool_quality(task: dict, trajectory: dict, judge_model: Optional[str] = None) -> dict:
+def layer3_tool_quality(
+    task: dict, trajectory: dict, judge_model: Optional[str] = None
+) -> dict:
     created = trajectory.get("created_tools", [])
-    if not created:
-        return {"score": None, "detail": "本次轨迹未创造新工具（可能为复用），L3 不适用。"}
+    if (
+        not created
+        or not isinstance(created[0], dict)
+        or "name" not in created[0]
+        or "code" not in created[0]
+    ):
+        return {
+            "score": None,
+            "detail": "本次轨迹未创造新工具（可能为复用），L3 不适用。",
+        }
 
     tool = created[0]
     model = Config.map_model(judge_model or Config.JUDGE_MODEL)
     client = Config.get_client()
     user = (
-        f"任务目标：{task['goal']}\n\n"
+        f"任务目标：{task.get('goal', '')}\n\n"
         f"Agent 创造的工具函数 `{tool['name']}` 代码如下：\n```python\n{tool['code']}\n```"
     )
     kwargs = dict(
@@ -154,13 +194,20 @@ def layer3_tool_quality(task: dict, trajectory: dict, judge_model: Optional[str]
         ],
     )
     try:
-        resp = client.chat.completions.create(response_format={"type": "json_object"}, **kwargs)
+        resp = client.chat.completions.create(
+            response_format={"type": "json_object"}, **kwargs
+        )
     except Exception:
         resp = client.chat.completions.create(**kwargs)  # 部分模型不支持 json_object
     raw = resp.choices[0].message.content or ""
     rubric = _parse_judge_json(raw)
     if not rubric:
-        return {"score": 0.0, "rubric": None, "judge_text": raw, "detail": "judge 输出无法解析为 JSON。"}
+        return {
+            "score": 0.0,
+            "rubric": None,
+            "judge_text": raw,
+            "detail": "judge 输出无法解析为 JSON。",
+        }
 
     dims = ["error_handling", "input_validation", "documentation", "robustness"]
     total = sum(int(rubric.get(d, 0)) for d in dims)
@@ -183,12 +230,19 @@ def layer3_tool_quality(task: dict, trajectory: dict, judge_model: Optional[str]
 def layer4_reuse(task: dict, variant_trajectory: dict) -> dict:
     if variant_trajectory is None:
         return {"score": None, "detail": "未提供第二次相似任务轨迹，L4 未测。"}
-    steps = variant_trajectory["steps"]
+    steps = variant_trajectory.get("steps", [])
     retrieved = any(
-        s["action"] == "retrieve_tool" and s.get("name") == task["tool_name"] for s in steps
+        isinstance(s, dict)
+        and s.get("action") == "retrieve_tool"
+        and s.get("name") == task.get("tool_name")
+        for s in steps
     )
-    re_searched = any(s["action"] == "search" for s in steps)
-    re_created = any(s["action"] == "create_tool" for s in steps)
+    re_searched = any(
+        isinstance(s, dict) and s.get("action") == "search" for s in steps
+    )
+    re_created = any(
+        isinstance(s, dict) and s.get("action") == "create_tool" for s in steps
+    )
 
     if retrieved and not re_searched and not re_created:
         score, verdict = 1.0, "直接检索并复用已注册工具（未重复搜索/创建）"
@@ -227,16 +281,25 @@ class FourLayerEvaluator:
         self.judge_model = judge_model or Config.JUDGE_MODEL
         self.layers = tuple(layers)
 
-    def evaluate(self, task: dict, trajectory: dict, variant_trajectory: Optional[dict] = None) -> dict:
+    def evaluate(
+        self, task: dict, trajectory: dict, variant_trajectory: Optional[dict] = None
+    ) -> dict:
         skipped = {"score": None, "detail": "（本次未选择该层，记 N/A）"}
         layers = {
-            "L1": layer1_correctness(task, trajectory) if "L1" in self.layers else dict(skipped),
-            "L2": layer2_discovery(task, trajectory) if "L2" in self.layers else dict(skipped),
+            "L1": layer1_correctness(task, trajectory)
+            if "L1" in self.layers
+            else dict(skipped),
+            "L2": layer2_discovery(task, trajectory)
+            if "L2" in self.layers
+            else dict(skipped),
             "L3": (
                 layer3_tool_quality(task, trajectory, self.judge_model)
-                if "L3" in self.layers else dict(skipped)
+                if "L3" in self.layers
+                else dict(skipped)
             ),
-            "L4": layer4_reuse(task, variant_trajectory) if "L4" in self.layers else dict(skipped),
+            "L4": layer4_reuse(task, variant_trajectory)
+            if "L4" in self.layers
+            else dict(skipped),
         }
         return {
             "task_id": task["id"],

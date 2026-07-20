@@ -8,7 +8,6 @@
 - 所有输出都基于「真实网络结果 / 真实执行结果」，从而抑制大模型的幻觉。
 """
 
-import json
 import os
 import subprocess
 import sys
@@ -37,11 +36,16 @@ def web_search(query: str, num_results: int = 6) -> dict:
     - 备用 html.duckduckgo.com；
     - 带指数退避重试，DDG 偶发返回 202（限流）时自动重试，避免「网络抖动即失败」。
     """
-    query = (query or "").strip()
+    if not isinstance(query, str):
+        query = str(query or "")
+    query = query.strip()
     if not query:
         return {"success": False, "error": "search query is empty", "results": []}
 
-    num_results = max(1, min(int(num_results), 10))
+    try:
+        num_results = max(1, min(int(num_results or 6), 10))
+    except (ValueError, TypeError):
+        num_results = 6
     headers = {
         "User-Agent": (
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -51,18 +55,29 @@ def web_search(query: str, num_results: int = 6) -> dict:
 
     last_err = None
     # 两个端点各重试若干次
-    for endpoint in ("https://lite.duckduckgo.com/lite/", "https://html.duckduckgo.com/html/"):
+    for endpoint in (
+        "https://lite.duckduckgo.com/lite/",
+        "https://html.duckduckgo.com/html/",
+    ):
         for attempt in range(3):
             try:
                 resp = requests.post(
-                    endpoint, data={"q": query, "kl": "wt-wt"}, headers=headers, timeout=15
+                    endpoint,
+                    data={"q": query, "kl": "wt-wt"},
+                    headers=headers,
+                    timeout=15,
                 )
                 if resp.status_code == 202:  # DDG 限流信号
                     raise RuntimeError("rate limited (202)")
                 resp.raise_for_status()
                 results = _parse_ddg(endpoint, resp.text, num_results)
                 if results:
-                    return {"success": True, "query": query, "count": len(results), "results": results}
+                    return {
+                        "success": True,
+                        "query": query,
+                        "count": len(results),
+                        "results": results,
+                    }
                 last_err = "no results parsed"
             except Exception as e:  # noqa: BLE001
                 last_err = str(e)
@@ -105,7 +120,11 @@ def _parse_ddg(endpoint: str, html: str, num_results: int) -> list:
 # --------------------------------------------------------------------------- #
 def read_webpage(url: str, max_chars: int = 6000) -> dict:
     """抓取网页并抽取纯文本正文，供 Agent 阅读 README / API 文档。"""
-    if not url or not url.startswith(("http://", "https://")):
+    if (
+        not url
+        or not isinstance(url, str)
+        or not url.startswith(("http://", "https://"))
+    ):
         return {"success": False, "error": "invalid url"}
     headers = {
         "User-Agent": (
@@ -122,7 +141,9 @@ def read_webpage(url: str, max_chars: int = 6000) -> dict:
     soup = BeautifulSoup(resp.text, "html.parser")
     for tag in soup(["script", "style", "noscript", "nav", "footer", "header"]):
         tag.decompose()
-    text = "\n".join(line.strip() for line in soup.get_text("\n").splitlines() if line.strip())
+    text = "\n".join(
+        line.strip() for line in soup.get_text("\n").splitlines() if line.strip()
+    )
     truncated = len(text) > max_chars
     return {
         "success": True,
@@ -136,7 +157,9 @@ def read_webpage(url: str, max_chars: int = 6000) -> dict:
 # --------------------------------------------------------------------------- #
 # 工具 3：code_interpreter —— 子进程沙箱执行 Python
 # --------------------------------------------------------------------------- #
-def code_interpreter(code: str, pip_install: list | None = None, timeout: int = 60) -> dict:
+def code_interpreter(
+    code: str, pip_install: list | None = None, timeout: int = 60
+) -> dict:
     """
     在 **独立子进程** 中执行 Python 代码（沙箱），用于验证从网上找到的库 / API。
 
@@ -147,6 +170,8 @@ def code_interpreter(code: str, pip_install: list | None = None, timeout: int = 
     安全边界提醒：这是「演示级」沙箱（仅进程隔离 + 超时），不是安全沙箱。
     生产环境请使用容器 / gVisor / 无网络命名空间等强隔离，并审计要安装的包（供应链风险）。
     """
+    if not isinstance(code, str):
+        return {"success": False, "error": "code must be a string"}
     SANDBOX_PKG_DIR.mkdir(exist_ok=True)
     logs = []
 
@@ -156,28 +181,56 @@ def code_interpreter(code: str, pip_install: list | None = None, timeout: int = 
 
     # 1) 按需 pip install --target
     if pip_install:
+        if isinstance(pip_install, str):
+            pip_install = [pip_install]
+        else:
+            try:
+                pip_install = [str(pkg) for pkg in pip_install]
+            except TypeError:
+                return {
+                    "success": False,
+                    "error": "pip_install must be a list of strings",
+                }
         for pkg in pip_install:
             try:
                 r = subprocess.run(
-                    [sys.executable, "-m", "pip", "install", "--quiet",
-                     "--target", str(SANDBOX_PKG_DIR), pkg],
-                    capture_output=True, text=True, timeout=180, env=env,
+                    [
+                        sys.executable,
+                        "-m",
+                        "pip",
+                        "install",
+                        "--quiet",
+                        "--target",
+                        str(SANDBOX_PKG_DIR),
+                        pkg,
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=180,
+                    env=env,
                 )
                 if r.returncode != 0:
-                    logs.append(f"[pip install {pkg}] FAILED: {r.stderr.strip()[-500:]}")
+                    logs.append(
+                        f"[pip install {pkg}] FAILED: {r.stderr.strip()[-500:]}"
+                    )
                 else:
                     logs.append(f"[pip install {pkg}] ok")
             except Exception as e:  # noqa: BLE001
                 logs.append(f"[pip install {pkg}] error: {e}")
 
     # 2) 执行代码
-    with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False, dir=SANDBOX_PKG_DIR) as f:
+    with tempfile.NamedTemporaryFile(
+        "w", suffix=".py", delete=False, dir=SANDBOX_PKG_DIR
+    ) as f:
         f.write(code)
         script = f.name
     try:
         r = subprocess.run(
             [sys.executable, script],
-            capture_output=True, text=True, timeout=timeout, env=env,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            env=env,
         )
         out = r.stdout[-8000:]
         result = {
@@ -195,7 +248,11 @@ def code_interpreter(code: str, pip_install: list | None = None, timeout: int = 
             )
         return result
     except subprocess.TimeoutExpired:
-        return {"success": False, "error": f"timeout after {timeout}s", "pip_logs": logs}
+        return {
+            "success": False,
+            "error": f"timeout after {timeout}s",
+            "pip_logs": logs,
+        }
     finally:
         try:
             os.unlink(script)
