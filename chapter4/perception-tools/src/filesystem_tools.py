@@ -37,6 +37,9 @@ async def read_file(
     """
     try:
         path = validate_file_path(file_path)
+
+        if max_length is None:
+            max_length = 50000
         
         logging.info(f"📖 Reading file: {path}")
         
