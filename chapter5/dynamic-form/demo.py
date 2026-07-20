@@ -256,7 +256,7 @@ def _render_field_html(f):
         )
     elif ftype == "radio":
         opts = []
-        for o in f["options"]:
+        for o in (f.get("options") or []):
             checked = " checked" if f.get("default") == o["value"] else ""
             opts.append(
                 f'<label class="radio"><input type="radio" name="{name}" '
@@ -268,7 +268,7 @@ def _render_field_html(f):
         )
     elif ftype == "select":
         opts = ""
-        for o in f.get("options", []):
+        for o in (f.get("options") or []):
             selected = " selected" if f.get("default") == o["value"] else ""
             opts += f'<option value="{o["value"]}"{selected}>{o["label"]}</option>'
         inner = (
