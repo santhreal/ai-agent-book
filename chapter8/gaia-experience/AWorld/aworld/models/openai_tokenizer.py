@@ -1,11 +1,11 @@
 # Copyright 2024 AWorld Team. All rights reserved.
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #    http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -20,16 +20,17 @@ from pathlib import Path
 from typing import Collection, Dict, List, Set, Union
 from aworld.logs.util import logger
 from aworld.utils import import_package
-import_package("tiktoken")
-import tiktoken
 
-VOCAB_FILES_NAMES = {'vocab_file': 'cl100k_base.tiktoken'}
+import_package("tiktoken")
+import tiktoken  # noqa: E402
+
+VOCAB_FILES_NAMES = {"vocab_file": "cl100k_base.tiktoken"}
 
 # OpenAI GPT tokenizer pattern
 PAT_STR = r"""(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\r\n\p{L}\p{N}]?\p{L}+|\p{N}| ?[^\s\p{L}\p{N}]+[\r\n]*|\s*[\r\n]+|\s+(?!\S)|\s+"""
 
 # OpenAI special tokens
-ENDOFTEXT = '<|endoftext|>'
+ENDOFTEXT = "<|endoftext|>"
 SPECIAL_TOKENS = {
     ENDOFTEXT: 100256,
 }
@@ -37,11 +38,20 @@ SPECIAL_TOKENS = {
 
 def _load_tiktoken_bpe(tiktoken_bpe_file: str) -> Dict[bytes, int]:
     """Load tiktoken BPE file similar to qwen_tokenizer."""
-    with open(tiktoken_bpe_file, 'rb') as f:
+    with open(tiktoken_bpe_file, "rb") as f:
         contents = f.read()
-    return {
-        base64.b64decode(token): int(rank) for token, rank in (line.split() for line in contents.splitlines() if line)
-    }
+    ranks = {}
+    seen_ranks = set()
+    for line in contents.splitlines():
+        if line:
+            token, rank = line.split()
+            token_bytes = base64.b64decode(token)
+            rank_int = int(rank)
+            if rank_int in seen_ranks:
+                continue
+            ranks[token_bytes] = rank_int
+            seen_ranks.add(rank_int)
+    return ranks
 
 
 class OpenAITokenizer:
@@ -52,11 +62,11 @@ class OpenAITokenizer:
     def __init__(
         self,
         vocab_file=None,
-        errors='replace',
+        errors="replace",
         extra_vocab_file=None,
     ):
         if not vocab_file:
-            vocab_file = VOCAB_FILES_NAMES['vocab_file']
+            vocab_file = VOCAB_FILES_NAMES["vocab_file"]
         self._decode_use_source_tokenizer = False
 
         # how to handle errors in decoding UTF-8 byte sequences
@@ -68,27 +78,31 @@ class OpenAITokenizer:
 
         # try load extra vocab from file
         if extra_vocab_file is not None:
-            used_ids = set(self.mergeable_ranks.values()) | set(self.special_tokens.values())
+            used_ids = set(self.mergeable_ranks.values()) | set(
+                self.special_tokens.values()
+            )
             extra_mergeable_ranks = _load_tiktoken_bpe(extra_vocab_file)
             for token, index in extra_mergeable_ranks.items():
                 if token in self.mergeable_ranks:
-                    logger.info(f'extra token {token} exists, skipping')
+                    logger.info(f"extra token {token} exists, skipping")
                     continue
                 if index in used_ids:
-                    logger.info(f'the index {index} for extra token {token} exists, skipping')
+                    logger.info(
+                        f"the index {index} for extra token {token} exists, skipping"
+                    )
                     continue
                 self.mergeable_ranks[token] = index
             # the index may be sparse after this, but don't worry tiktoken.Encoding will handle this
 
         enc = tiktoken.Encoding(
-            'cl100k_base',
+            "cl100k_base",
             pat_str=PAT_STR,
             mergeable_ranks=self.mergeable_ranks,
             special_tokens=self.special_tokens,
         )
-        assert len(self.mergeable_ranks) + len(
-            self.special_tokens
-        ) == enc.n_vocab, f'{len(self.mergeable_ranks) + len(self.special_tokens)} != {enc.n_vocab} in encoding'
+        assert len(self.mergeable_ranks) + len(self.special_tokens) <= enc.n_vocab, (
+            f"{len(self.mergeable_ranks) + len(self.special_tokens)} > {enc.n_vocab} in encoding"
+        )
 
         self.decoder = {v: k for k, v in self.mergeable_ranks.items()}  # type: dict[int, bytes|str]
         self.decoder.update({v: k for k, v in self.special_tokens.items()})
@@ -100,14 +114,14 @@ class OpenAITokenizer:
     def __getstate__(self):
         # for pickle lovers
         state = self.__dict__.copy()
-        del state['tokenizer']
+        del state["tokenizer"]
         return state
 
     def __setstate__(self, state):
         # tokenizer is not python native; don't pass it; rebuild it
         self.__dict__.update(state)
         enc = tiktoken.Encoding(
-            'cl100k_base',
+            "cl100k_base",
             pat_str=PAT_STR,
             mergeable_ranks=self.mergeable_ranks,
             special_tokens=self.special_tokens,
@@ -120,7 +134,9 @@ class OpenAITokenizer:
     def get_vocab(self) -> Dict[bytes, int]:
         return self.mergeable_ranks
 
-    def convert_tokens_to_ids(self, tokens: Union[bytes, str, List[Union[bytes, str]]]) -> List[int]:
+    def convert_tokens_to_ids(
+        self, tokens: Union[bytes, str, List[Union[bytes, str]]]
+    ) -> List[int]:
         ids = []
         if isinstance(tokens, (str, bytes)):
             if tokens in self.special_tokens:
@@ -135,10 +151,10 @@ class OpenAITokenizer:
         return ids
 
     def tokenize(
-            self,
-            text: str,
-            allowed_special: Union[Set, str] = 'all',
-            disallowed_special: Union[Collection, str] = (),
+        self,
+        text: str,
+        allowed_special: Union[Set, str] = "all",
+        disallowed_special: Union[Collection, str] = (),
     ) -> List[Union[bytes, str]]:
         """
         Converts a string in a sequence of tokens.
@@ -159,10 +175,12 @@ class OpenAITokenizer:
         tokens = []
         if text is None:
             return tokens
-        text = unicodedata.normalize('NFC', text)
+        text = unicodedata.normalize("NFC", text)
 
         # this implementation takes a detour: text -> token id -> token surface forms
-        for t in self.tokenizer.encode(text, allowed_special=allowed_special, disallowed_special=disallowed_special):
+        for t in self.tokenizer.encode(
+            text, allowed_special=allowed_special, disallowed_special=disallowed_special
+        ):
             tokens.append(self.decoder[t])
         return tokens
 
@@ -170,20 +188,20 @@ class OpenAITokenizer:
         """
         Converts a sequence of tokens in a single string.
         """
-        text = ''
-        temp = b''
+        text = ""
+        temp = b""
         for t in tokens:
             if isinstance(t, str):
                 if temp:
-                    text += temp.decode('utf-8', errors=self.errors)
-                    temp = b''
+                    text += temp.decode("utf-8", errors=self.errors)
+                    temp = b""
                 text += t
             elif isinstance(t, bytes):
                 temp += t
             else:
-                raise TypeError('token should only be of type types or str')
+                raise TypeError("token should only be of type types or str")
         if temp:
-            text += temp.decode('utf-8', errors=self.errors)
+            text += temp.decode("utf-8", errors=self.errors)
         return text
 
     @property
@@ -211,7 +229,13 @@ class OpenAITokenizer:
     def count_tokens(self, text: str) -> int:
         return len(self.encode(text))
 
-    def truncate(self, text: str, max_token: int, start_token: int = 0, keep_both_sides: bool = False) -> str:
+    def truncate(
+        self,
+        text: str,
+        max_token: int,
+        start_token: int = 0,
+        keep_both_sides: bool = False,
+    ) -> str:
         max_token = int(max_token)
         token_ids = self.encode(text)[start_token:]
         if len(token_ids) <= max_token:
@@ -221,7 +245,7 @@ class OpenAITokenizer:
             ellipsis_tokens = self.encode("...")
             ellipsis_len = len(ellipsis_tokens)
             available = max_token - ellipsis_len
-            if available <= 0: # Degenerate case: not enough space even for "..."
+            if available <= 0:  # Degenerate case: not enough space even for "..."
                 return self.decode(token_ids[:max_token])
 
             left_len = available // 2
@@ -234,4 +258,6 @@ class OpenAITokenizer:
 
 
 # Default tokenizer instance using local cl100k_base.tiktoken
-openai_tokenizer = OpenAITokenizer(Path(__file__).resolve().parent.parent / 'config' / 'cl100k_base.tiktoken')
+openai_tokenizer = OpenAITokenizer(
+    Path(__file__).resolve().parent.parent / "config" / "cl100k_base.tiktoken"
+)

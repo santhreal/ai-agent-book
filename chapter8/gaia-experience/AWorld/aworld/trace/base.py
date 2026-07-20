@@ -7,13 +7,8 @@ from aworld.logs.util import trace_logger
 
 
 class TraceProvider(ABC):
-
     @abstractmethod
-    def get_tracer(
-            self,
-            name: str,
-            version: Optional[str] = None
-    ) -> "Tracer":
+    def get_tracer(self, name: str, version: Optional[str] = None) -> "Tracer":
         """Returns a `Tracer` for use by the given name.
 
         This function may return different `Tracer` types (e.g. a no-op tracer
@@ -62,8 +57,7 @@ class TraceProvider(ABC):
 
 
 class SpanType(Enum):
-    """Specifies additional details on how this span relates to its parent span.
-    """
+    """Specifies additional details on how this span relates to its parent span."""
 
     #: Default value. Indicates that the span is used internally in the
     # application.
@@ -100,19 +94,18 @@ AttributeValueType = Union[
 
 
 class Tracer(ABC):
-    """Handles span creation and in-process context propagation.
-    """
+    """Handles span creation and in-process context propagation."""
 
     @abstractmethod
     def start_span(
-            self,
-            name: str,
-            span_type: SpanType = SpanType.INTERNAL,
-            attributes: dict[str, AttributeValueType] = None,
-            start_time: Optional[int] = None,
-            record_exception: bool = True,
-            set_status_on_exception: bool = True,
-            trace_context: Optional["TraceContext"] = None,
+        self,
+        name: str,
+        span_type: SpanType = SpanType.INTERNAL,
+        attributes: dict[str, AttributeValueType] = None,
+        start_time: Optional[int] = None,
+        record_exception: bool = True,
+        set_status_on_exception: bool = True,
+        trace_context: Optional["TraceContext"] = None,
     ) -> "Span":
         """Starts and returns a new Span.
         Args:
@@ -134,15 +127,15 @@ class Tracer(ABC):
 
     @abstractmethod
     def start_as_current_span(
-            self,
-            name: str,
-            span_type: SpanType = SpanType.INTERNAL,
-            attributes: dict[str, AttributeValueType] = None,
-            start_time: Optional[int] = None,
-            record_exception: bool = True,
-            set_status_on_exception: bool = True,
-            end_on_exit: bool = True,
-            trace_context: Optional['TraceContext'] = None
+        self,
+        name: str,
+        span_type: SpanType = SpanType.INTERNAL,
+        attributes: dict[str, AttributeValueType] = None,
+        start_time: Optional[int] = None,
+        record_exception: bool = True,
+        set_status_on_exception: bool = True,
+        end_on_exit: bool = True,
+        trace_context: Optional["TraceContext"] = None,
     ) -> Iterator["Span"]:
         """Context manager for creating a new span and set it
         as the current span in this tracer's context.
@@ -178,12 +171,11 @@ class Tracer(ABC):
                 context manager.
             trace_context: The trace context to use for the span. If not
                 provided, the current trace context will be used.
-    """
+        """
 
 
 class Span(ABC):
-    """A Span represents a single operation within a trace.
-    """
+    """A Span represents a single operation within a trace."""
 
     @abstractmethod
     def end(self, end_time: Optional[int] = None) -> None:
@@ -218,11 +210,11 @@ class Span(ABC):
 
     @abstractmethod
     def record_exception(
-            self,
-            exception: BaseException,
-            attributes: dict[str, Any] = None,
-            timestamp: Optional[int] = None,
-            escaped: bool = False,
+        self,
+        exception: BaseException,
+        attributes: dict[str, Any] = None,
+        timestamp: Optional[int] = None,
+        escaped: bool = False,
     ) -> None:
         """Records an exception in the span.
         Args:
@@ -271,11 +263,11 @@ class NoOpSpan(Span):
         return False
 
     def record_exception(
-            self,
-            exception: BaseException,
-            attributes: dict[str, Any] = None,
-            timestamp: Optional[int] = None,
-            escaped: bool = False,
+        self,
+        exception: BaseException,
+        attributes: dict[str, Any] = None,
+        timestamp: Optional[int] = None,
+        escaped: bool = False,
     ) -> None:
         pass
 
@@ -290,34 +282,33 @@ class NoOpTracer(Tracer):
     """No-op implementation of `Tracer`."""
 
     def start_span(
-            self,
-            name: str,
-            span_type: SpanType = SpanType.INTERNAL,
-            attributes: dict[str, AttributeValueType] = None,
-            start_time: Optional[int] = None,
-            record_exception: bool = True,
-            set_status_on_exception: bool = True,
-            trace_context: Optional["TraceContext"] = None,
+        self,
+        name: str,
+        span_type: SpanType = SpanType.INTERNAL,
+        attributes: dict[str, AttributeValueType] = None,
+        start_time: Optional[int] = None,
+        record_exception: bool = True,
+        set_status_on_exception: bool = True,
+        trace_context: Optional["TraceContext"] = None,
     ) -> Span:
         return NoOpSpan()
 
     def start_as_current_span(
-            self,
-            name: str,
-            span_type: SpanType = SpanType.INTERNAL,
-            attributes: dict[str, AttributeValueType] = None,
-            start_time: Optional[int] = None,
-            record_exception: bool = True,
-            set_status_on_exception: bool = True,
-            end_on_exit: bool = True,
-            trace_context: Optional['TraceContext'] = None
+        self,
+        name: str,
+        span_type: SpanType = SpanType.INTERNAL,
+        attributes: dict[str, AttributeValueType] = None,
+        start_time: Optional[int] = None,
+        record_exception: bool = True,
+        set_status_on_exception: bool = True,
+        end_on_exit: bool = True,
+        trace_context: Optional["TraceContext"] = None,
     ) -> Iterator[Span]:
         yield NoOpSpan()
 
 
 class Carrier(Protocol):
-    """Carrier is a protocol that represents a carrier for trace context.
-    """
+    """Carrier is a protocol that represents a carrier for trace context."""
 
     def get(self, key: str) -> Optional[str]:
         """Returns the value of the given key from the carrier.
@@ -343,8 +334,8 @@ class Carrier(Protocol):
 
 @dataclass(frozen=True)
 class TraceContext:
-    """TraceContext is a class that represents a trace context.
-    """
+    """TraceContext is a class that represents a trace context."""
+
     trace_id: str
     span_id: str
     version: str = "00"
@@ -353,8 +344,7 @@ class TraceContext:
 
 
 class Propagator(ABC):
-    """Propagator is a protocol that represents a propagator for trace context.
-    """
+    """Propagator is a protocol that represents a propagator for trace context."""
 
     def _get_value(self, carrier: Carrier, name: str) -> str:
         """
@@ -365,7 +355,9 @@ class Propagator(ABC):
         Returns:
             The value of the name.
         """
-        return carrier.get(name) or carrier.get('HTTP_' + name.upper().replace('-', '_'))
+        return carrier.get(name) or carrier.get(
+            "HTTP_" + name.upper().replace("-", "_")
+        )
 
     @abstractmethod
     def extract(self, carrier: Carrier) -> Optional[TraceContext]:
@@ -375,6 +367,7 @@ class Propagator(ABC):
         Returns:
             The trace context extracted from the carrier.
         """
+
     @abstractmethod
     def inject(self, trace_context: TraceContext, carrier: Carrier) -> None:
         """Injects a trace context into the given carrier.
@@ -413,10 +406,26 @@ def get_tracer_provider_silent():
         return None
 
 
+def get_trace_id():
+    try:
+        tracer = get_tracer_provider()
+    except Exception:
+        tracer = None
+
+    trace_id = ""
+    if tracer:
+        try:
+            span = tracer.get_current_span()
+            trace_id = span.get_trace_id()
+        except Exception:
+            pass
+    return trace_id
+
+
 def log_trace_error():
     """
     Log an error with traceback information.
     """
     trace_logger.exception(
-        'This is logging the trace internal error.',
+        "This is logging the trace internal error.",
     )
