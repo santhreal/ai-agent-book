@@ -61,7 +61,9 @@ async def search_web(
     try:
         if not query or not query.strip():
             raise ValueError("Search query cannot be empty")
-        
+
+        if num_results is None:
+            num_results = 5
         validated_num_results = max(1, min(num_results, 10))
         
         logging.info(f"🔍 Searching for: '{query}'")
