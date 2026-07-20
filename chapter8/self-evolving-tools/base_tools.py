@@ -107,6 +107,8 @@ def read_webpage(url: str, max_chars: int = 6000) -> dict:
     """抓取网页并抽取纯文本正文，供 Agent 阅读 README / API 文档。"""
     if not url or not url.startswith(("http://", "https://")):
         return {"success": False, "error": "invalid url"}
+    if max_chars is None:
+        max_chars = 6000
     headers = {
         "User-Agent": (
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
