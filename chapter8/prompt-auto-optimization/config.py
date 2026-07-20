@@ -68,9 +68,12 @@ def _is_reasoning_model(model: str) -> bool:
     """gpt-5.x / o1·o3·o4 / kimi-k3 / *reasoner 等推理模型：不接受 temperature=0，
     直连 gpt-5.x 还需组织实名且工具调用受限，故优先走 OpenRouter。"""
     m = (model or "").lower()
-    return (m.startswith(("gpt-5", "o1", "o3", "o4"))
-            or m.startswith("kimi-k3")
-            or "reasoner" in m or "thinking" in m)
+    return (
+        m.startswith(("gpt-5", "o1", "o3", "o4"))
+        or m.startswith("kimi-k3")
+        or "reasoner" in m
+        or "thinking" in m
+    )
 
 
 def _use_openrouter(cfg: dict) -> bool:
@@ -104,7 +107,9 @@ def get_client() -> OpenAI:
         raise ValueError(f"未知的 LLM_PROVIDER: {provider}")
     cfg = _PROVIDERS[provider]
     if _use_openrouter(cfg):
-        return OpenAI(api_key=os.getenv("OPENROUTER_API_KEY"), base_url=OPENROUTER_BASE_URL)
+        return OpenAI(
+            api_key=os.getenv("OPENROUTER_API_KEY"), base_url=OPENROUTER_BASE_URL
+        )
     api_key = os.getenv(cfg["key_env"])
     if not api_key:
         raise RuntimeError(

@@ -54,9 +54,13 @@ def _pct(cn):
 def print_table(rows):
     """rows: list of (label, holdout_tuple, boundary_tuple)"""
     print("\n" + "=" * 74)
-    print("正确率对比（保留任务集 = 既有正确行为不能退化；边界案例集 = 过度转接应改善）")
+    print(
+        "正确率对比（保留任务集 = 既有正确行为不能退化；边界案例集 = 过度转接应改善）"
+    )
     print("=" * 74)
-    header = f"{'系统提示词版本':<26}{'保留任务集(holdout)':<20}{'边界案例集(boundary)':<20}"
+    header = (
+        f"{'系统提示词版本':<26}{'保留任务集(holdout)':<20}{'边界案例集(boundary)':<20}"
+    )
     print(header)
     print("-" * 74)
     for label, holdout, boundary in rows:
@@ -84,7 +88,9 @@ def main(cases=None, rounds=3, output=None):
     print("#" * 74)
     print("# 实验 8-3：基于人类反馈的系统提示词自动优化（航空客服场景）")
     print(f"# LLM 提供商: {get_provider()}   模型: {get_model()}")
-    print(f"# 用例数: {len(cases)}（保留集 + 边界集）   Coding Agent 优化轮数上限: {rounds}")
+    print(
+        f"# 用例数: {len(cases)}（保留集 + 边界集）   Coding Agent 优化轮数上限: {rounds}"
+    )
     print("#" * 74)
 
     # ---- 准备：把初始 prompt 复制成本次运行的工作副本（Coding Agent 会改写它）----
@@ -99,17 +105,22 @@ def main(cases=None, rounds=3, output=None):
         f"边界集 {_pct(before['boundary'])}"
     )
     over_transfer = [
-        r for r in before["results"]
+        r
+        for r in before["results"]
         if r["group"] == "boundary" and not r["should_transfer"] and r["transferred"]
     ]
-    print(f"  边界案例中出现【过度转接】的用例数：{len(over_transfer)} / "
-          f"{len([r for r in before['results'] if r['group'] == 'boundary'])}")
+    print(
+        f"  边界案例中出现【过度转接】的用例数：{len(over_transfer)} / "
+        f"{len([r for r in before['results'] if r['group'] == 'boundary'])}"
+    )
     for r in over_transfer:
         print(f"    - {r['id']}：政策争议却直接转人工，原因『{r['transfer_reason']}』")
 
     # ---- 步骤 2：Coding Agent 自动改写 prompt 文件 ----
     print("\n【步骤 2】Coding Agent 读取并改写系统提示词文件……")
-    opt = optimize_prompt(WORKING_PROMPT, HUMAN_FEEDBACK, max_rounds=rounds, verbose=True)
+    opt = optimize_prompt(
+        WORKING_PROMPT, HUMAN_FEEDBACK, max_rounds=rounds, verbose=True
+    )
     print(f"\n  Coding Agent 改动说明：{opt['rationale']}")
     print("\n  ---------- 系统提示词文件 diff（真实写入磁盘）----------")
     print(opt["diff"] if opt["diff"].strip() else "  (无改动)")
@@ -121,14 +132,18 @@ def main(cases=None, rounds=3, output=None):
 
     # ---- 步骤 4：对照人工调优版 ----
     print("\n【步骤 4】对照组：人工调优版系统提示词")
-    manual = evaluate_prompt(_read(MANUAL_PROMPT), label="人工调优版 prompt(对照)", cases=cases)
+    manual = evaluate_prompt(
+        _read(MANUAL_PROMPT), label="人工调优版 prompt(对照)", cases=cases
+    )
 
     # ---- 步骤 5：对比表 ----
-    print_table([
-        ("初始 prompt(优化前)", before["holdout"], before["boundary"]),
-        ("自动优化后 prompt", after["holdout"], after["boundary"]),
-        ("人工调优版(对照)", manual["holdout"], manual["boundary"]),
-    ])
+    print_table(
+        [
+            ("初始 prompt(优化前)", before["holdout"], before["boundary"]),
+            ("自动优化后 prompt", after["holdout"], after["boundary"]),
+            ("人工调优版(对照)", manual["holdout"], manual["boundary"]),
+        ]
+    )
 
     # ---- 结论 ----
     b_before_c, b_before_n = before["boundary"]
@@ -136,10 +151,14 @@ def main(cases=None, rounds=3, output=None):
     h_before_c, _ = before["holdout"]
     h_after_c, _ = after["holdout"]
     print("\n【结论】")
-    print(f"  · 边界案例集正确率：{b_before_c}/{b_before_n} → {b_after_c}/{b_before_n} "
-          f"（{'提升 ✓' if b_after_c > b_before_c else '未提升'}）")
-    print(f"  · 保留任务集正确率：{h_before_c} → {h_after_c} "
-          f"（{'未退化 ✓' if h_after_c >= h_before_c else '退化 ✗'}）")
+    print(
+        f"  · 边界案例集正确率：{b_before_c}/{b_before_n} → {b_after_c}/{b_before_n} "
+        f"（{'提升 ✓' if b_after_c > b_before_c else '未提升'}）"
+    )
+    print(
+        f"  · 保留任务集正确率：{h_before_c} → {h_after_c} "
+        f"（{'未退化 ✓' if h_after_c >= h_before_c else '退化 ✗'}）"
+    )
     print(f"\n  优化后的工作副本已写入：{WORKING_PROMPT}")
 
     # ---- 可选：把对比结果落盘为 JSON，便于复现与二次分析 ----
@@ -152,12 +171,21 @@ def main(cases=None, rounds=3, output=None):
             "rationale": opt["rationale"],
             "diff": opt["diff"],
             "rows": [
-                {"label": "初始 prompt(优化前)", "holdout": list(before["holdout"]),
-                 "boundary": list(before["boundary"])},
-                {"label": "自动优化后 prompt", "holdout": list(after["holdout"]),
-                 "boundary": list(after["boundary"])},
-                {"label": "人工调优版(对照)", "holdout": list(manual["holdout"]),
-                 "boundary": list(manual["boundary"])},
+                {
+                    "label": "初始 prompt(优化前)",
+                    "holdout": list(before["holdout"]),
+                    "boundary": list(before["boundary"]),
+                },
+                {
+                    "label": "自动优化后 prompt",
+                    "holdout": list(after["holdout"]),
+                    "boundary": list(after["boundary"]),
+                },
+                {
+                    "label": "人工调优版(对照)",
+                    "holdout": list(manual["holdout"]),
+                    "boundary": list(manual["boundary"]),
+                },
             ],
         }
         os.makedirs(os.path.dirname(os.path.abspath(output)), exist_ok=True)
@@ -182,35 +210,51 @@ def _build_parser():
         ),
     )
     parser.add_argument(
-        "--quick", action="store_true",
+        "--quick",
+        action="store_true",
         help="快速演示模式：每组只取 2 个用例，减少 API 调用与耗时。",
     )
     parser.add_argument(
-        "--limit", type=int, default=None, metavar="N",
+        "--limit",
+        type=int,
+        default=None,
+        metavar="N",
         help="每组最多评测 N 个用例（覆盖 --quick）。",
     )
     parser.add_argument(
-        "--group", choices=("holdout", "boundary", "both"), default="both",
+        "--group",
+        choices=("holdout", "boundary", "both"),
+        default="both",
         help="选择评测的任务集：holdout(保留集) / boundary(边界集) / both(默认，两者都跑)。",
     )
     parser.add_argument(
-        "--rounds", type=int, default=3, metavar="N",
+        "--rounds",
+        type=int,
+        default=3,
+        metavar="N",
         help="Coding Agent 自动改写提示词的最大重试轮数（默认 3）。",
     )
     parser.add_argument(
-        "--model", default=None, metavar="NAME",
+        "--model",
+        default=None,
+        metavar="NAME",
         help="覆盖 LLM 模型名（等价于设置环境变量 LLM_MODEL，如 gpt-5.6-luna）。",
     )
     parser.add_argument(
-        "--provider", choices=("openai", "moonshot", "ark"), default=None,
+        "--provider",
+        choices=("openai", "moonshot", "ark"),
+        default=None,
         help="覆盖 LLM 提供商（等价于设置环境变量 LLM_PROVIDER，默认 openai）。",
     )
     parser.add_argument(
-        "--output", default=None, metavar="PATH",
+        "--output",
+        default=None,
+        metavar="PATH",
         help="把优化前后 + 人工对照的对比结果写入指定 JSON 文件（如 output/run.json）。",
     )
     parser.add_argument(
-        "--dry-run", action="store_true",
+        "--dry-run",
+        action="store_true",
         help="离线自检：只打印解析后的配置与选中用例数，不调用任何 LLM API。",
     )
     return parser

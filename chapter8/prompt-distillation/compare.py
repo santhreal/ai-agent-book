@@ -25,7 +25,21 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
 
-VALID_LABELS = ["ar", "de", "el", "en", "es", "fr", "hi", "ru", "tr", "ur", "vi", "zh", "ot"]
+VALID_LABELS = [
+    "ar",
+    "de",
+    "el",
+    "en",
+    "es",
+    "fr",
+    "hi",
+    "ru",
+    "tr",
+    "ur",
+    "vi",
+    "zh",
+    "ot",
+]
 
 
 def load_prompt_template(source_file: str) -> str:
@@ -44,7 +58,9 @@ def load_prompt_template(source_file: str) -> str:
     return match.group(1)
 
 
-def build_token_counter(tokenizer_name: Optional[str]) -> Tuple[Callable[[str], int], str]:
+def build_token_counter(
+    tokenizer_name: Optional[str],
+) -> Tuple[Callable[[str], int], str]:
     """
     构造一个 token 计数函数，按优先级回退，保证离线可用。
 
@@ -59,9 +75,14 @@ def build_token_counter(tokenizer_name: Optional[str]) -> Tuple[Callable[[str], 
             from transformers import AutoTokenizer
 
             tok = AutoTokenizer.from_pretrained(tokenizer_name, trust_remote_code=True)
-            return (lambda s: len(tok.encode(s))), f"HuggingFace 分词器（精确）: {tokenizer_name}"
+            return (
+                lambda s: len(tok.encode(s))
+            ), f"HuggingFace 分词器（精确）: {tokenizer_name}"
         except Exception as exc:  # noqa: BLE001
-            print(f"[warn] 无法加载分词器 {tokenizer_name}（{exc}），回退到 tiktoken。", file=sys.stderr)
+            print(
+                f"[warn] 无法加载分词器 {tokenizer_name}（{exc}），回退到 tiktoken。",
+                file=sys.stderr,
+            )
 
     try:
         import tiktoken
@@ -132,10 +153,18 @@ def compare(
         student_input_total += s_tok
         per_text_tokens.append((t_tok, s_tok))
 
-    teacher_avg = teacher_input_total / n
-    student_avg = student_input_total / n
-    reduction_pct = 100.0 * (1 - student_input_total / teacher_input_total)
-    ratio = teacher_input_total / student_input_total if student_input_total else float("inf")
+    teacher_avg = teacher_input_total / n if n > 0 else 0.0
+    student_avg = student_input_total / n if n > 0 else 0.0
+    reduction_pct = (
+        100.0 * (1 - student_input_total / teacher_input_total)
+        if teacher_input_total > 0
+        else 0.0
+    )
+    ratio = (
+        teacher_input_total / student_input_total
+        if student_input_total
+        else float("inf")
+    )
 
     # 学生预测（与 test_file 逐行对齐）
     student_preds: Optional[List[Optional[str]]] = None
@@ -200,20 +229,28 @@ def print_report(r: Dict) -> None:
     print(line)
     print(f"样本数            : {r['num_cases']}")
     print(f"Token 计数方式    : {r['token_method']}")
-    print(f"固定提示开销      : {r['fixed_prompt_overhead']} tokens（模板本身，每次调用都要重复付费）")
+    print(
+        f"固定提示开销      : {r['fixed_prompt_overhead']} tokens（模板本身，每次调用都要重复付费）"
+    )
 
     print("\n" + "-" * 78)
     print("一、输入成本（每次调用的输入 token）")
     print("-" * 78)
     print(f"{'维度':<24}{'教师(长提示+思考)':>20}{'学生(无提示)':>18}")
-    print(f"{'单条平均输入 token':<24}{r['teacher_input_avg']:>20.1f}{r['student_input_avg']:>18.1f}")
-    print(f"{'全量总输入 token':<24}{r['teacher_input_total']:>20,}{r['student_input_total']:>18,}")
+    print(
+        f"{'单条平均输入 token':<24}{r['teacher_input_avg']:>20.1f}{r['student_input_avg']:>18.1f}"
+    )
+    print(
+        f"{'全量总输入 token':<24}{r['teacher_input_total']:>20,}{r['student_input_total']:>18,}"
+    )
     print(
         f"\n→ 输入 token 降低 {r['input_token_reduction_pct']:.1f}%"
         f"（教师是学生的 {r['teacher_student_ratio']:.1f} 倍）。"
     )
     print("  按输入 token 计费的 API 上，这一项直接等比例降低费用；教师端还有未计入的")
-    print("  思考（CoT）输出 token，实际差距只会更大。延迟需在 GPU 上实测，此处不估算。")
+    print(
+        "  思考（CoT）输出 token，实际差距只会更大。延迟需在 GPU 上实测，此处不估算。"
+    )
 
     print("\n" + "-" * 78)
     print("二、任务质量（学生在相同输入上与教师标注的一致率 = 蒸馏保真度）")
@@ -228,13 +265,17 @@ def print_report(r: Dict) -> None:
             f"质量损失约 {(1 - r['student_accuracy']) * 100:.1f} 个百分点。"
         )
     else:
-        print("未找到 evaluation_results.json（学生尚未评估）。先运行 evaluate.py 生成，")
+        print(
+            "未找到 evaluation_results.json（学生尚未评估）。先运行 evaluate.py 生成，"
+        )
         print("再回来看这一栏。本栏缺失不影响上面的输入成本对比。")
 
     print("\n" + "-" * 78)
     print(f"三、逐条案例（{len(r['examples'])} 例）")
     print("-" * 78)
-    print(f"{'待分类文本':<44}{'教师tok':>8}{'学生tok':>8}{'教师':>6}{'学生':>6}{'一致':>6}")
+    print(
+        f"{'待分类文本':<44}{'教师tok':>8}{'学生tok':>8}{'教师':>6}{'学生':>6}{'一致':>6}"
+    )
     for ex in r["examples"]:
         if ex["match"] is None:
             mark = "—"
