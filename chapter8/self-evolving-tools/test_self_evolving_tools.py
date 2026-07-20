@@ -54,6 +54,11 @@ def test_tool_library_robustness():
         assert not res["success"]
         assert "tool name must be a string" in res["error"]
 
+        # Test create_tool with invalid code type
+        res = library.create_tool("name", "desc", {}, None)
+        assert not res["success"]
+        assert "tool code must be a string" in res["error"]
+
         # Create a malformed json file directly in the library
         p_malformed = Path(tmp_dir) / "malformed.json"
         p_malformed.write_text("invalid json")

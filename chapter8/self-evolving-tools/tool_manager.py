@@ -67,6 +67,8 @@ class ToolLibrary:
         """
         if not isinstance(name, str):
             return {"success": False, "error": "tool name must be a string"}
+        if not isinstance(code, str):
+            return {"success": False, "error": "tool code must be a string"}
         name = name.strip()
         if not name.isidentifier():
             return {
