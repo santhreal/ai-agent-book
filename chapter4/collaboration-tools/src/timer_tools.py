@@ -291,6 +291,10 @@ async def set_recurring_timer(
         Dictionary with recurring timer ID
     """
     try:
+        # JSON null must fail before scheduling (else success=True then sleep(None) crashes).
+        if interval_seconds is None:
+            raise TypeError("interval_seconds must be a number")
+
         timer_id = str(uuid.uuid4())
         
         timer_data = {
