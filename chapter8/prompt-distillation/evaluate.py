@@ -134,14 +134,14 @@ def evaluate_model(
             display_sentence = sentence if len(sentence) <= 60 else sentence[:57] + "..."
             
             print(f"{status_color} [{idx+1:4d}/{len(test_sentences)}] "
-                  f"Pred: {pred_label:>2s} | GT: {gt_label:>2s} | "
+                  f"Pred: {(pred_label or '??'):>2s} | GT: {gt_label:>2s} | "
                   f"Acc: {correct}/{total} ({correct/total*100:5.1f}%) | "
                   f"{display_sentence}")
         else:
             # No ground truth - just show prediction
             display_sentence = sentence if len(sentence) <= 60 else sentence[:57] + "..."
             print(f"  [{idx+1:4d}/{len(test_sentences)}] "
-                  f"Pred: {pred_label:>2s} | "
+                  f"Pred: {(pred_label or '??'):>2s} | "
                   f"{display_sentence}")
     
     print("="*80)
