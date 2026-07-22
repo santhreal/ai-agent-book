@@ -84,7 +84,8 @@ async def get_calendar_events(
             orderBy='startTime'
         ).execute()
         
-        events = events_result.get('items', [])
+        # Google Calendar may omit items/attendees or set them to JSON null.
+        events = events_result.get('items') or []
         
         formatted_events = []
         for event in events:
@@ -98,7 +99,7 @@ async def get_calendar_events(
                 "end": end,
                 "location": event.get('location'),
                 "description": event.get('description'),
-                "attendees": [a.get('email') for a in event.get('attendees', [])]
+                "attendees": [a.get('email') for a in (event.get('attendees') or [])]
             })
         
         logging.info(f"✅ Found {len(formatted_events)} calendar events")
