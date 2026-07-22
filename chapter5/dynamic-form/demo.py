@@ -256,7 +256,7 @@ def _render_field_html(f):
         )
     elif ftype == "radio":
         opts = []
-        for o in f["options"]:
+        for o in f.get("options", []):
             checked = " checked" if f.get("default") == o["value"] else ""
             opts.append(
                 f'<label class="radio"><input type="radio" name="{name}" '
