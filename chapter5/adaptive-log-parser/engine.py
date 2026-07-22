@@ -77,11 +77,11 @@ class LogParserEngine:
         for name, fn in self._parsers:
             try:
                 result = fn(line)
+                if result and isinstance(result, dict):
+                    return {"_parser": name, **result}
             except Exception:
                 # 某个解析器对这行报错，不代表别的不行，继续尝试
                 continue
-            if result:
-                return {"_parser": name, **result}
         raise ParseError(line)
 
     # -- 热加载：从 .py 文件加载 parse 函数 ----------------------------------
