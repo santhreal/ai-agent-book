@@ -501,7 +501,8 @@ def run_orchestration(chapters, out_dir, *, source_lang="英文", target_lang="�
         client, tracker, manager_context["task"],
         manager_context["file_index"], report_summary
     )
-    revise = decision.get("revise", [])
+    # JSON null revise must behave like omit ([]); .get(..., []) does not.
+    revise = decision.get("revise") or []
     emit(f"Manager 决策 ✓：需修订章节 {revise or '无'}")
 
     for name in revise:
