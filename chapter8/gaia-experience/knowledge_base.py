@@ -312,7 +312,11 @@ class KnowledgeBase:
         scored_docs = []
         
         for doc in self.documents:
-            doc_text = f"{doc.get('question', '')} {doc.get('approach', '')} {' '.join(doc.get('tools_used', []))}"
+            # tools_used may be JSON null; treat like [] (same as missing key).
+            tools = doc.get('tools_used') or []
+            if not isinstance(tools, list):
+                tools = []
+            doc_text = f"{doc.get('question', '')} {doc.get('approach', '')} {' '.join(tools)}"
             doc_words = set(doc_text.lower().split())
             
             # Calculate simple overlap score
