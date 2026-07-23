@@ -12,6 +12,11 @@ import json
 from pathlib import Path
 
 
+def _savefig(save_path: str, **kwargs) -> None:
+    Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+    plt.savefig(save_path, **kwargs)
+
+
 def _configure_cjk_font():
     """
     Best-effort: pick a CJK-capable font so Chinese token labels (e.g. the
@@ -119,7 +124,7 @@ def create_attention_heatmap(
     
     # Save if path provided
     if save_path:
-        plt.savefig(save_path, dpi=150, bbox_inches='tight')
+        _savefig(save_path, dpi=150, bbox_inches='tight')
         
     return fig
 
@@ -211,7 +216,7 @@ def create_attention_flow_diagram(
     plt.tight_layout()
     
     if save_path:
-        plt.savefig(save_path, dpi=150, bbox_inches='tight')
+        _savefig(save_path, dpi=150, bbox_inches='tight')
         
     return fig
 
@@ -340,7 +345,7 @@ def create_token_attention_summary(
     plt.tight_layout()
     
     if save_path:
-        plt.savefig(save_path, dpi=150, bbox_inches='tight')
+        _savefig(save_path, dpi=150, bbox_inches='tight')
         
     return fig
 
@@ -551,7 +556,7 @@ def create_layer_attention_heatmap(
     plt.tight_layout()
 
     if save_path:
-        plt.savefig(save_path, dpi=150, bbox_inches="tight")
+        _savefig(save_path, dpi=150, bbox_inches="tight")
 
     return fig
 
@@ -609,7 +614,7 @@ def create_attention_comparison(
     plt.tight_layout()
 
     if save_path:
-        plt.savefig(save_path, dpi=150, bbox_inches="tight")
+        _savefig(save_path, dpi=150, bbox_inches="tight")
 
     return fig
 
