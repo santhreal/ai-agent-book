@@ -98,6 +98,23 @@ def column_label(col, schema):
 def fit(schema, results, k_range=range(2, 5), save=True, verbose=True):
     """在**每个罪名内部**聚类出案件原型（书中：在某罪名内自动聚出典型模式），
     再跨全部原型算全局因子重要性。"""
+    # Empty extract pass (e.g. empty cases.jsonl) is valid; do not crash StandardScaler.
+    if not results:
+        model = {
+            "columns": [],
+            "scaler_mean": [],
+            "scaler_scale": [],
+            "n_archetypes": 0,
+            "silhouette_mean": 0.0,
+            "global_importance": [],
+            "archetypes": [],
+            "n_samples": 0,
+        }
+        if save:
+            os.makedirs(DATA_DIR, exist_ok=True)
+            with open(MODEL_PATH, "w", encoding="utf-8") as fh:
+                json.dump(model, fh, ensure_ascii=False, indent=2)
+        return model
     columns = build_columns(schema, results)
     X_raw = np.array([vectorize(r["extracted"], columns)[0] for r in results])
     months = np.array([r["label_months"] for r in results], dtype=float)
