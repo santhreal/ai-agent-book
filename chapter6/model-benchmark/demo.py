@@ -189,6 +189,8 @@ def summary_to_dict(s: ProviderSummary) -> dict:
 
 def write_output(path: str, meta: dict, summaries: list[ProviderSummary]) -> None:
     payload = {"meta": meta, "results": [summary_to_dict(s) for s in summaries]}
+    # Nested --output paths (e.g. out/run1/result.json) need their parent dirs.
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
     print(f"结果已写入：{path}")
