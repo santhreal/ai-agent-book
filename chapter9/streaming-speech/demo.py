@@ -483,7 +483,9 @@ def main(argv=None):
 
     # ---- 可选：结果落盘 ----
     if args.output:
-        Path(args.output).write_text(
+        out_path = Path(args.output)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(
             json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
         print(f"\n[输出] 结果已写入：{args.output}")
 
