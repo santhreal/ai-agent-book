@@ -99,4 +99,7 @@ class ToolIndex:
         q = self.embedder.embed([need])[0]
         scored = [(name, _cosine(q, self.vectors[name])) for name in self.names]
         scored.sort(key=lambda x: x[1], reverse=True)
+        # Negative top_k must not use Python's tail-dropping slice.
+        if top_k < 0:
+            return scored
         return scored[:top_k]
