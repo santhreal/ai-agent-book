@@ -37,7 +37,7 @@ description: 围绕核心公式 Agent = LLM + 上下文 + 工具,用 10 章把 A
 
 <a class="exp-card" href="book/chapter1/">
 <span class="exp-title">🚀 第 1 章 · Agent 基础知识</span>
-<span class="exp-desc">「模型即 Agent」新范式 + Agent 核心公式;Harness 工程才是竞争力</span>
+<span class="exp-desc">Agent = LLM + 上下文 + 工具；Harness 工程才是竞争力</span>
 </a>
 
 <a class="exp-card" href="book/chapter2/">
@@ -98,9 +98,9 @@ description: 围绕核心公式 Agent = LLM + 上下文 + 工具,用 10 章把 A
 
 使用顶部导航栏的语言 Tab 切换:
 
-| 中文 | 正體中文 | English | தமிழ் | Tiếng Việt |
-|:---:|:---:|:---:|:---:|:---:|
-| ✅ 原版 | 社区翻译 | 社区翻译 | 社区翻译 | 社区翻译 |
+| 中文 | 正體中文 | English | Русский | தமிழ் | Tiếng Việt | 日本語 |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| ✅ 原版 | 社区翻译 | 社区翻译 | 社区翻译 | 社区翻译 | 社区翻译 | 社区翻译 |
 
 ---
 
