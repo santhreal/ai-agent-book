@@ -194,6 +194,8 @@ class Judge:
             return
         seer = seers[0]
         candidates = [p.name for p in self.alive() if p.name != seer.name]
+        if not candidates:
+            return
         target = seer.choose_target(
             "现在是夜晚，预言家行动。请选择一名玩家查验其真实阵营。",
             candidates, self.names, allow_none=False)
