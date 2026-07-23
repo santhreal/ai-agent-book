@@ -151,7 +151,10 @@ def descriptive_stats(numbers: List[float]) -> str:
     """给一组数值返回基本描述统计（均值/最大/最小/极差）。"""
     if not numbers:
         return "输入为空，无法统计。"
-    nums = [float(x) for x in numbers]
+    # JSON null elements (e.g. [1, null, 3] from tool args) are skipped.
+    nums = [float(x) for x in numbers if x is not None]
+    if not nums:
+        return "输入为空，无法统计。"
     n = len(nums)
     mean = sum(nums) / n
     return (
