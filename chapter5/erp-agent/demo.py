@@ -220,6 +220,7 @@ def _write_output(path, mode, today, passed, total, results):
         "total": total,
         "results": results,
     }
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
     print(f"\n已写出结果 JSON：{path}")
