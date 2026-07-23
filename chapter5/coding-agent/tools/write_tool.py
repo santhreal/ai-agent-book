@@ -38,7 +38,7 @@ class WriteTool(BaseTool):
             result = {
                 "file_path": str(file_path),
                 "bytes_written": len(content.encode('utf-8')),
-                "lines_written": len(content.split('\n'))
+                "lines_written": len(content.splitlines())
             }
             
             # Check for lint errors

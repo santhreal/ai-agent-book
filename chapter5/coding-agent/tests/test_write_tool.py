@@ -70,7 +70,7 @@ class TestWriteTool:
         })
         
         assert result.success
-        assert result.data["lines_written"] == 4  # 3 lines + final newline
+        assert result.data["lines_written"] == 3
         assert file_path.read_text() == content
     
     def test_python_lint_check_success(self, system_state, temp_dir):
