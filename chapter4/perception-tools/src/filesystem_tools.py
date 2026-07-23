@@ -120,6 +120,27 @@ async def grep_search(
         logging.info(f"🔍 Searching for pattern '{pattern}' in {dir_path}")
         
         results = []
+        # max_results=0 means zero hits (like `head -0`), not "unlimited until one match".
+        if max_results <= 0:
+            action_response = ActionResponse(
+                success=True,
+                message={
+                    "pattern": pattern,
+                    "results": [],
+                    "total_found": 0,
+                    "truncated": False,
+                },
+                metadata={
+                    "directory": str(dir_path),
+                    "file_pattern": file_pattern,
+                    "recursive": recursive,
+                },
+            )
+            return TextContent(
+                type="text",
+                text=json.dumps(action_response.model_dump()),
+            )
+
         flags = re.IGNORECASE if not case_sensitive else 0
         regex = re.compile(pattern, flags)
         
