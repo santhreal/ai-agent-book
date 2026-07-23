@@ -110,8 +110,8 @@ def normalize_number(text: str) -> Optional[str]:
     # 去除逗号和空格
     text = text.replace(",", "").replace(" ", "")
     
-    # 提取数字（包括小数和负数）
-    match = re.search(r'-?\d+\.?\d*', text)
+    # 提取数字（包括小数、负数与科学计数法，如 1e3 / 1.5E+2）
+    match = re.search(r'-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?', text)
     if match:
         num_str = match.group(0)
         try:
