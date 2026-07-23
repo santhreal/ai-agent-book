@@ -36,6 +36,16 @@ import sys
 from csp_solver import solve_labeled
 from sandbox import run_python
 
+
+def write_run_json(path: str, payload: dict) -> None:
+    """Persist run results; create parent dirs so --output a/b/run.json works."""
+    parent = os.path.dirname(os.path.abspath(path))
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+
+
 # ---- 读取 .env(如果存在)。避免额外依赖，手写一个极简解析器。----
 def _load_dotenv(path=".env"):
     if not os.path.exists(path):
@@ -365,8 +375,7 @@ def main():
     for m, recs in results.items():
         payload[m] = recs
         payload[f"{m}_acc"] = sum(r["correct"] for r in recs) / len(recs)
-    with open(args.output, "w", encoding="utf-8") as f:
-        json.dump(payload, f, ensure_ascii=False, indent=2)
+    write_run_json(args.output, payload)
     print(f"\n完整逐题记录已保存到 {args.output}")
 
 
