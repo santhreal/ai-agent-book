@@ -35,17 +35,36 @@ def load_problems(path: str) -> list[dict]:
     return problems
 
 
+def _parse_number_token(token: str):
+    """Parse a decimal or a simple a/b quotient."""
+    token = token.replace(",", "").replace(" ", "")
+    if "/" in token:
+        left, right = token.split("/", 1)
+        try:
+            num, den = float(left), float(right)
+        except ValueError:
+            return None
+        if den == 0:
+            return None
+        return num / den
+    try:
+        return float(token)
+    except ValueError:
+        return None
+
+
 def extract_predicted_number(text: str) -> Optional[float]:
     """从模型输出中解析最终答案数值。优先匹配 Final Answer 标记，否则取最后一个数字。"""
-    m = re.findall(r"Final Answer[:：]\s*(-?[\d,]+(?:\.\d+)?)", text, re.IGNORECASE)
+    m = re.findall(
+        r"Final Answer[:：]\s*(-?[\d,]+(?:\.\d+)?(?:\s*/\s*-?[\d,]+(?:\.\d+)?)?)",
+        text,
+        re.IGNORECASE,
+    )
     if not m:
         m = re.findall(r"-?[\d,]+(?:\.\d+)?", text)
     if not m:
         return None
-    try:
-        return float(m[-1].replace(",", ""))
-    except ValueError:
-        return None
+    return _parse_number_token(m[-1])
 
 
 def verify(text: str, gold: float, tol: float = 1e-6) -> bool:
