@@ -4,6 +4,7 @@ Demo script showcasing different extraction techniques
 
 import argparse
 import asyncio
+import os
 import sys
 from pathlib import Path
 from typing import List, Optional, Tuple
@@ -26,6 +27,14 @@ class _Tee:
     def flush(self):
         self._stream.flush()
         self._file.flush()
+
+
+def open_output(path: str):
+    """Open --output for writing; create parent dirs for nested paths."""
+    parent = os.path.dirname(os.path.abspath(path))
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    return open(path, "w", encoding="utf-8")
 
 
 async def compare_extraction_modes(file_path: str, query: str, model: str = "gemini-3.5-flash"):
@@ -324,7 +333,7 @@ async def main():
 
     # 支持 --output：把整段对比结果同时落盘
     if args.output:
-        with open(args.output, "w", encoding="utf-8") as fh:
+        with open_output(args.output) as fh:
             original_stdout = sys.stdout
             sys.stdout = _Tee(original_stdout, fh)
             try:
