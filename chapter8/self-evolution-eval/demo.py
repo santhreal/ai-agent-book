@@ -34,6 +34,16 @@ DEMO_TASK_IDS = ["task-01", "task-17", "task-07"]  # 多媒体 / 地理空间 / 
 _PROFILES = {"strong": STRONG, "weak": WEAK}
 
 
+def write_reports_json(path: str, payload: dict) -> None:
+    """Write eval reports; create parent dirs for nested --output paths."""
+    parent = os.path.dirname(os.path.abspath(path))
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+
+
+
 def load_dataset():
     with open(os.path.join(HERE, "dataset.json"), encoding="utf-8") as f:
         return json.load(f)
@@ -267,9 +277,10 @@ def main():
     print_results_table(all_reports)
 
     if args.output:
-        with open(args.output, "w", encoding="utf-8") as f:
-            json.dump({"layers": list(layers), "reports": all_reports}, f,
-                      ensure_ascii=False, indent=2)
+        write_reports_json(
+            args.output,
+            {"layers": list(layers), "reports": all_reports},
+        )
         print(f"[已写出] 完整评分结果 -> {args.output}\n")
 
     print("=" * 78)
