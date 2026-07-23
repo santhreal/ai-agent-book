@@ -214,7 +214,7 @@ class ContextualChunker:
                 for sent in sentences:
                     if len(sent) > self.chunking_config.max_chunk_size:
                         # Force split very long sentences
-                        for i in range(0, len(sent), self.chunking_config.chunk_size):
+                        for i in range(0, len(sent), max(1, self.chunking_config.chunk_size)):
                             sub_chunk = sent[i:i + self.chunking_config.chunk_size]
                             chunks.append(self._create_basic_chunk(sub_chunk, doc_id, len(chunks)))
                     else:
@@ -249,7 +249,7 @@ class ContextualChunker:
         """Simple size-based chunking"""
         chunks = []
         
-        for i in range(0, len(text), self.chunking_config.chunk_size - self.chunking_config.chunk_overlap):
+        for i in range(0, len(text), max(1, self.chunking_config.chunk_size - self.chunking_config.chunk_overlap)):
             chunk_text = text[i:i + self.chunking_config.chunk_size]
             
             if len(chunk_text) >= self.chunking_config.min_chunk_size:
