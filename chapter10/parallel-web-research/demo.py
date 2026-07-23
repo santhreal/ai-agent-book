@@ -40,6 +40,15 @@ from message_bus import MessageBus
 from sources import DEMO_SOURCES, QUESTION, build_sources
 
 
+def write_conclusion_json(path: str, summary: dict) -> None:
+    """Write conclusion JSON; create parent dirs for nested --output paths."""
+    parent = os.path.dirname(os.path.abspath(path))
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(summary, f, ensure_ascii=False, indent=2)
+
+
 def _parse_args() -> argparse.Namespace:
     """解析命令行参数；不传任何参数时行为与之前完全一致（10 Agent、离线、详细日志）。"""
     parser = argparse.ArgumentParser(
@@ -198,8 +207,7 @@ async def main(args: argparse.Namespace):
             ),
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
         }
-        with open(args.output, "w", encoding="utf-8") as f:
-            json.dump(summary, f, ensure_ascii=False, indent=2)
+        write_conclusion_json(args.output, summary)
         print(f"\n[已写入] 结论 JSON -> {args.output}")
 
     # —— 断言式自检：仅在离线可复现模式下强断言（LLM 模式命中与否取决于模型）——
