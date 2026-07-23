@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 def _save_output(path: str, payload: dict):
     """把问题、ReAct 轨迹和答案保存为 JSON 文件"""
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
     print(f"\n💾 结果已保存到: {path}")
