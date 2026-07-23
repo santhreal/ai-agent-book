@@ -468,6 +468,8 @@ def main(argv=None):
             "code_correct": code_correct if run_code else None,
             "rows": rows,
         }
+        # Nested --output paths need parent dirs (same pattern as other chapter demos).
+        os.makedirs(os.path.dirname(args.output) or ".", exist_ok=True)
         with open(args.output, "w", encoding="utf-8") as f:
             json.dump(summary, f, ensure_ascii=False, indent=2)
         print(f"\n结果已写入：{args.output}")
