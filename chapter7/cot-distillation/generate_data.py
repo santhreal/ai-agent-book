@@ -177,8 +177,8 @@ async def main():
     client = AsyncOpenAI(base_url=args.base_url, api_key=api_key, timeout=args.request_timeout)
     semaphore = asyncio.Semaphore(args.concurrency)
 
-    os.makedirs(os.path.dirname(args.raw_output), exist_ok=True)
-    os.makedirs(os.path.dirname(args.sft_output), exist_ok=True)
+    os.makedirs(os.path.dirname(args.raw_output) or ".", exist_ok=True)
+    os.makedirs(os.path.dirname(args.sft_output) or ".", exist_ok=True)
 
     # 增量落盘：每题完成立即写入原始轨迹，进程被挂死/中断也不丢已完成的结果
     records = []
