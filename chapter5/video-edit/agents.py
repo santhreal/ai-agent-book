@@ -208,6 +208,8 @@ class VideoAnalyzerAgent:
 
 def _frange(start, stop, step):
     """浮点 range（含首、含接近末尾的采样点）。"""
+    if step <= 0:
+        raise ValueError(f"step must be positive, got {step!r}")
     out = []
     t = start
     while t < stop - 1e-6:
