@@ -34,6 +34,10 @@ class GrepTool(BaseTool):
         - Head limit
         """
         pattern = params["pattern"]
+        # Empty pattern matches every position in Python re / would list all files;
+        # ripgrep rejects it — do the same.
+        if not str(pattern):
+            return {"error": "Empty pattern not allowed"}
         path = params.get("path", ".")
         if path is None:
             path = "."
