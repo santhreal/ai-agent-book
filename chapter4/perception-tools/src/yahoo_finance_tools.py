@@ -132,6 +132,12 @@ async def get_stock_quote(
         )
 
 
+def _preview_rows(historical_data, max_rows_preview: int):
+    """Return head preview; 0 or negative means all (negative must not slice from the tail)."""
+    preview = max(0, max_rows_preview)
+    return historical_data if preview == 0 else historical_data[:preview]
+
+
 async def get_historical_data(
     symbol: str,
     start: str,
@@ -184,7 +190,7 @@ async def get_historical_data(
             "end_date": end,
             "interval": interval,
             "total_records": len(historical_data),
-            "data": historical_data if max_rows_preview == 0 else historical_data[:max_rows_preview]
+            "data": _preview_rows(historical_data, max_rows_preview)
         }
         
         metadata = YFinanceMetadata(
