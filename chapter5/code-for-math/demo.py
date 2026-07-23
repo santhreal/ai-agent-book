@@ -155,17 +155,37 @@ CODE_SYSTEM = (
 # 答案抽取
 # ---------------------------------------------------------------------------
 
+def _parse_int_answer(token: str):
+    """Parse an integer or a simple a/b that evaluates to an integer."""
+    token = token.replace(",", "").replace(" ", "")
+    if "/" in token:
+        left, right = token.split("/", 1)
+        try:
+            num, den = int(left), int(right)
+        except ValueError:
+            return None
+        if den == 0 or num % den != 0:
+            return None
+        return num // den
+    try:
+        return int(token)
+    except ValueError:
+        return None
+
+
 def extract_answer(text: str):
     """从模型输出中解析整数答案。优先匹配 FINAL ANSWER，退化到最后一个整数。"""
     if not text:
         return None
-    m = list(re.finditer(r"FINAL ANSWER:\s*(-?\d+)", text, re.IGNORECASE))
+    m = list(re.finditer(
+        r"FINAL ANSWER:\s*(-?\d+(?:\s*/\s*-?\d+)?)", text, re.IGNORECASE
+    ))
     if m:
-        return int(m[-1].group(1))
-    # 退化：抓最后一个 \boxed{...} 或末尾整数
-    m = list(re.finditer(r"\\boxed\{\s*(-?\d+)\s*\}", text))
+        return _parse_int_answer(m[-1].group(1))
+    # 退化：抓最后一个 \boxed{...} 或末尾整数（含 boxed 内 a/b）
+    m = list(re.finditer(r"\\boxed\{\s*(-?\d+(?:\s*/\s*-?\d+)?)\s*\}", text))
     if m:
-        return int(m[-1].group(1))
+        return _parse_int_answer(m[-1].group(1))
     nums = re.findall(r"-?\d+", text)
     return int(nums[-1]) if nums else None
 
