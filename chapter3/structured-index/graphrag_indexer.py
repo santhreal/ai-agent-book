@@ -494,17 +494,20 @@ class GraphRAGIndexer:
 
         # BFS 沿边遍历，收集 <= max_hops 跳的路径
         results: List[Dict[str, Any]] = []
-        queue = [(start_id, [])]
+        queue = [(start_id, [], {start_id})]
         while queue and len(results) < top_k * 4:
-            node_id, path = queue.pop(0)
+            node_id, path, visited = queue.pop(0)
             if len(path) >= max_hops:
                 continue
             for neighbor in self.graph.neighbors(node_id):
+                if neighbor in visited:
+                    continue
                 rel_type = self.graph[node_id][neighbor].get("type", "related")
                 src_name = self.entities[node_id].name if node_id in self.entities else node_id
                 dst_name = self.entities[neighbor].name if neighbor in self.entities else neighbor
                 step = {"source": src_name, "relation": rel_type, "target": dst_name}
                 new_path = path + [step]
+                new_visited = visited | {neighbor}
                 if relation_filter is None or rel_type == relation_filter:
                     results.append({
                         "target": dst_name,
@@ -512,7 +515,7 @@ class GraphRAGIndexer:
                         "hops": len(new_path),
                         "path": new_path,
                     })
-                queue.append((neighbor, new_path))
+                queue.append((neighbor, new_path, new_visited))
 
         results.sort(key=lambda r: r["hops"])
         return results[:top_k]
