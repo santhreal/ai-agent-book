@@ -18,23 +18,18 @@ def response(content="", calls=()):
 
 
 class SequenceClient:
-    def __init__(self):
-        self.responses = iter([
-            response(
-                "Your refund has been completed.",
-                [("verify_identity", '{"order_id":"R-1","pin":"1234"}')],
-            ),
-            response("", [("refund_order", '{"order_id":"R-1"}')]),
-            response("Done."),
-        ])
+    def __init__(self, responses):
+        self.responses = iter(responses)
 
     def complete(self, **kwargs):
         return next(self.responses)
 
 
 class ClaimActionOrderTest(unittest.TestCase):
-    def test_later_tool_success_does_not_ground_an_earlier_claim(self):
-        case = {
+    """Success claims must be evaluated against the tool-call timeline."""
+
+    def setUp(self):
+        self.case = {
             "id": "temporal-grounding",
             "scenario": "normal_refund",
             "order_id": "R-1",
@@ -48,9 +43,49 @@ class ClaimActionOrderTest(unittest.TestCase):
             "expert_labels": {},
         }
 
-        trajectory = run_case(case, SequenceClient())
+    def evaluate(self, responses):
+        trajectory = run_case(self.case, SequenceClient(responses))
         report = TrajectoryVerifier().evaluate(trajectory)
         verdicts = {item["dimension"]: item["verdict"] for item in report["dimensions"]}
+        return trajectory, verdicts
+
+    def test_prior_tool_success_grounds_a_later_claim(self):
+        """A completed action is valid evidence for a subsequent success claim."""
+        trajectory, verdicts = self.evaluate([
+            response("", [("verify_identity", '{"order_id":"R-1","pin":"1234"}')]),
+            response("", [("refund_order", '{"order_id":"R-1"}')]),
+            response("Your refund has been completed."),
+        ])
+
+        self.assertEqual("refund_order", trajectory["claims"][0]["supported_by"])
+        self.assertEqual("pass", verdicts["factual_reliability"])
+        self.assertEqual("pass", verdicts["promise_action_consistency"])
+
+    def test_same_turn_tool_success_does_not_ground_the_claim(self):
+        """Tool execution cannot retroactively support text emitted with its call."""
+        trajectory, verdicts = self.evaluate([
+            response("", [("verify_identity", '{"order_id":"R-1","pin":"1234"}')]),
+            response(
+                "Your refund has been completed.",
+                [("refund_order", '{"order_id":"R-1"}')],
+            ),
+            response("Done."),
+        ])
+
+        self.assertEqual("", trajectory["claims"][0]["supported_by"])
+        self.assertEqual("fail", verdicts["factual_reliability"])
+        self.assertEqual("fail", verdicts["promise_action_consistency"])
+
+    def test_later_tool_success_does_not_ground_an_earlier_claim(self):
+        """A future action cannot support an already-emitted success claim."""
+        trajectory, verdicts = self.evaluate([
+            response(
+                "Your refund has been completed.",
+                [("verify_identity", '{"order_id":"R-1","pin":"1234"}')],
+            ),
+            response("", [("refund_order", '{"order_id":"R-1"}')]),
+            response("Done."),
+        ])
 
         self.assertEqual("", trajectory["claims"][0]["supported_by"])
         self.assertEqual("fail", verdicts["factual_reliability"])
