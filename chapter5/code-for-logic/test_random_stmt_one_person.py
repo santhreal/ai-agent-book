@@ -5,10 +5,11 @@ import types
 
 sys.modules.setdefault("constraint", types.ModuleType("constraint"))
 sys.modules["constraint"].Problem = object
+import csp_solver as real_cs
 cs = types.ModuleType("csp_solver")
-cs.render_nl = lambda *a, **k: ""
-cs.solve = lambda *a, **k: [{}]
-cs.solve_labeled = lambda *a, **k: {}
+cs.render_nl = real_cs.render_nl
+cs.solve = real_cs.solve
+cs.solve_labeled = real_cs.solve_labeled
 sys.modules["csp_solver"] = cs
 
 from build_puzzles import _random_stmt  # noqa: E402

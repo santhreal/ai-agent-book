@@ -104,15 +104,19 @@ def render_nl(node):
         word = {">=": "至少", "<=": "至多", "==": "恰好"}[node[2]]
         return f"我们当中{word}有 {node[3]} 个{role}。"
     if tag == "and":
-        return f"{render_nl(node[1])[:-1]}，并且 {render_nl(node[2])}"
+        sub = render_nl(node[1]).rstrip("。？")
+        return f"{sub}，并且 {render_nl(node[2])}"
     if tag == "or":
-        return f"{render_nl(node[1])[:-1]}，或者 {render_nl(node[2])}"
+        sub = render_nl(node[1]).rstrip("。？")
+        return f"{sub}，或者 {render_nl(node[2])}"
     if tag == "not":
         return f"以下说法不成立：{render_nl(node[1])}"
     if tag == "implies":
-        return f"如果 {render_nl(node[1])[:-1]}，那么 {render_nl(node[2])}"
+        sub = render_nl(node[1]).rstrip("。？")
+        return f"如果 {sub}，那么 {render_nl(node[2])}"
     if tag == "iff":
-        return f"{render_nl(node[1])[:-1]}，当且仅当 {render_nl(node[2])}"
+        sub = render_nl(node[1]).rstrip("。？")
+        return f"{sub}，当且仅当 {render_nl(node[2])}"
     raise ValueError(f"未知的陈述节点: {node!r}")
 
 
