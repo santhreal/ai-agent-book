@@ -19,8 +19,13 @@ def test_native_s1_nonverbal_events_not_onomatopoeia():
     assert "哈哈，" not in texts and "唉——" not in texts
 
 
-def test_concat_handles_apostrophe_in_output_directory(tmp_path):
-    output_dir = tmp_path / "speaker's clips"
+@pytest.mark.parametrize(
+    "directory_name",
+    ["speaker clips", "speaker's clips", "d'angelo's clips"],
+)
+def test_concat_handles_apostrophe_in_output_directory(tmp_path, directory_name):
+    """FFconcat must preserve ordinary, single-quote, and multi-quote paths."""
+    output_dir = tmp_path / directory_name
     output_dir.mkdir()
     parts = [output_dir / "first.mp3", output_dir / "second.mp3"]
     for part in parts:
