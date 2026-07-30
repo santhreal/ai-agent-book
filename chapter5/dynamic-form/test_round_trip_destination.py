@@ -10,9 +10,20 @@ import pytest
     [
         "我想订一张去北京的机票",
         "我想订一张去北京的往返机票",
+        "我想订一张去北京往返机票",
+        "我想订一张去北京的单程机票",
+        "我想订一张去北京单程机票",
+    ],
+    ids=[
+        "simple",
+        "round-trip-with-de",
+        "round-trip-without-de",
+        "one-way-with-de",
+        "one-way-without-de",
     ],
 )
 def test_offline_cli_extracts_only_the_destination(user_request, tmp_path):
+    """Trip-type modifiers must not become part of the submitted destination."""
     demo = Path(__file__).with_name("demo.py")
     result = subprocess.run(
         [
@@ -30,3 +41,4 @@ def test_offline_cli_extracts_only_the_destination(user_request, tmp_path):
 
     assert result.returncode == 0, result.stderr
     assert '"destination_city": "北京"' in result.stdout
+    assert "已收到您的订票信息：上海 → 北京，出发日期" in result.stdout
