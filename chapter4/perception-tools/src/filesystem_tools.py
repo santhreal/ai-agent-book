@@ -456,15 +456,17 @@ async def grep_search(
                                 "absolute_path": str(file_path)
                             })
 
-                            if len(results) >= max_results:
+                            if len(results) > max_results:
                                 break
 
-                if len(results) >= max_results:
+                if len(results) > max_results:
                     break
 
             except Exception as e:
                 logging.warning(f"Error reading {file_path}: {e}")
                 continue
+        truncated = len(results) > max_results
+        results = results[:max_results]
 
         logging.info(f"✅ Found {len(results)} matches")
 
@@ -474,7 +476,7 @@ async def grep_search(
                 "pattern": pattern,
                 "results": results,
                 "total_found": len(results),
-                "truncated": len(results) >= max_results
+                "truncated": truncated
             },
 
             metadata={

@@ -57,3 +57,14 @@ async def test_max_results_one_still_caps(tmp_path: Path):
     assert msg["total_found"] == 1
     assert len(msg["results"]) == 1
     assert msg["truncated"] is True
+
+
+@pytest.mark.asyncio
+async def test_exact_max_results_is_not_truncated(tmp_path: Path):
+    (tmp_path / "a.py").write_text("hello world\n", encoding="utf-8")
+    r = await grep_search("hello", str(tmp_path), max_results=1)
+    payload = json.loads(r.text if hasattr(r, "text") else r)
+    msg = payload["message"]
+    assert msg["total_found"] == 1
+    assert len(msg["results"]) == 1
+    assert msg["truncated"] is False
