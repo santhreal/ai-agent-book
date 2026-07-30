@@ -33,6 +33,12 @@ async def set_timer(
         Dictionary with timer ID and metadata
     """
     try:
+        if duration_seconds is None or duration_seconds <= 0:
+            return {
+                "success": False,
+                "error": "duration_seconds must be positive",
+                "message": "Failed to set timer"
+            }
         # Generate timer ID
         timer_id = str(uuid.uuid4())
         
