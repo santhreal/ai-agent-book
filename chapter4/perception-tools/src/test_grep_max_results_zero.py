@@ -38,6 +38,7 @@ from filesystem_tools import grep_search  # noqa: E402
 
 @pytest.mark.asyncio
 async def test_max_results_zero_returns_no_matches(tmp_path: Path):
+    """A zero cap returns no matches and does not report truncation."""
     (tmp_path / "a.py").write_text("hello world\nhello again\n", encoding="utf-8")
     r = await grep_search("hello", str(tmp_path), max_results=0)
     payload = json.loads(r.text if hasattr(r, "text") else r)
@@ -50,6 +51,7 @@ async def test_max_results_zero_returns_no_matches(tmp_path: Path):
 
 @pytest.mark.asyncio
 async def test_max_results_one_still_caps(tmp_path: Path):
+    """Matches beyond the cap are omitted and reported as truncated."""
     (tmp_path / "a.py").write_text("hello world\nhello again\n", encoding="utf-8")
     r = await grep_search("hello", str(tmp_path), max_results=1)
     payload = json.loads(r.text if hasattr(r, "text") else r)
@@ -61,6 +63,7 @@ async def test_max_results_one_still_caps(tmp_path: Path):
 
 @pytest.mark.asyncio
 async def test_exact_max_results_is_not_truncated(tmp_path: Path):
+    """A complete result set equal to the cap is not truncated."""
     (tmp_path / "a.py").write_text("hello world\n", encoding="utf-8")
     r = await grep_search("hello", str(tmp_path), max_results=1)
     payload = json.loads(r.text if hasattr(r, "text") else r)
