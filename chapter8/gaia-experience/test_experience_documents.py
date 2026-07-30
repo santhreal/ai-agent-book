@@ -59,6 +59,29 @@ class ExperienceDocumentTest(unittest.TestCase):
         self.assertEqual(1, len(documents))
         self.assertIn("gaia-x (failure, score=0.00)", documents[0].sources)
 
+    def test_evaluate_retrieval_baselines_empty_inputs(self):
+        cases = [{"query": "test query", "task_family": "web_research", "expected_guidance": [], "harmful_guidance": []}]
+        report = evaluate_retrieval_baselines([], [], cases)
+        self.assertEqual(0.0, report["single_trajectory_summary"]["average_retrieved_characters"])
+        self.assertEqual(0.0, report["knowledge_document"]["average_retrieved_characters"])
+        self.assertEqual(1.0, report["single_trajectory_summary"]["transfer_success_rate"])
+        self.assertEqual(1.0, report["knowledge_document"]["transfer_success_rate"])
+
+    def test_build_documents_tolerates_null_environment_score(self):
+        record = {
+            "id": "gaia-null-score",
+            "task_family": "web_research",
+            "environment_score": None,
+            "observed_strategies": ["s"],
+            "mistakes": [],
+            "exceptions": [],
+            "applies_when": [],
+            "capabilities": [],
+        }
+        documents = build_documents([record])
+        self.assertEqual(1, len(documents))
+        self.assertIn("gaia-null-score (failure, score=0.00)", documents[0].sources)
+
 
 if __name__ == "__main__":
     unittest.main()

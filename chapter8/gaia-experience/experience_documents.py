@@ -79,7 +79,8 @@ def build_documents(
     groups: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
     for item in trajectories:
         record = dict(item)
-        record["outcome"] = outcome_label(float(record.get("environment_score", 0.0)))
+        score_val = float(record.get("environment_score") or 0.0)
+        record["outcome"] = outcome_label(score_val)
         groups[record["task_family"]].append(record)
 
     documents: List[ExperienceDocument] = []
@@ -104,7 +105,7 @@ def build_documents(
         )
         pitfalls = tuple(text for text, _ in pitfall_support.most_common())
         sources = tuple(
-            f"{record['id']} ({record['outcome']}, score={float(record.get('environment_score', 0.0)):.2f})"
+            f"{record['id']} ({record['outcome']}, score={float(record.get('environment_score') or 0.0):.2f})"
             for record in records
         )
         documents.append(ExperienceDocument(
@@ -164,6 +165,8 @@ def _trajectory_summary(record: Dict[str, Any]) -> Dict[str, Any]:
 def _retrieve_summary(query: str, family: str, records: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
     query_tokens = _tokens(query)
     summaries = [_trajectory_summary(record) for record in records]
+    if not summaries:
+        return {"id": "", "task_family": family, "text": "", "directives": []}
 
     def score(summary: Dict[str, Any]) -> tuple[float, str]:
         family_bonus = 10.0 if summary["task_family"] == family else 0.0
@@ -190,9 +193,14 @@ def evaluate_retrieval_baselines(
                 directives = summary["directives"]
                 content = summary["text"]
             else:
-                document = retrieve_documents(case["query"], case["task_family"], documents)[0]
-                directives = list(document.recommended_strategies)
-                content = document.to_markdown()
+                retrieved = retrieve_documents(case["query"], case["task_family"], documents)
+                if retrieved:
+                    document = retrieved[0]
+                    directives = list(document.recommended_strategies)
+                    content = document.to_markdown()
+                else:
+                    directives = []
+                    content = ""
 
             guidance = " ".join(directives).lower()
             expected = [term.lower() for term in case.get("expected_guidance", [])]
