@@ -70,12 +70,16 @@ class Config:
         return True
     
     @classmethod
-    def resolve_llm(cls):
-        """Return ``(api_key, base_url, model)`` honoring the MOONSHOT->OpenRouter fallback.
+    def resolve_llm(cls, api_key: Optional[str] = None):
+        """Return ``(api_key, base_url, model)`` honoring explicit credentials
+        and the MOONSHOT->OpenRouter fallback.
 
         Computed at call time so a runtime override of ``Config.MODEL_NAME``
         (e.g. via ``--model``) is respected.
         """
+        if api_key:
+            return api_key, cls.MOONSHOT_BASE_URL, cls.MODEL_NAME
+
         from openrouter_fallback import resolve_llm as _resolve
         return _resolve(
             model=cls.MODEL_NAME,
