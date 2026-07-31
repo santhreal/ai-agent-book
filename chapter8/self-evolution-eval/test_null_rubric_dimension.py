@@ -22,3 +22,7 @@ def test_missing_dimension_still_zero():
 def test_empty_string_score_rejected():
     with pytest.raises(ValueError):
         _rubric_dimension_total({"error_handling": ""})
+
+
+def test_null_rubric_dict():
+    assert _rubric_dimension_total(None) == 0

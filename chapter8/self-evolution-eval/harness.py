@@ -11,6 +11,8 @@ PHASES = ("learning", "transfer", "change", "retention")
 
 def _rubric_dimension_total(rubric: dict) -> int:
     """Compatibility helper retained for older result files and tests."""
+    if not isinstance(rubric, dict):
+        return 0
     dims = ["error_handling", "input_validation", "documentation", "robustness"]
     return sum(int(value) if value is not None else 0 for value in (rubric.get(key) for key in dims))
 
