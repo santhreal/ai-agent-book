@@ -9,3 +9,9 @@ def test_small_two_model_sample():
     ratings = compute_mle_elo(df)
     assert len(ratings) == 2
     assert set(ratings.index) == {"gpt-4", "llama-3"}
+
+
+def test_calibration_rating_none():
+    df = pd.DataFrame(simulate_battles({"gpt-4": 1200.0, "llama-3": 1000.0}, 10, seed=1))
+    ratings = compute_mle_elo(df, calibration_model="gpt-4", calibration_rating=None)
+    assert len(ratings) == 2
