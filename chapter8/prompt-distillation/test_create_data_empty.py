@@ -35,3 +35,8 @@ def test_generate_blank_lines_only(tmp_path):
     )
     assert result is None
     assert not output_file.exists()
+
+
+def test_parse_final_answer_none():
+    from create_data import parse_final_answer
+    assert parse_final_answer(None) is None

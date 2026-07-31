@@ -90,6 +90,9 @@ def parse_final_answer(response: str, debug: bool = False) -> Optional[str]:
     Parse the final answer from the model response.
     For Thinking models, extract from <think>...</think> tags or after them.
     """
+    if not isinstance(response, str):
+        return None
+
     # For Thinking models, the response may have <think></think> tags
     # Remove thinking content and focus on the final answer
     response_stripped = response.strip()
