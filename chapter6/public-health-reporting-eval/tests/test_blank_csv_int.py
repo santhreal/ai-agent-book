@@ -59,3 +59,11 @@ def test_numeric_tests_unchanged(tmp_path):
     _write_csv(path, "12")
     env = ReportingEnvironment(path)
     assert env.rows[0]["tests"] == 12
+
+
+def test_reporting_environment_call_null_arguments(tmp_path):
+    path = tmp_path / "ok.csv"
+    _write_csv(path, "12")
+    env = ReportingEnvironment(path)
+    res = env.call("calculate_test_positivity", None)
+    assert isinstance(res, dict)
