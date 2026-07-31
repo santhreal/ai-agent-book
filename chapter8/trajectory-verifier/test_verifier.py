@@ -25,6 +25,11 @@ class VerifierTest(unittest.TestCase):
         self.assertEqual({"trajectory_id", "score"}, set(scalar_baseline(report)))
         self.assertEqual(1.0, diagnostic_utility(report))
 
+    def test_scalar_baseline_missing_fields(self):
+        result = scalar_baseline({})
+        self.assertEqual("", result["trajectory_id"])
+        self.assertEqual(0.0, result["score"])
+
     def test_calibration_matches_experts(self):
         calibration = calibration_report(self.trajectories, self.reports)
         self.assertEqual(1.0, calibration["exact_label_agreement"])

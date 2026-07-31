@@ -283,7 +283,12 @@ class TrajectoryVerifier:
 
 def scalar_baseline(report: Dict[str, Any]) -> Dict[str, Any]:
     """Simulates the information loss of returning one overall number."""
-    return {"trajectory_id": report["trajectory_id"], "score": report["overall_score"]}
+    if not isinstance(report, dict):
+        report = {}
+    return {
+        "trajectory_id": report.get("trajectory_id", ""),
+        "score": report.get("overall_score", 0.0),
+    }
 
 
 def diagnostic_utility(report: Dict[str, Any]) -> float:
