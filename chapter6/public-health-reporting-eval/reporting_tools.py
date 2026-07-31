@@ -131,7 +131,9 @@ class ReportingEnvironment:
             "evidence": [row["row_id"] for row in affected],
         }
 
-    def call(self, tool: str, arguments: dict[str, str]) -> dict[str, Any]:
+    def call(self, tool: str, arguments: dict[str, str] | None) -> dict[str, Any]:
+        if not isinstance(arguments, dict):
+            arguments = {}
         allowed_tools = {
             "calculate_test_positivity": self.calculate_test_positivity,
             "calculate_reporting_completeness": self.calculate_reporting_completeness,
@@ -141,6 +143,9 @@ class ReportingEnvironment:
         }
         try:
             function = allowed_tools[tool]
-        except KeyError as exc:
-            raise ValueError(f"Unknown reporting tool: {tool}") from exc
-        return function(**arguments)
+        except KeyError:
+            return {"error": f"Unknown tool: {tool}"}
+        try:
+            return function(**arguments)
+        except TypeError as exc:
+            return {"error": f"Invalid arguments for {tool}: {exc}"}
