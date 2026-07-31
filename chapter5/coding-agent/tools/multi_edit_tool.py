@@ -33,7 +33,7 @@ class MultiEditTool(BaseTool):
         creating_new = False
         if not file_path.exists():
             # Defer create/write until every edit succeeds (atomic).
-            if edits and edits[0]["old_string"] == "":
+            if edits and isinstance(edits[0], dict) and edits[0].get("old_string") == "":
                 creating_new = True
                 try:
                     file_path.parent.mkdir(parents=True, exist_ok=True)

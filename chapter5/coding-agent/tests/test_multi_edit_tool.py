@@ -128,6 +128,17 @@ def old_function():
         assert result.data["completed_edits"] == 1
         assert not file_path.exists()
     
+
+    def test_nonexistent_file_non_dict_edit(self, system_state, temp_dir):
+        """Test nonexistent file multi-edit with non-dict edit element degrades cleanly to File not found."""
+        tool = MultiEditTool(system_state)
+        file_path = temp_dir / "does_not_exist.py"
+        result = tool.execute({
+            "file_path": str(file_path),
+            "edits": [None]
+        })
+        assert "error" in result.data
+        assert "File not found" in result.data["error"]
     def test_create_and_modify(self, system_state, temp_dir):
         """Test creating file and then modifying it in subsequent edits"""
         tool = MultiEditTool(system_state)
