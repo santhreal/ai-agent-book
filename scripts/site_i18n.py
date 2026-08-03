@@ -250,7 +250,7 @@ def build_catalog() -> dict[str, Any]:
         browser_languages[code] = {
             "locale": effective_ui.get("language", material_locale),
             "direction": effective_ui.get("direction", "ltr"),
-            "nav": {label: nav[label] for label in nav_labels if label in nav},
+            "nav": {label: nav[label] for label in nav_labels if label in nav and isinstance(nav[label], str)},
             "ui": ui,
             **controls,
         }
