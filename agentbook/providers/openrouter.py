@@ -126,5 +126,5 @@ def map_model_to_openrouter(model: str, *, substitute_unknown: bool = False) -> 
     if ml.startswith("deepseek"):
         return "deepseek/" + m
     if substitute_unknown:
-        return os.getenv("OPENROUTER_MODEL", OPENROUTER_DEFAULT_MODEL)
+        return os.getenv("OPENROUTER_MODEL", "").strip() or OPENROUTER_DEFAULT_MODEL
     return m

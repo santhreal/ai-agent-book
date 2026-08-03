@@ -9,6 +9,7 @@ import dataclasses
 import pytest
 
 from agentbook.providers import (
+    OPENROUTER_DEFAULT_MODEL,
     PROVIDERS,
     SUPPORTED_PROVIDERS,
     Provider,
@@ -77,6 +78,12 @@ def test_unknown_model_falls_back_to_openrouter_model_env(monkeypatch):
     mapped = map_model_to_openrouter("doubao-seed-1-6", substitute_unknown=True)
     assert mapped == "google/gemma-4-31b-it:free"
 
+
+def test_unknown_model_falls_back_to_default_when_openrouter_model_env_is_empty(monkeypatch):
+    """Empty or whitespace OPENROUTER_MODEL must fall back to the package default."""
+    monkeypatch.setenv("OPENROUTER_MODEL", "   ")
+    mapped = map_model_to_openrouter("doubao-seed-1-6", substitute_unknown=True)
+    assert mapped == OPENROUTER_DEFAULT_MODEL
 
 def test_unknown_model_is_returned_unchanged_by_default(monkeypatch):
     """The default keeps the reader's model id, so an unhosted one is rejected
