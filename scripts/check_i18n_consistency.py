@@ -88,8 +88,9 @@ def discover_locales() -> list[str]:
     docs = ROOT / "docs"
     if docs.is_dir():
         for path in sorted(docs.iterdir()):
-            if path.is_dir() and path.name != "zh-CN" and (path / "README.md").exists():
-                locales.append(path.name)
+            if path.is_dir() and (path / "README.md").exists():
+                if path.name not in locales:
+                    locales.append(path.name)
     return locales
 
 
