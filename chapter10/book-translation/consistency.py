@@ -29,6 +29,8 @@ import re
 
 def _strip_code(text):
     """去掉围栏代码块与行内代码：代码按翻译指南原样保留英文，不应计入术语一致性统计。"""
+    if not text or not isinstance(text, str):
+        return ""
     text = re.sub(r"```.*?```", " ", text, flags=re.DOTALL)
     text = re.sub(r"`[^`]*`", " ", text)
     return text
