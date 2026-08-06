@@ -34,7 +34,8 @@ def retain_step_screenshots(history_data: dict[str, Any], run_dir: Path) -> tupl
     screenshot_dir = run_dir / "screenshots"
     records: list[dict[str, Any]] = []
 
-    for index, item in enumerate(retained.get("history", []), start=1):
+    history = retained.get("history") or []
+    for index, item in enumerate(history, start=1):
         state = item.get("state") or {}
         raw_path = state.get("screenshot_path")
         record: dict[str, Any] = {"step": index, "source_present": False, "path": None, "sha256": None}
