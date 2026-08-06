@@ -70,6 +70,10 @@ def records_in_problem_order(problems: list[dict], records_by_id: dict[str, dict
 
 def extract_predicted_number(text: str) -> Optional[float]:
     """从模型输出中解析最终答案数值。优先匹配 Final Answer 标记，否则取最后一个数字。"""
+    if not isinstance(text, str):
+        return None
+    if not isinstance(text, str):
+        return None
     m = re.findall(r"Final Answer[:：]\s*(-?[\d,]+(?:\.\d+)?)", text, re.IGNORECASE)
     if not m:
         m = re.findall(r"-?[\d,]+(?:\.\d+)?", text)
