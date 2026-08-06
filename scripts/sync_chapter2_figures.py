@@ -760,8 +760,13 @@ def replace_text_nodes(svg: str, values: list[str], *, rtl: bool = False) -> str
 
     def replace(match: re.Match[str]) -> str:
         opening = match.group(1)
-        if rtl and "direction=" not in opening:
-            opening = opening[:-1] + ' direction="rtl" unicode-bidi="plaintext">'
+        if rtl:
+            if "direction=" in opening:
+                opening = re.sub(r'direction="[^"]*"', 'direction="rtl"', opening)
+            else:
+                opening = opening[:-1] + ' direction="rtl">'
+            if "unicode-bidi=" not in opening:
+                opening = opening[:-1] + ' unicode-bidi="plaintext">'
         return opening + html.escape(next(replacements), quote=False) + match.group(3)
 
     return TEXT_RE.sub(replace, svg)
