@@ -285,6 +285,7 @@ async def get_game_status() -> Dict[str, Any]:
     try:
         state = _get_current_board_state()
         
+        is_draw = state.is_stalemate or state.is_insufficient_material or (state.is_game_over and not state.is_checkmate)
         status_message = "Game in progress"
         winner = None
         
@@ -295,6 +296,8 @@ async def get_game_status() -> Dict[str, Any]:
             status_message = "Stalemate! The game is a draw"
         elif state.is_insufficient_material:
             status_message = "Draw by insufficient material"
+        elif state.is_game_over:
+            status_message = "Game over! The game is a draw"
         elif state.is_check:
             status_message = f"{state.turn.capitalize()} is in check"
         
@@ -304,7 +307,7 @@ async def get_game_status() -> Dict[str, Any]:
             "is_check": state.is_check,
             "is_checkmate": state.is_checkmate,
             "is_stalemate": state.is_stalemate,
-            "is_draw": state.is_stalemate or state.is_insufficient_material,
+            "is_draw": is_draw,
             "winner": winner,
             "current_turn": state.turn
         }
