@@ -31,7 +31,10 @@ def run_python(code: str, timeout: int = 20) -> str:
     except subprocess.TimeoutExpired:
         return f"[错误] 代码执行超时（超过 {timeout} 秒）。"
     finally:
-        os.unlink(path)
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
 
 
 if __name__ == "__main__":
