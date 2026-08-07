@@ -33,8 +33,10 @@ _EMO_ALIAS = {
     "中性": "neutral", "高兴": "happy", "开心": "happy", "兴奋": "happy",
     "沮丧": "frustrated", "无奈": "frustrated", "思考": "thinking",
 }
+_EMO_VALID = {"neutral", "happy", "frustrated", "thinking"}
 _SPEED_ALIAS = {"正常": "normal", "快": "fast", "快速": "fast", "慢": "slow", "慢速": "slow"}
 _STYLE_ALIAS = {"正式": "formal", "轻松": "casual", "随意": "casual"}
+_STYLE_VALID = {"formal", "casual"}
 
 # 各内联事件插入的停顿时长（毫秒）
 PAUSE_MS = 500
@@ -116,6 +118,8 @@ def parse(text: str, trace: list | None = None):
 
         if key == "EMO":
             e = _norm(val, _EMO_ALIAS)
+            if e not in _EMO_VALID:
+                e = "neutral"
             set_state(emotion=e)
             log(f"  {m:22s} -> 情绪 = {e}")
             continue
@@ -139,6 +143,8 @@ def parse(text: str, trace: list | None = None):
             continue
         if key == "STYLE":
             st = _norm(val, _STYLE_ALIAS)
+            if st not in _STYLE_VALID:
+                st = "formal"
             set_state(style=st)
             log(f"  {m:22s} -> 风格 = {st}")
             continue
