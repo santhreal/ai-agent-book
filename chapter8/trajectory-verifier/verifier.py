@@ -142,7 +142,7 @@ class ProcessVerifier:
             sensitive = []
         leaks = [
             item for item in sensitive
-            if isinstance(item, dict) and item.get("value") and str(item["value"]) in reply
+            if isinstance(item, dict) and item.get("value") is not None and str(item["value"]) != "" and str(item["value"]) in reply
         ]
         if leaks:
             return DimensionResult(
