@@ -215,6 +215,8 @@ class NumpyEloRatingSystem:
         Returns:
             List of tuples (model, rating, matches, wins)
         """
+        if self.ratings is None:
+            return []
         # Use NumPy's argsort for fast sorting
         sorted_indices = np.argsort(-self.ratings)  # Negative for descending order
         
