@@ -331,8 +331,9 @@ class PEDOSecurityEvaluator:
             else:
                 masked_or_hidden.append(field_name)
 
-            if field_name in sensitive_fields and field_name not in allowed_fields and field_name in visible_fields:
-                leaked_fields.append(field_name)
+        leaked_fields = [
+            f for f in visible_fields if f in sensitive_fields and f not in allowed_fields
+        ]
         # Check if sensitive fields were properly withheld
         unauthorized_leakage = len(leaked_fields) > 0
         if scenario.expected_visible_fields is not None:

@@ -269,17 +269,7 @@ class NotificationDispatcher:
 
         trace_events: List[Dict[str, Any]] = []
 
-        # Dispatch across multi-channels
-        channel_results = await self.dispatch_all(channels, req_obj.message, req_obj.context)
-        trace_events.append(
-            {
-                "event": "dispatched",
-                "channels": channels,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-            }
-        )
-
-        # Store pending state
+        # Store pending state before dispatching to handle instant decisions cleanly
         event = asyncio.Event()
         self._decision_events[request_id] = event
         self._pending_requests[request_id] = {
@@ -293,6 +283,16 @@ class NotificationDispatcher:
             "notes": None,
             "dispatched_at": dispatched_at,
         }
+
+        # Dispatch across multi-channels
+        channel_results = await self.dispatch_all(channels, req_obj.message, req_obj.context)
+        trace_events.append(
+            {
+                "event": "dispatched",
+                "channels": channels,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
 
         trace_events.append(
             {

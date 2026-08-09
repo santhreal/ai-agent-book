@@ -276,9 +276,10 @@ class HybridStructuredRetriever:
                 if c_id is not None:
                     self.add_graphrag_community(c_id, e_ids, summ, lvl, emb)
 
-    def _compute_relevance_score(self, query: str, node: Dict[str, Any]) -> float:
+    def _compute_relevance_score(
+        self, query: str, query_terms: set[str], query_vector: Optional[np.ndarray], node: Dict[str, Any]
+    ) -> float:
         """Compute relevance score between query and node text/summary."""
-        query_terms = set(re.findall(r"\w+", query.lower()))
         if not query_terms:
             return 0.0
 
@@ -290,7 +291,7 @@ class HybridStructuredRetriever:
         elif src_type == "graphrag_entity":
             text_content = f"{node.get('name', '')} {node.get('type', '')} {node.get('description', '')}"
         elif src_type == "graphrag_relation":
-            text_content = f"{node.get('source', '')} {node.get('type', '')} {node.get('target', '')} {node.get('description', '')}"
+            text_content = f"{node.get('source', '')} {node.get('type', '')} {node.get('description', '')}"
         elif src_type == "graphrag_community":
             text_content = f"{node.get('summary', '')}"
 
@@ -298,21 +299,19 @@ class HybridStructuredRetriever:
             return 0.0
 
         # Vector similarity if embeddings available
-        if self.embedding_fn is not None:
+        if query_vector is not None:
             try:
-                q_emb = self.embedding_fn(query)
                 n_emb = node.get("embedding")
-                if n_emb is None:
+                if n_emb is None and self.embedding_fn is not None:
                     n_emb = self.embedding_fn(text_content)
-                if q_emb is not None and n_emb is not None:
-                    q_norm = np.linalg.norm(q_emb)
+                if n_emb is not None:
+                    q_norm = np.linalg.norm(query_vector)
                     n_norm = np.linalg.norm(n_emb)
                     if q_norm > 0 and n_norm > 0:
-                        cos_sim = float(np.dot(q_emb, n_emb) / (q_norm * n_norm))
+                        cos_sim = float(np.dot(query_vector, n_emb) / (q_norm * n_norm))
                         return max(0.0, cos_sim)
             except Exception:
                 pass
-
         # Term overlap + TF-IDF-like scoring
         words = re.findall(r"\w+", text_content.lower())
         if not words:
@@ -416,11 +415,14 @@ class HybridStructuredRetriever:
         if not query or not query.strip():
             return []
 
+        query_terms = set(re.findall(r"\w+", query.lower()))
+        query_vector = self.embedding_fn(query) if self.embedding_fn is not None else None
+
         # 1. Rank RAPTOR tree summary nodes
         raptor_scores: List[Tuple[str, float]] = []
         for key, node in self.unified_nodes.items():
             if node.get("source_type") == "raptor_tree":
-                score = self._compute_relevance_score(query, node)
+                score = self._compute_relevance_score(query, query_terms, query_vector, node)
                 if score > 0:
                     raptor_scores.append((key, score))
         raptor_scores.sort(key=lambda x: x[1], reverse=True)
@@ -429,11 +431,10 @@ class HybridStructuredRetriever:
         graphrag_scores: List[Tuple[str, float]] = []
         for key, node in self.unified_nodes.items():
             if node.get("source_type") in ("graphrag_entity", "graphrag_relation", "graphrag_community"):
-                score = self._compute_relevance_score(query, node)
+                score = self._compute_relevance_score(query, query_terms, query_vector, node)
                 if score > 0:
                     graphrag_scores.append((key, score))
         graphrag_scores.sort(key=lambda x: x[1], reverse=True)
-
         # Build rank lookups (1-indexed ranks)
         raptor_ranks = {item_key: rank + 1 for rank, (item_key, _) in enumerate(raptor_scores)}
         graphrag_ranks = {item_key: rank + 1 for rank, (item_key, _) in enumerate(graphrag_scores)}

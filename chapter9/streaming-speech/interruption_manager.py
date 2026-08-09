@@ -173,6 +173,8 @@ class DuplexInterruptionManager:
                 )
                 barge_in_result["energy"] = energy
                 barge_in_result["is_speech"] = True
+                barge_in_result["vad_threshold"] = self.vad_threshold
+                barge_in_result["is_playing"] = False
                 return barge_in_result
         else:
             self._consecutive_active_frames = 0

@@ -91,19 +91,14 @@ class BilingualConsistencyAuditor:
         """Initialize the auditor with optional custom glossary."""
         self.glossary = glossary or DEFAULT_GLOSSARY
 
-    @classmethod
     def audit_translation(
-        cls,
+        self,
         source_file: Union[str, Path],
         target_file: Union[str, Path],
         lang: str = "zh",
     ) -> AuditReport:
-        """Audit entrypoint to check translation consistency.
-
-        Can be called as an instance method or class/module entrypoint.
-        """
-        auditor = cls()
-        return auditor.run_audit(source_file, target_file, lang)
+        """Audit entrypoint to check translation consistency."""
+        return self.run_audit(source_file, target_file, lang)
 
     def run_audit(
         self,
@@ -192,7 +187,11 @@ class BilingualConsistencyAuditor:
             canonical = spec.get("canonical", "")
             variants = spec.get("variants", [canonical])
 
-            matched_variants = [v for v in variants if v in prose_target]
+            raw_matched = [v for v in variants if v in prose_target]
+            # Filter out shorter variants that are substrings of longer matched variants
+            matched_variants = [
+                v for v in raw_matched if not any(v != other and v in other for other in raw_matched)
+            ]
 
             if not matched_variants:
                 findings.append(
@@ -207,7 +206,7 @@ class BilingualConsistencyAuditor:
                         },
                     )
                 )
-            elif len(matched_variants) > 1 and canonical not in matched_variants:
+            elif len(matched_variants) > 1:
                 findings.append(
                     AuditFinding(
                         category="terminology",
@@ -413,4 +412,4 @@ def audit_translation(
     lang: str = "zh",
 ) -> AuditReport:
     """Standalone module-level entrypoint for auditing translation consistency."""
-    return BilingualConsistencyAuditor.audit_translation(source_file, target_file, lang)
+    return BilingualConsistencyAuditor().run_audit(source_file, target_file, lang)

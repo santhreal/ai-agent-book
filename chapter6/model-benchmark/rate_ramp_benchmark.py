@@ -60,10 +60,14 @@ class RateRampBenchmark:
         if "rates" in config and isinstance(config["rates"], (list, tuple)):
             rates = [int(r) for r in config["rates"]]
         else:
-            rates = list(range(start_rate, end_rate + 1, max(1, step_rate)))
-            if rates[-1] != end_rate:
+            if start_rate <= end_rate:
+                step = max(1, step_rate)
+                rates = list(range(start_rate, end_rate + 1, step))
+            else:
+                step = -max(1, abs(step_rate))
+                rates = list(range(start_rate, end_rate - 1, step))
+            if not rates or rates[-1] != end_rate:
                 rates.append(end_rate)
-
         return {
             "start_rate": start_rate,
             "end_rate": end_rate,

@@ -48,7 +48,7 @@ class SafetyPolicyGate:
         re.compile(r'\.\.[/\\]'),                           # ../ or ..\
         re.compile(r'%2e%2e', re.IGNORECASE),               # URL-encoded ..
         re.compile(r'\x00|%00'),                            # Null bytes
-        re.compile(r'/(etc|var/log|sys|proc|boot|dev|root)/', re.IGNORECASE), # Sensitive Linux dirs
+        re.compile(r'^/(etc|var/log|sys|proc|boot|dev|root)(?:/|$)', re.IGNORECASE), # Sensitive Linux system dirs
         re.compile(r'~/(?:\.ssh|\.aws|\.gnupg|\.bashrc|\.zshrc)', re.IGNORECASE), # Sensitive user configs
         re.compile(r'^[a-zA-Z]:\\(Windows|System32|Program Files)', re.IGNORECASE), # Sensitive Windows dirs
     ]
@@ -121,7 +121,7 @@ class SafetyPolicyGate:
     def issue_confirmation(self, tool_name: str, params: Dict[str, Any]) -> str:
         """Generate a single-use HMAC confirmation token bound to tool name and parameters."""
         fp = self._fingerprint(tool_name, params)
-        token = hmac.new(fp.encode("utf-8"), self.secret_key.encode("utf-8"), hashlib.sha256).hexdigest()[:24]
+        token = hmac.new(self.secret_key.encode("utf-8"), fp.encode("utf-8"), hashlib.sha256).hexdigest()[:24]
         self._pending_confirmations[token] = fp
         return token
 
