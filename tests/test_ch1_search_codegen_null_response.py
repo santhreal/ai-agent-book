@@ -1,8 +1,13 @@
 import sys
+import importlib.util
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "chapter1" / "search-codegen"))
-from agent import GPT5NativeAgent
+_module_path = Path(__file__).parent.parent / "chapter1" / "search-codegen" / "agent.py"
+_spec = importlib.util.spec_from_file_location("ch1_search_codegen_agent", _module_path)
+_sc_agent = importlib.util.module_from_spec(_spec)
+sys.modules["ch1_search_codegen_agent"] = _sc_agent
+_spec.loader.exec_module(_sc_agent)
+GPT5NativeAgent = _sc_agent.GPT5NativeAgent
 
 
 def test_gpt5_native_agent_null_response_citations():
