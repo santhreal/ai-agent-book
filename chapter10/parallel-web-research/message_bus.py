@@ -54,7 +54,7 @@ class Envelope:
     def short(self) -> str:
         """给日志用的紧凑单行表示。"""
         tgt = "ALL" if self.target == BROADCAST else self.target
-        body = json.dumps(self.payload, ensure_ascii=False)
+        body = json.dumps(self.payload, ensure_ascii=False, default=str)
         if len(body) > 80:
             body = body[:77] + "..."
         return (
