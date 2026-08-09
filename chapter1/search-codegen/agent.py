@@ -118,6 +118,8 @@ code_interpreter 实际执行，不得口算或声称运行了代码。"""
 
     @staticmethod
     def _output_text(response: Dict[str, Any]) -> str:
+        if not isinstance(response, dict):
+            return ""
         chunks: List[str] = []
         for item in response.get("output") or []:
             if not isinstance(item, dict) or item.get("type") != "message":
@@ -129,6 +131,8 @@ code_interpreter 实际执行，不得口算或声称运行了代码。"""
 
     @staticmethod
     def _tool_items(response: Dict[str, Any]) -> List[Dict[str, Any]]:
+        if not isinstance(response, dict):
+            return []
         return [
             item
             for item in response.get("output") or []
@@ -142,6 +146,8 @@ code_interpreter 实际执行，不得口算或声称运行了代码。"""
 
     @staticmethod
     def _citations(response: Dict[str, Any]) -> List[Dict[str, Any]]:
+        if not isinstance(response, dict):
+            return []
         citations = []
         for item in response.get("output") or []:
             if not isinstance(item, dict):

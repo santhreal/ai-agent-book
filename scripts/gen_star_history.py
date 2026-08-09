@@ -120,7 +120,7 @@ def fetch_starred_at(repo: str, refresh: bool) -> list[str]:
 def build_series(starred: list[str], start: datetime) -> tuple[np.ndarray, np.ndarray]:
     """Cumulative star count per star event, cropped to `start` (UTC)."""
     times = [
-        datetime.strptime(s, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+        datetime.fromisoformat(s.replace("Z", "+00:00"))
         for s in starred
     ]
     base = sum(1 for t in times if t < start)
