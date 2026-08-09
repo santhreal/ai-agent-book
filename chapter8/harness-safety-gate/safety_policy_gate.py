@@ -154,10 +154,13 @@ class SafetyPolicyGate:
         """Inspect parameters for path traversal vulnerabilities."""
         strings = self._extract_string_values(params)
         for s in strings:
-            decoded = urllib.parse.unquote(s)
+            decoded_once = urllib.parse.unquote(s)
+            decoded_twice = urllib.parse.unquote(decoded_once)
             for pattern in self.PATH_TRAVERSAL_PATTERNS:
-                if pattern.search(s) or pattern.search(decoded):
+                if pattern.search(s) or pattern.search(decoded_once) or pattern.search(decoded_twice):
                     return f"Path traversal attack detected in parameter value: '{s}'"
+            if ".." in s or "%2e%2e" in s.lower() or "%252e%252e" in s.lower():
+                return f"Path traversal attack detected in parameter value: '{s}'"
         return None
 
     def inspect_dangerous_commands(self, tool_name: str, params: Dict[str, Any]) -> Optional[str]:
