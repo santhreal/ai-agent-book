@@ -35,6 +35,9 @@ def compute_mle_elo(df: pd.DataFrame,
     # Empty battle frame (e.g. --num-battles 0 or fully filtered input) is valid.
     if df is None or len(df) == 0:
         return pd.Series(dtype=float)
+    models = sorted(set(df["model_a"]) | set(df["model_b"]))
+    if len(models) <= 1:
+        return pd.Series({m: INIT_RATING for m in models}, index=pd.Index(models), dtype=float)
     # Create pivot tables for wins
     ptbl_a_win = pd.pivot_table(
         df[df["winner"] == "model_a"],
