@@ -147,7 +147,7 @@ class SemanticRouter:
         request_vector = self.server_vectorizer.transform([request])
         # Calculate similarities with all servers
         similarities = cosine_similarity(request_vector, self.server_embeddings)[0]
-        
+        similarities = np.nan_to_num(similarities, nan=0.0)
         # Get top-k servers
         top_indices = np.argsort(similarities)[::-1][:top_k]
         
@@ -177,7 +177,7 @@ class SemanticRouter:
         
         # Calculate similarities with all tools in this server
         similarities = cosine_similarity(request_vector, tool_embeddings)[0]
-        
+        similarities = np.nan_to_num(similarities, nan=0.0)
         # Get top-k tools
         top_indices = np.argsort(similarities)[::-1][:top_k]
         
