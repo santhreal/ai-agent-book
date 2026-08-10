@@ -57,7 +57,10 @@ def extract_one(fact_text, schema=None, client=None, charge=None):
                 {"role": "user", "content": fact_text},
             ],
         )
-        charge = json.loads(charge_resp.choices[0].message.content).get("charge")
+        try:
+            charge = json.loads(charge_resp.choices[0].message.content).get("charge")
+        except json.JSONDecodeError:
+            charge = None
     if charge not in charges:  # 兜底：默认第一个罪名
         charge = charges[0]
 
@@ -78,7 +81,10 @@ def extract_one(fact_text, schema=None, client=None, charge=None):
         messages=[{"role": "system", "content": sys},
                   {"role": "user", "content": f"判决书事实段落：\n{fact_text}"}],
     )
-    raw = json.loads(resp.choices[0].message.content)
+    try:
+        raw = json.loads(resp.choices[0].message.content)
+    except json.JSONDecodeError:
+        raw = {}
     return _normalize(raw, charge, factors)
 
 

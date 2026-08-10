@@ -90,7 +90,7 @@ def fetch_starred_at(repo: str, refresh: bool) -> list[str]:
     """Return sorted ISO-8601 UTC timestamps of every star event."""
     if CACHE.exists() and not refresh:
         print(f"using cached stargazers from {CACHE}", file=sys.stderr)
-        return json.loads(CACHE.read_text())
+        return json.loads(CACHE.read_text(encoding="utf-8"))
 
     headers = {
         "Accept": "application/vnd.github.star+json",
@@ -113,7 +113,7 @@ def fetch_starred_at(repo: str, refresh: bool) -> list[str]:
     print(file=sys.stderr)
 
     starred.sort()
-    CACHE.write_text(json.dumps(starred))
+    CACHE.write_text(json.dumps(starred), encoding="utf-8")
     return starred
 
 
