@@ -12,7 +12,7 @@ This chapter begins with practical examples and works back toward the core compo
 
 The essence of a modern Agent system fits into one concise formula: **Agent = LLM (Large Language Model) + Context + Tools**. The formula is simple and practical—provided each term is read broadly:
 
-- **The LLM is the Agent's reasoning engine**: It is more than a set of model parameters; it is the Agent's decision-making core, responsible for understanding intent, reasoning, planning, and judgment. An LLM's capabilities come from world knowledge and language ability acquired during **pre-training**, plus decision-making strategies encoded through **post-training** (techniques such as supervised fine-tuning and reinforcement learning are covered in Chapter 7).
+- **The LLM is the Agent's reasoning engine**: It is more than a set of model parameters; it is the Agent's decision-making core, responsible for understanding intent, reasoning, planning, and judgment. An LLM's capabilities come from world knowledge and language ability acquired during **pre-training**, plus decision-making strategies encoded through **post-training** (techniques such as supervised fine-tuning and reinforcement learning are covered in Chapter 8).
 - **Context is the Agent's working set of information**: Not just the text fed into the model, but the working set of information available to the Agent at each decision point—the environment, user memory, domain knowledge, its own state, and task progress. Just as a person making a decision needs to size up the situation, recall relevant experience, and consult references, the Agent's context window contains the information it can use at that moment.
 - **Tools are the Agent's action interfaces**: Not a handful of callable API functions, but the full set of ways the Agent can act—from predefined tool calls to Skills loaded on demand, from generating code to create new capabilities on the fly to delegating work to sub-agents, from reaching out to the user to responding to external events.
 
@@ -26,7 +26,7 @@ Figure 1-1 shows two levels of abstraction. The outer level is the interaction b
 
 The engineering formula can therefore be expanded as follows: the LLM is the Model, while Context + Tools form the minimum Harness; production systems add constraints, verification, and correction inside that boundary. The rest of this chapter follows this boundary.
 
-These three components correspond exactly to three core concepts in RL (reinforcement learning; see Chapter 7), but they are not strict one-to-one equivalents: context is the Agent's internal representation of observations and history, while tools define observation/action interfaces whose underlying objects remain in the Environment.
+These three components correspond exactly to three core concepts in RL (reinforcement learning; see Chapter 8), but they are not strict one-to-one equivalents: context is the Agent's internal representation of observations and history, while tools define observation/action interfaces whose underlying objects remain in the Environment.
 
 | Intuition | Agent Component | RL Concept | Role |
 |---------------|----------------|------------------|---------------------------------------------|
@@ -82,7 +82,7 @@ Tool calling proceeds in four steps: first, the context tells the model which to
 
 For a weather query, the simplified representation of the four-step process at the API level is as follows:
 
-```
+```text
 Step 1: Declare tools                  Step 2: Model decides to call
 tools: [{                             assistant: {
   name: "get_weather",                  tool_calls: [{
@@ -130,9 +130,9 @@ The preceding discussion noted that a model can internalize tool-use policies as
 
 **Contextual adaptation** occurs within the current task. Once examples, state, and retrieval results enter the context, the model can adjust its behavior immediately, but this does not change the persistent state of the next session. Its advantages are speed and low cost; its limitations arise from the context window and the way information is organized. Chapter 2 explains in detail how this form of adaptation works.
 
-For changes to persist across tasks, the system can update **external artifacts**: facts and experience can be organized into knowledge documents, strategies expressible in language can be written into a Prompt or Skill, and deterministic procedures and constraints can be encoded in programs and Harnesses. These artifacts are auditable and revisable, but the Agent must still access them at execution time through the context or tool interfaces. Chapters 3 through 5 establish the foundations for knowledge and programs, while Chapter 8 discusses how such updates can be generated from evaluated operational trajectories.
+For changes to persist across tasks, the system can update **external artifacts**: facts and experience can be organized into knowledge documents, strategies expressible in language can be written into a Prompt or Skill, and deterministic procedures and constraints can be encoded in programs and Harnesses. These artifacts are auditable and revisable, but the Agent must still access them at execution time through the context or tool interfaces. Chapters 3 through 5 establish the foundations for knowledge and programs, while Chapter 9 discusses how such updates can be generated from evaluated operational trajectories.
 
-When the objective is a high-dimensional capability—such as medical-image understanding, natural-language style, or an implicit decision policy—that external rules cannot fully express, **model parameters** must be updated through post-training. Parameter updates carry higher deployment costs but can produce natural and broad generalization; Chapter 7 presents their methods systematically. The three paths are therefore not mutually exclusive categories but coordinated mechanisms operating at different timescales: context supports immediate adaptation, external artifacts support controlled accumulation, and parameters internalize capabilities that are difficult to express explicitly.
+When the objective is a high-dimensional capability—such as medical-image understanding, natural-language style, or an implicit decision policy—that external rules cannot fully express, **model parameters** must be updated through post-training. Parameter updates carry higher deployment costs but can produce natural and broad generalization; Chapter 8 presents their methods systematically. The three paths are therefore not mutually exclusive categories but coordinated mechanisms operating at different timescales: context supports immediate adaptation, external artifacts support controlled accumulation, and parameters internalize capabilities that are difficult to express explicitly.
 
 ### Context: The Agent's Working Set
 
@@ -168,9 +168,30 @@ Consider a concrete example—aggregating revenue across multiple currencies—t
 
 ![Figure 1-4: Agent trajectory—ReAct loop for a multi-currency aggregation task](images/fig1-4.svg)
 
+The following Python-style sketch is explanatory pseudocode, not runnable SDK code; the `python` marker is used only for syntax highlighting.
+
+**ReAct control loop:**
+
+```python
+trajectory = [user_request]
+
+repeat:
+    context = stable_prefix + trajectory
+    decision = Model(context)
+    trajectory.append(decision)
+
+    if decision has no tool call:
+        return decision.answer
+
+    for call in decision.tool_calls:       # independent calls may run in parallel
+        validated_call = Harness.validate(call)
+        observation = Environment.execute(validated_call)
+        trajectory.append(observation)
+```
+
 Here is the structure of a trajectory, in pseudocode:
 
-```
+```text
 trajectory = [
   {role: "user", content: "Based on the company's quarterly revenue: Q1 2.5M USD, Q2 2.1M EUR, Q3 1.8M GBP, Q4 380M JPY, calculate the company's total annual revenue and average quarterly revenue"},
   
@@ -256,6 +277,20 @@ Expanded as an equation, the complete production-grade composition is:
 >
 > **Agent ↔ Environment**
 
+**Harness production boundary:**
+
+```python
+decision = Model(Harness.build_context(state, trajectory))
+allowed_action = Harness.constrain(decision)
+observation = Environment.apply(allowed_action)
+evidence = Harness.verify(allowed_action, observation)
+
+if evidence passes:
+    trajectory.append(observation)
+else:
+    trajectory.append(Harness.correct(evidence))
+```
+
 A minimal working Agent runs on LLM, context, and tools alone. To keep running reliably in long-running production workloads, it needs the three outer engineering layers as well—constrain to prevent overreach, verify to catch errors, correct to recover from failures. Put differently: the minimal formula is the demo view, and the expanded formula is the production view—the latter contains the former entirely and adds a safety net around it.
 
 An example clarifies the boundaries: embedding the refund policy in the context falls under **Context**, while checking that the refund amount does not exceed the order total falls under **Constrain**. Executing an API call falls under **Tools**, while automatically retrying after the API times out falls under **Correct**. The model supplies the underlying understanding and reasoning; the Harness guides, constrains, and amplifies those capabilities into reliable task execution. The engineering practice of designing and optimizing this infrastructure outside the model is **Harness Engineering**.
@@ -266,13 +301,13 @@ In short, a model without a Harness may be highly capable, but it lacks the surr
 
 More precisely, the Harness is not everything outside the model: it is the runtime and governance layer **inside the Agent boundary and outside the Model**. It mediates the Model–Environment interaction but does not include the Environment itself. Tool definitions, call adapters, sandbox permissions and reset mechanisms belong to the Harness; files and processes that change inside the sandbox, external databases, web pages, users and the physical world belong to the Environment. Deployment location does not change this conceptual boundary. The core of the Harness is context management and tool interfaces, around which three types of engineering safeguards are built:
 
-| Function | One-Sentence Responsibility | Relationship with Context/Tools |
-|----------|-------------------------------------------|------------------------------------------|
-| **Context** | Provides the model with relevant information | Core capability |
-| **Tools** | Provides the model with action interfaces | Core capability |
-| **Constrain** | Sets behavioral boundaries—what can and cannot be done | Safety boundary built around context and tools |
-| **Verify** | Automatically judges the correctness of tool execution results | Checking mechanism built around tool execution results |
-| **Correct** | Automatically recovers or rolls back when problems are found | Recovery mechanism built around tool call failures |
+| Function | One-Sentence Responsibility / Core Principle | Practical Example | See Chapter |
+|---|---|---|---|
+| **Context** | Provides the model with relevant information; Information Sufficiency: Ensure the Agent makes decisions based on sufficient information at every decision point | System prompts, knowledge bases, Agent status bars, Sidecar bypass queries | Chapters 2 & 3 |
+| **Tools** | Provides the model with action interfaces; Clear Interface: Tool names are intuitive, parameters have examples, boundaries are explained | MCP tools, code interpreter, search tools | Chapter 4 |
+| **Constrain** | Sets behavioral boundaries—what can and cannot be done; Fail-Safe Defaults: All capabilities are off by default and must be explicitly enabled (similar to mobile app permission management) | In Claude Code, every tool requires user authorization by default before execution | Chapter 4 |
+| **Verify** | Automatically judges the correctness of tool execution results; Input Isolation: Security checks only look at structured data (e.g., JSON fields returned by tools), not free-form text generated by the model (because attackers might manipulate model output through prompt injection) | Linter checks, type systems, tool call result validation | Chapters 5 & 6 |
+| **Correct** | Automatically recovers or rolls back when problems are found; Do not expose intermediate states until a failure is confirmed unrecoverable (e.g., silently retry a failed tool call instead of showing the user a half-finished result) | Silent retries, continuation generation, fallback to human judgment upon consecutive failures (circuit breaker mechanism) | Chapters 2 & 5 |
 
 Context and Tools let the Agent complete tasks—understand the task and act on it. Constrain, Verify, and Correct make sure it does so reliably and safely—not as something apart from Context and Tools, but as the engineering that keeps them working reliably in production. Along the maturity curve of Agent products, the emphasis between these two groups shifts.
 
@@ -308,20 +343,6 @@ These five stages are not replacements but nested layers: Prompt Engineering is 
 
 Recent engineering practice supports this view. LangChain's work on Terminal Bench 2.0 (a benchmark evaluating an Agent's ability to complete complex tasks in a terminal environment) is a striking example: their Coding Agent improved from 52.8% to 66.5% (jumping from outside the top 30 to the top 5 on the leaderboard). What changed was not the model but the Harness—having the Agent check its own execution results, detect when it was stuck in a repetitive loop, and refine its reasoning strategy.
 
-### Core Principles of the Five Harness Functions
-
-The earlier table listed the Harness's five functions. The table below adds each function's core design principle and where this book treats it, mapping concept to practice:
-
-| Function | Core Principle | Practical Example | See Chapter |
-|----------|------------------------------------------|----------------------------------|---------|
-| **Context** | Information Sufficiency: Ensure the Agent makes decisions based on sufficient information at every decision point | System prompts, knowledge bases, Agent status bars, Sidecar bypass queries | Chapters 2 & 3 |
-| **Tools** | Clear Interface: Tool names are intuitive, parameters have examples, boundaries are explained | MCP tools, code interpreter, search tools | Chapter 4 |
-| **Constrain** | Fail-Safe Defaults: All capabilities are off by default and must be explicitly enabled (similar to mobile app permission management) | In Claude Code, every tool requires user authorization by default before execution | Chapter 4 |
-| **Verify** | Input Isolation: Security checks only look at structured data (e.g., JSON fields returned by tools), not free-form text generated by the model (because attackers might manipulate model output through prompt injection) | Linter checks, type systems, tool call result validation | Chapters 5 & 6 |
-| **Correct** | Do not expose intermediate states until a failure is confirmed unrecoverable (e.g., silently retry a failed tool call instead of showing the user a half-finished result) | Silent retries, continuation generation, fallback to human judgment upon consecutive failures (circuit breaker mechanism) | Chapters 2 & 5 |
-
-The five functions form a closed loop: Context and Tools support decision-making, Constrain prevents errors, Verify detects deviations, and Correct closes the cycle. If any link is missing, the system develops a reliability gap. Before examining specific orchestration patterns and guardrail designs, we first lay out the core principles for building effective Agents and for choosing a model—the foundation for every design decision that follows.
-
 ### Core Principles for Building Effective Agents
 
 Based on Anthropic's experience, successful Agent systems follow three core principles.
@@ -340,7 +361,7 @@ Before discussing orchestration patterns, we first need to answer a practical qu
 
 The model is the foundation of the Agent's intelligence, and choosing the right one often matters more than any amount of prompt tuning. Model releases move too quickly for specific version recommendations to stay useful, so this section offers directions instead.
 
-**Closed-Source Models.** The two most commonly used closed-source model providers in current Agent development are OpenAI (GPT/o series) and Anthropic (Claude series). Closed-source models generally lead in capability but are more expensive and constrained by the vendor's API policies. When selecting a model, do not rely only on leaderboards; **evaluate it on your own tasks** (see Chapter 6).
+**Closed-Source Models.** The two most commonly used closed-source model providers in current Agent development are OpenAI (GPT/o series) and Anthropic (Claude series). Closed-source models generally lead in capability but are more expensive and constrained by the vendor's API policies. When selecting a model, do not rely only on leaderboards; **evaluate it on your own tasks** (see Chapter 7).
 
 **Open-Source Models.** At the time of writing, open-source models lag closed-source models by no more than six months, while costing substantially less. If your business scenario does not demand the highest model capability, an open-source model is a pragmatic choice. Open-source models are low-cost, support private deployment, and allow fine-tuning customization, making them suitable for cost-sensitive scenarios or those with data compliance requirements. DeepSeek, Kimi, and GLM are among the stronger Chinese models for Agent capabilities. Note that models differ widely in tool-calling ability, so be sure to test in your specific scenario before committing.
 
@@ -405,10 +426,10 @@ The following table summarizes widely used Agent frameworks and platforms to hel
 | Context extension (knowledge persistence) | Chapter 3 (Knowledge Bases) | User memory, RAG, structured indexes, Agentic RAG | Exposure of sensitive information, privacy protection |
 | Tool design and security constraints | Chapter 4 (Tool Design) | Tool classification, permission control, MCP standards, asynchronous architecture | Misoperation, unauthorized access, irreversible operations |
 | Tool validation and correction | Chapter 5 (Code Generation) | Coding Agent Harnesses, test-driven development, rules encoded as code | Identity impersonation, attribution of responsibility |
-| System-level validation | Chapter 6 (Evaluation) | Evaluation environments, datasets, automated evaluation, observability | — |
-| Model-level correction | Chapter 7 (Post-training) | SFT (Supervised Fine-Tuning), reinforcement learning—writing feedback signals accumulated in the Harness into model parameters, which can be viewed as an extension of Harness engineering | Goal deviation, alignment, and robustness |
-| Experience-driven continuous correction | Chapter 8 (Continuous Evolution) | Trajectory learning signals; knowledge/instruction/program/parameter updates; self-modification; validation and rollback | Memory poisoning, unsafe self-modification, capability drift |
-| Multimodal context and tools | Chapter 9 (Multimodality and Real-Time Interaction) | Voice Agents, Computer Use, robotic manipulation | Security filtering of multimodal input, permission control in real-time interaction |
+| System-level validation | Chapter 7 (Evaluation) | Evaluation environments, datasets, automated evaluation, observability | — |
+| Model-level correction | Chapter 8 (Post-training) | SFT (Supervised Fine-Tuning), reinforcement learning—writing feedback signals accumulated in the Harness into model parameters, which can be viewed as an extension of Harness engineering | Goal deviation, alignment, and robustness |
+| Experience-driven continuous correction | Chapter 9 (Continuous Evolution) | Trajectory learning signals; knowledge/instruction/program/parameter updates; self-modification; validation and rollback | Memory poisoning, unsafe self-modification, capability drift |
+| Multimodal context and tools | Chapter 6 (Multimodality and Real-Time Interaction) | Voice Agents, Computer Use, robotic manipulation | Security filtering of multimodal input, permission control in real-time interaction |
 | Constraints and correction among multiple Agents | Chapter 10 (Multi-Agent Collaboration) | Collaboration architectures, failure modes, Agent societies | Trust-boundary violations among Agents, conflicts over shared resources |
 
 As the "Model as Agent" trend deepens, a framework's core value no longer lies in "orchestrating LLM calls"—models increasingly decide for themselves. What has grown more important is the Harness engineering around the model: context management, the tool ecosystem, security constraints, error recovery. When choosing a framework, the question is not how sophisticated the framework is, but whether it lets you focus on business logic through the thinnest possible layer of abstraction.
@@ -417,7 +438,7 @@ Orchestration patterns solve the organization of context and tools within the Ha
 
 ### Guardrails and Safety
 
-This section gives a high-level overview of guardrails to establish the big picture. Implementation details and practice follow in Chapter 2 (prompt injection protection), Chapter 4 (tool permission control), and Chapter 5 (code execution security); first-time readers do not need to follow every detail.
+This section gives a high-level overview of guardrails to establish the big picture. Implementation details and practice follow in Chapter 2 (the context layer: prompt injection protection), Chapter 4 (the execution layer: tool permission control), and Chapter 5 (the execution and data layers: code execution security and moving the trust boundary down); first-time readers do not need to follow every detail.
 
 Guardrails are how the "constrain, verify, and correct" layer of the Harness is primarily implemented—a layered defense that keeps Agent behavior safe and controllable. Well-designed **guardrails** help manage data privacy risks (for example, preventing system prompt leakage) and reputational risks (for example, keeping model behavior consistent with the brand). Start with guardrails for the risks you have already identified, then add new ones as new vulnerabilities surface.
 
@@ -427,15 +448,17 @@ Guardrails also have another failure mode: **false refusal**. To reduce the chan
 
 #### Types of Guardrails
 
-Based on where they sit in the execution flow, guardrails fall into three types: input-side, execution-side, and output-side.
+Guardrails can be placed at three layers: **the context layer, the execution layer, and the data layer**. These three are ordered not by where they sit in the request lifecycle, but by **how hard they are to bypass**—the lower the layer, the less it depends on the model's own judgment, and the harder it is for a single successful attack to get through. Every security discussion later in this book hangs on this tree.
 
-**Input-side** guardrails intercept requests before they reach the Agent, typically through four mechanisms. **Relevance classifiers** flag off-topic queries—for example, a coding assistant being asked, "How tall is the Empire State Building?" **Safety classifiers** detect jailbreaks (inducing the model to bypass its safety restrictions) and prompt injections (embedding malicious instructions in input). The key difference: in a jailbreak, the user tries to bypass the model's restrictions directly; in prompt injection, an attacker manipulates model behavior indirectly through external data (web content, documents). **Content moderation** flags harmful or inappropriate input, such as violent or discriminatory content. **Rule-based protections** apply deterministic measures—blacklists, input length limits, regular-expression filters—against known threats like SQL injection.
+**Context-layer** guardrails govern **what the model gets to see**, intercepting content before it enters the context. They usually comprise four mechanisms. A **relevance classifier** flags off-topic queries—a coding assistant asked "how tall is the Empire State Building?" A **safety classifier** detects jailbreaks (inducing the model to bypass its safety limits) and prompt injection (embedding malicious instructions in the input); the key difference is that a jailbreak is the user trying to get around the model's own limits, whereas prompt injection is an attacker manipulating the model indirectly through external data such as web pages or documents. **Content moderation** flags harmful or inappropriate input such as violent or discriminatory content. **Rule-based protection** applies deterministic measures—blocklists, input length limits, regular-expression filters—against known threats such as SQL injection. Source labelling and the separation of "instructions" from "data" also belong to this layer; Chapter 2 develops them.
 
-**Execution-side** guardrails validate tool calls. The core is **tool risk rating**: based on whether an operation is reversible, its permission level, and financial impact, each tool is assigned a risk level (low/medium/high). High-risk operations require additional review or human confirmation.
+But this layer has a structural ceiling: **an Agent sitting inside the very context under attack can hardly tell whether it has already been injected**. The context layer can therefore lower the success rate of an attack but cannot offer a guarantee—which is exactly why the two layers below it are necessary.
 
-**Output-side** guardrails check the response before it is returned to the user. **PII filters** review the output for personally identifiable information (e.g., ID numbers, phone numbers) to prevent unnecessary exposure; **output validation** ensures the reply aligns with brand values through content checks.
+**Execution-layer** guardrails govern **what the model gets to do**, validating an action before it takes effect. At their core is **tool risk rating**: each tool is labelled low, medium, or high risk according to reversibility, privilege level, and financial impact, and high-risk operations require additional review or human confirmation. What matters is that this review must be performed by a mechanism **outside the context**—an independent review process, least-privilege credentials, sandbox isolation, a human in the loop—otherwise it falls together with the injected Agent. The reply returned to the user is itself an action (Chapter 4 classifies it as a user-communication tool), so **output checks** belong to this layer too: a **PII filter** screens the output for personally identifiable information such as ID or phone numbers to prevent unnecessary exposure, and **output validation** checks content to keep replies aligned with brand values.
 
-Note that some mechanisms (e.g., rule-based regex filtering) can be used on both the input and output sides; the above categorization follows the most common deployment locations.
+**Data-layer** guardrails govern **what the world can ultimately be changed into**, delegating "who may do what to which record" to a stable, human-reviewed mechanism: row-level security policies in the database, constraints and validators, controlled views and stored procedures, and an access context bound by a trusted runtime that cannot be forged. The value of this layer is precisely that it does not depend on the two above it being correct—even if the prompt injection succeeds and the generated code omits its permission checks entirely, the unauthorized operation is still rejected at the data layer. Chapter 5 develops this layer through the example of dynamically generated software.
+
+Note that the same mechanism can appear at more than one layer—a rule-based regex filter can screen both input and output—and the classification above follows the place where it provides its guarantee. The three layers are additive rather than alternative: the upper layers keep most attacks out and give feedback early, while the lower layers hold the inviolable boundary when the upper ones fall.
 
 A representative industry practice of classifier-based guardrails is Anthropic's Constitutional Classifiers[^ch1-3]. Its design has three key elements. First, **rule-driven training**: a "constitution" written in natural language—which explicitly specifies what is allowed and what is not—is used to generate synthetic training data for the input and output classifiers. Second, **joint contextual judgment**: the new generation checks the user's question and the model's answer together, because some answers look perfectly fine on their own (e.g., "how to use food flavorings"), and only against the question does it become clear that "food flavorings" is code for chemical reagents. Third, **two-stage screening**: an extremely lightweight probe—which reads the model's internal activations at almost zero cost—checks every conversation first, and anything suspicious is escalated to a more powerful classifier for review rather than being refused outright. This way the first stage can tolerate more false positives without hurting the user experience, and the overall cost is greatly reduced.
 
@@ -455,11 +478,13 @@ Set caps on the Agent's retries and operations. If the Agent exceeds those caps,
 **High-Risk Operations**
 Sensitive, irreversible, or high-risk operations should trigger human oversight—at least until the team has built enough confidence in the Agent's reliability. Typical examples include authorizing a large refund or processing a payment.
 
-With the five Harness elements in mind, the rest of the book follows this structure.
+Back to the main thread of the five Harness elements—let us see how they relate to the structure of this book.
 
-### This Book as a Practical Guide to Harness Engineering
+### The Five Harness Elements and the "Building" Part
 
-Seen through the lens of Harness engineering, each chapter of this book systematically builds out one component of the Harness. Security, meanwhile, belongs to no single chapter; it is a cross-cutting concern of the whole book (a cross-cutting concern touches many parts of a system at once—the way logging, in software engineering, has to thread through every module). The table below presents the Harness functions, security aspects, and corresponding chapters in a single view:
+**First, the relationship between the two formulas, so that no one has to remember two skeletons.** The book has exactly one structural skeleton, the one the introduction and afterword keep using: **Agent = LLM + Context + Tools**—chapters 2 through 6 build, chapters 7 through 9 evaluate and evolve, chapter 10 collaborates. **Agent = Model + Harness** is not a rival partition alongside it but the same thing unfolded into its production form: it expands "context" and "tools" into five responsibilities—context management, tool interface, constraints, verification, correction. It is therefore **a lens inside the "building" part**, not a table of contents covering all ten chapters.
+
+Within that scope, the five Harness elements map cleanly onto chapters 2 through 5:
 
 | Harness Focus | Corresponding Chapter | Core Content | Security Concerns |
 |--------------------|--------------------|-------------------------------|------------------------|
@@ -467,13 +492,51 @@ Seen through the lens of Harness engineering, each chapter of this book systemat
 | Context Expansion (Knowledge Persistence) | Chapter 3 (Knowledge Base) | User memory, RAG, structured indexing, agentic RAG | Sensitive information exposure, privacy protection |
 | Tool Design and Security Constraints | Chapter 4 (Tool Design) | Tool classification, permission control, MCP standard, asynchronous architecture | Misoperation, unauthorized access, irreversible operations |
 | Tool Verification and Correction | Chapter 5 (Code Generation) | Coding Agent's Harness, test-driven development, codified rules | Identity impersonation, responsibility attribution |
-| System-Level Verification | Chapter 6 (Evaluation) | Evaluation environment, datasets, automated evaluation, observability | — |
-| Model-Level Correction | Chapter 7 (Post-Training) | SFT (Supervised Fine-Tuning), Reinforcement Learning—encoding feedback signals accumulated by the Harness into model parameters, as an extension of Harness engineering | Goal misalignment, alignment and robustness |
-| System-Level Correction | Chapter 8 (Self-Evolution) | Externalized learning, tool creation, experience accumulation | — |
-| Multimodal Context and Tools | Chapter 9 (Multimodal and Real-Time Interaction) | Voice Agent, Computer Use, robotic operation | Security filtering of multimodal input, permission control in real-time interaction |
-| Constraints and Corrections Among Multiple Agents | Chapter 10 (Multi-Agent Collaboration) | Collaboration architecture, failure modes, Agent society | Trust boundary violations between Agents, shared resource conflicts |
+
+Chapter 6 (Interaction) does not belong to any of the five elements; what it expands is the modality and timing of the observation and action spaces themselves. Chapters 7 through 9 ask **how we know the Harness was built right, and how to keep making it better**. Chapter 10 replaces a single Agent's Harness with a collaboration structure among several. Forcing those chapters into the five boxes only makes the boxes stop discriminating.
+
+Security likewise is not partitioned by chapter: it is a cross-cutting concern (a problem that affects many parts of a system) running through the whole book, organized by the three guardrail layers of the previous section—context, execution, data. The "security focus" column above gives each chapter's principal landing point among those three layers.
 
 Anthropic's practice in building long-running Agents shows how Harness design can solve problems the model itself cannot. They split complex tasks between an "Initialization Agent" (setting up the environment, decomposing the task list) and an "Execution Agent" (making incremental progress each session and leaving clear handover artifacts), using a structured Harness to tackle the two failure modes of long tasks: running out of context and declaring the task done prematurely. The chapters ahead work through the Harness component by component—Chapter 2 begins with the most central one, context engineering, and Chapter 5 lays out the complete practice of Harness engineering in Coding Agents.
+
+## Design Patterns That Run Through the Book
+
+The nine chapters that follow keep reaching for the same handful of structures. They do not belong to any single chapter—they are repeated solutions under one and the same constraint—so we name them once here and give each a canonical definition. Later chapters then call them by name and only describe the local variation.
+
+**Proposer-Reviewer**: production and judgment are carried out by two roles that do not share a context, and the judge sees the artifact itself—the rendered result, the test output, the structured call arguments—rather than the producer's reasoning. The premise is that **self-review is unreliable**: a model inside a given context can neither think of what it failed to think of, nor readily tell whether it has already been injected. Chapter 3 uses it to update knowledge; Chapter 4 uses it for pre-approval and post-validation of tool calls (the Sidecar is a read-only variant); the PPT, video and log experiments of Chapter 5 are all built on it; Chapter 7 uses it to evaluate UIs; Chapter 9 uses it to review update proposals; and Chapter 10 discusses its shape in peer collaboration, and why an Agent must not review itself.
+
+**Progressive Disclosure**: rather than putting everything into the context at once, offer a searchable catalogue first and load the details on demand. It optimizes two things simultaneously—the context budget and selection accuracy. Agent Skills in Chapter 2 is the archetype (metadata resident, body loaded on demand); the layered retrieval of Chapter 3, the proactive tool discovery and paginated truncation of Chapter 4, and Agent discovery in Chapter 10 are all variants.
+
+**Append-only**: state evolves by appending, and what has been written is never revised in place. What this buys is cacheability, replayability and auditability. The KV Cache prefix stability of Chapter 2 is its performance form—the earlier a change lands, the more cache it invalidates; the event-shaped memory of Chapter 3 and Chapter 4's habit of appending a newly discovered tool schema to the end of the trajectory rather than splicing it back into the prefix follow the same discipline.
+
+**Boundary Set + Retention Set**: every change must be validated both on "the samples it is supposed to change" and on "the samples it must not affect". Testing only the former mistakes overfitting for progress; testing only the latter mistakes an ineffective change for a safe one. The regression tasks of Chapter 7, the training/evaluation isolation of Chapter 8, and the update-proposal validation of Chapter 9 all rest on this pair of sets.
+
+**Minimal Diff, Reversible**: keep each change as small as possible, carrying its provenance, and independently revertible instead of rewritten wholesale. This is what makes attribution possible—when something breaks, it can be traced to one specific change. The knowledge updates of Chapter 3, the code patches of Chapter 5, and the prompt and program updates of Chapter 9 all follow it; and the three update paths given at the start of this chapter (in-context adaptation, external-artifact updates, parameter updates) are themselves ordered from most to least reversible.
+
+These five patterns share one motif: **moving judgment from "the model decides" to "a mechanism outside the model decides"**—the reviewer sits outside the context, the catalogue outside the body text, the cache outside the change, the retention set outside the boundary set, the rollback outside the commit. The three-layer guardrails given earlier in this chapter are that motif applied to security. When these patterns reappear later, this book names them and states the local difference rather than deriving them again.
+
+## The Discovery Loop: Evidence, Proposal, Experiment, Feedback
+
+The five patterns of the previous section are local structures. One larger structure spans three chapters, but because it is built in pieces it is easily mistaken for three independent pipelines.
+
+Chapter 7 has to locate the first error in a failed trajectory and classify it. Chapter 3 has to turn a new piece of evidence into the smallest well-grounded change to the knowledge base. Chapter 9 has to decide whether a change actually made the system better, and then whether to ship or roll back. These three use completely different machinery—attribution rests on rubrics and first-error localization, proposal on Proposer-Reviewer, validation on boundary and retention sets with canary release and rollback—so they are **not three repetitions of one mechanism**, and forcibly unifying their vocabulary would hide the differences that matter.
+
+What they genuinely share is a position: each occupies one segment of the same loop.
+
+```text
+Evidence (Chapter 7): failed trajectory → first error + error class
+  → Proposal (Chapter 3): evidence → one minimal, reviewable, reversible change
+  → Experiment (Chapter 9): measure on boundary and retention sets, ship to a canary
+  → Feedback: measured results and new failed trajectories return to the evidence segment
+```
+
+This loop was recently named and pushed toward automation by Discovery Loop, founded by Jeff Dean and colleagues: propose an experiment, implement what it needs, evaluate it, take the result into the next round, and parallelize a process that used to run serially[^ch1-discovery-loop]. It should be said plainly that the company was founded in August 2026 and has so far published only its mission, with no public technical results; this book cites it for **its naming of the loop**, not as evidence—exactly the distinction Chapter 7 will keep insisting on.
+
+Setting an Agent system's version of this loop beside a pure research loop reveals two extra constraints, and they are precisely what much of the rest of this book is about. **First, the experiment must be grounded in real observation.** In a research loop the "experiment" can be a training run; in an Agent system it modifies a system that is currently serving users, so the verdict has to come from the environment's actual state—whether the tests pass, the final state of the database, what the tool returned—and not from the model's own account of what it did. **Second, every experiment must answer both "what did this fix" and "what did this break".** A research loop usually just wants the metric to go up; an Agent system must also show that behavior which was already correct still is. That is why the boundary set and retention set of the previous section exist.
+
+The three chapters that follow each cover only their own segment and do not restate the loop: Chapter 3 on what makes a proposal well-grounded, Chapter 7 on what makes evidence trustworthy, Chapter 9 on what keeps experiment and feedback running long-term without drifting.
+
+[^ch1-discovery-loop]: Discovery Loop was announced on 5 August 2026 by Jeff Dean, Sanjay Ghemawat, Quoc Le and Oriol Vinyals as a public benefit corporation whose mission is to automate machine learning, science and engineering; its public description is automating complete experimental loops and running at scale in parallel what used to run serially. See https://techcrunch.com/2026/08/05/jeff-dean-and-other-top-ai-researchers-are-leaving-google-to-launch-their-own-startup/ . As of this writing it has published no reproducible technical results.
 
 ## Chapter Summary
 
@@ -489,9 +552,13 @@ This chapter has built a practice-first framework for understanding and construc
 
 **From Workflow to Autonomous Agent**: Prompts first, then workflows, autonomous Agents last—that ordering is the most practical way to reduce unexpected behavior. Every orchestration pattern has situations where it fits; no single pattern is best everywhere.
 
-**Security Is an Architectural Issue**: Guardrails, human-in-the-loop intervention, alignment (keeping the model's behavior consistent with human intent)—security has to be designed in from the first line of code, not patched on before launch. It spans five levels: model, context, tools, collaboration, and society.
+**Five patterns run through the book**: Proposer-Reviewer, Progressive Disclosure, Append-only, Boundary Set + Retention Set, and Minimal Diff / Reversible—all sharing one motif, moving judgment from the model itself to a mechanism outside it. Later chapters call them by name instead of deriving them again.
 
-The next chapter examines the Harness's most central component in depth: context engineering. Chapter 7 covers the Agent concept's academic roots in reinforcement learning and compares traditional RL with modern LLM Agents.
+**The discovery loop spans three chapters**: evidence (failure attribution in Chapter 7) → proposal (knowledge updates in Chapter 3) → experiment and feedback (validation and release in Chapter 9). The three use genuinely different machinery; what they share is position, not vocabulary. Compared with a pure research loop, an Agent system's loop carries two extra constraints: the experiment must be grounded in real observation, and every round must answer both what it fixed and what it broke.
+
+**Security Is an Architectural Issue**: Guardrails, human-in-the-loop intervention, alignment (keeping the model's behavior consistent with human intent)—security has to be designed in from the first line of code, not patched on before launch. Guardrails fall into three layers—context, execution, and data—ordered by how hard they are to bypass, and every later chapter hangs its security discussion on that skeleton.
+
+The next chapter examines the Harness's most central component in depth: context engineering. Chapter 8 covers the Agent concept's academic roots in reinforcement learning and compares traditional RL with modern LLM Agents.
 
 The thought questions below are designed to take the chapter's core concepts a level deeper; they do not have standard answers.
 
