@@ -148,6 +148,8 @@ The two calls in the figure both refer to **calls to the model API**, not to two
 }
 ```
 
+This `tools` list is static tool metadata the developer registered ahead of time: the tool names, descriptions and parameter schemas are written into the code and have nothing to do with what the user happens to be asking this time. Whether the user asks about the weather in Vancouver or asks the Agent to book a flight, the same list goes out; the example lists only the two relevant tools to keep the request short, whereas a real Agent often declares dozens of them at once. **The Agent did not first split the user input into a "look up the time" subtask and a "look up the weather" subtask and then write the matching tool descriptions** — that decomposition happens on the model's side, and it is precisely the `tool_calls` in the response below.
+
 **Model returns a tool call request (not a final reply):**
 
 ```javascript
@@ -333,7 +335,7 @@ The loop has one main branch: **if the model returns `tool_calls`, execute the t
 The `messages` list changes across rounds as follows:
 
 **Initial state (before the first call):**
-```
+```text
 messages = [
   { role: "system",  content: "You are a helpful assistant..." },     # Written by developer
   { role: "user",    content: "What's the current time and weather in Vancouver?" },  # User input
@@ -341,7 +343,7 @@ messages = [
 ```
 
 **After the first call (model returns tool calls):**
-```
+```text
 messages = [
   { role: "system",    content: "..." },
   { role: "user",      content: "What's the current time..." },
@@ -352,7 +354,7 @@ messages = [
 ```
 
 **After the second call (model returns final reply, loop ends):**
-```
+```text
 messages = [
   { role: "system",    content: "..." },
   { role: "user",      content: "What's the current time..." },
@@ -374,6 +376,25 @@ The example above shows the complete composition of context each time the Agent 
 The upper part (System Prompt + Tool Definitions) remains unchanged throughout the conversation, while the lower part (conversation history, i.e., the **trajectory** defined in Chapter 1) grows with each interaction. This is how the five context components from Chapter 1 appear at the API level: the system prompt and tool definitions form a static prefix, while user messages, model replies, and tool execution results form a dynamically growing message history. This "static prefix + trajectory" structure is the foundation for later discussions of KV Cache optimization, context compression, and related techniques: the prefix should remain stable, while later trajectory segments can be summarized or replaced when the trade-off is worthwhile.
 
 The rest of this chapter examines each layer of this structure: how to use a stable static prefix to accelerate inference (KV Cache), how to design an effective System Prompt (prompt engineering), how to prevent external content from hijacking the context (prompt injection defense), how to load specialized knowledge on demand (Agent Skills), how to inject dynamic state at the end of the conversation (Agent Status Bar), and how to compress conversation history when it grows too large (compression strategies).
+
+**Context construction before each request:**
+
+```python
+stable_prefix = system_message
+stable_tools = core_tool_schemas
+trajectory = load_message_history(session)
+status_message = make_status_message(derive_current_state(trajectory))
+
+if estimated_tokens(stable_prefix, trajectory, status_message) > budget:
+    trajectory = compress_old_evidence(
+        trajectory,
+        preserve = [decisions, constraints, failures, citations]
+    )
+
+request.messages = [stable_prefix] + trajectory + [status_message]
+request.tools = stable_tools
+response = call_model(request)
+```
 
 > **Experiment 2-1 ★: Local LLM Service Deployment and Tool Calling**
 >
@@ -596,7 +617,7 @@ Methods that reduce cognitive load for humans are equally effective for large la
 
 In contrast, a process-driven prompt functions like an effective training manual, providing a clear Standard Operating Procedure (SOP):
 
-```
+```text
 File Processing Standard Operating Procedure:
 
 Step 1: Validation
@@ -783,7 +804,7 @@ A common misconception needs clarification: “KV Cache-friendly” does not mea
 
 ### Relationship Between Skills and Tools
 
-From a context-management perspective, the Skills mechanism is highly KV Cache-friendly. If all specialized code-tool definitions were placed in the system prompt, their proliferation would consume many tokens and interfere with the model's attention. Under the Skill + generic executor model, however, the tool set remains small—as Chapter 5 shows, only seven core tools are required—and Skill content is loaded on demand through the progressive-disclosure mechanism described above, without affecting the cached prefix. Chapter 4 provides a detailed comparison and selection framework for these two forms, while Chapter 8 examines how an Agent undergoing continuous evolution decides whether an experience should be encoded as knowledge, instructions, a program, or model parameters.
+From a context-management perspective, the Skills mechanism is highly KV Cache-friendly. If all specialized code-tool definitions were placed in the system prompt, their proliferation would consume many tokens and interfere with the model's attention. Under the Skill + generic executor model, however, the tool set remains small—as Chapter 5 shows, only seven core tools are required—and Skill content is loaded on demand through the progressive-disclosure mechanism described above, without affecting the cached prefix. Chapter 4 provides a detailed comparison and selection framework for these two forms, while Chapter 9 examines how an Agent undergoing continuous evolution decides whether an experience should be encoded as knowledge, instructions, a program, or model parameters.
 
 > **Experiment 2-6 ★★: Generate a Presentation from a Paper Using Agent Skills**
 >
@@ -799,6 +820,14 @@ From a context-management perspective, the Skills mechanism is highly KV Cache-f
 >
 > **Acceptance Criteria**: The generated PowerPoint covers the paper's main content (title page, problem background, method overview, key results, conclusion), includes at least 3 figures extracted from the paper that are consistent with the text descriptions, and has correct formatting that opens properly in PowerPoint or compatible software.
 >
+
+> **Experiment 2-7 ★★: Creating a "De-AI-ified" Writing Skill from Personal Samples**
+>
+> **Experiment Goal**: Generate a loadable, inspectable writing Skill from a small set of human-written samples, and observe whether it can reproduce the author's main stylistic preferences in new articles.
+>
+> **Experiment Description**: Prepare three to five original articles and let a runtime that supports Agent Skills generate a first-draft `SKILL.md`. Pick a new topic and draft an article; after the author edits it by hand, compare before/after and write the stable patterns back into the Skill. Acceptance only requires that the Skill have clear trigger conditions, three to five principles with examples, a scope, and exceptions — without treating a single subjective judgment as a universal rule.
+>
+> **What This Experiment Shows**: The value of a Skill lies in externalizing personal experience into instructions that load on demand. A short, readable first draft that survives a real task is a better starting point for later iteration than listing dozens of rules up front.
 
 ## Agent Status Bar: Managing Trajectories with Meta-Information
 
@@ -830,7 +859,7 @@ In long-context scenarios, the model's attention resources are limited. As conte
 
 The Agent Status Bar addresses this problem by deliberately placing key meta-information in a structured format at the end of the context. Because this information is close to the tokens the model is about to generate, it is more likely to receive attention. This is a form of attention steering through placement.
 
-> **Experiment 2-7 ★★: Verifying the Effect of the Agent Status Bar via Attention Visualization**
+> **Experiment 2-8 ★★: Verifying the Effect of the Agent Status Bar via Attention Visualization**
 >
 > Based on the `attention_visualization` project, we designed a controlled experiment where a customer service Agent handles a refund request. The Agent has already called Xfinity 3 times, interspersed with web searches. The user asks: "Can you call them again to follow up?"
 >
@@ -849,7 +878,7 @@ The Agent Status Bar addresses this problem by deliberately placing key meta-inf
 > Attention is highly concentrated on the status bar information. The reasoning process directly uses the already distilled information, no longer computing statistics from the raw data. For a small model like Qwen3-0.6B, Control Group A frequently violates the constraint and continues calling, while Control Group B consistently adheres to the constraint.
 >
 
-Experiment 2-7 is a small qualitative demonstration that provides intuition. To quantify the value and limits of this "precompute and access directly" approach, the author and collaborators evaluated it with a dedicated benchmark[^ch2-7]. This approach has a general name: **Context Distillation**. The Agent Status Bar is its most common form. The results:
+Experiment 2-8 is a small qualitative demonstration that provides intuition. To quantify the value and limits of this "precompute and access directly" approach, the author and collaborators evaluated it with a dedicated benchmark[^ch2-8]. This approach has a general name: **Context Distillation**. The Agent Status Bar is its most common form. The results:
 
 - **For weak models, a precomputed status bar recovers accuracy.** The weakest models saw accuracy gains of 40 to 54 percentage points, and on these tasks a local 2B model even matched a frontier model that had no status bar.
 - **For strong models that already answer correctly, it improves efficiency.** The same status bar reduces the reasoning effort, latency, and cost per query by roughly an order of magnitude (reasoning tokens are cut by 80–90% or more).
@@ -863,7 +892,7 @@ However, **how the precomputation is performed matters greatly**. Three lessons:
 
 **3. Monitor the accuracy of the status bar as a first-line production metric.** The experiment found that **the model almost unconditionally trusts the status bar**. If it says "called 3 times," the model accepts that value without checking or recalculating it. This trust makes the status bar effective, but it also allows errors to flow **directly** into the final answer. This also means the **status bar poisoning** risk discussed earlier deserves serious attention.
 
-[^ch2-7]: Li, Bojie and Noah Shi. *Distill, Don't Retrieve: Inference-Time Context Distillation for LLM Agent Reasoning.* 2026. https://01.me/research/context-distillation
+[^ch2-8]: Li, Bojie and Noah Shi. *Distill, Don't Retrieve: Inference-Time Context Distillation for LLM Agent Reasoning.* 2026. https://01.me/research/context-distillation
 
 Seen from this perspective, the Loop Engineering introduced at the end of Chapter 1's evolutionary arc, and developed further in Chapter 10 alongside multi-agent collaboration systems, turns this third axis of interaction into engineering practice. Each iteration makes real progress only when verification writes observations of the external world back into the context. Without that step, the model merely rearranges existing information. Thus, the claim that "the verifier, not the model, is the bottleneck" and the finding that the measuring instrument must be grounded in real observations express the same principle.
 
@@ -889,7 +918,7 @@ An important implementation detail is that the Agent Status Bar is inserted at t
 
 Below is the actual message list constructed by the Agent framework during the Nth API call:
 
-```
+```text
 messages: [
   { role: "system",    content: "You are a customer service assistant..." }  ← Fixed (KV Cache cached)
   { role: "user",      content: "Help me cancel my Xfinity plan" }  ← Original user request
@@ -916,13 +945,15 @@ This design applies the core principle from the KV Cache section to the status b
 
 "Appending does not break the cache" only holds for a single injection. Status naturally changes over time: TODO items are completed, tool counts increase, and previous status messages become outdated. There are two ways to update the status bar, each with different cache costs:
 
-**Implementation 1: Replace each round.** Before each API call, remove the previous round's status message from the message list and append the latest status at the end. This keeps only one current status in the context. The cost is that removing the old status invalidates all cached content after its position, which is the same invalidation mechanism discussed in the "dynamic timestamp" section of this chapter. The difference is that because the status message is near the end of the context, the invalidation range is limited to the most recent few rounds of messages rather than the entire prefix.
+**Implementation 1: Replace each round.** Before each API call, remove the previous round's status message from the message list and append the latest status at the end. This keeps only one current status in the context. The cost is that removing the old status invalidates all cached content after its position, which is the same invalidation mechanism discussed in the "dynamic timestamp" section of this chapter. The difference is that because the status message is near the end of the context, invalidation is limited to messages added since the previous status injection—usually one round—rather than the entire prefix.
 
 **Implementation 2: Persistent appending.** Once injected, the status message remains permanently in the trajectory, and a new status is appended at the end each round. Claude Code's `<system-reminder>` uses this approach: historical status messages remain in the transcript and are never deleted or modified. This method is fully cache-friendly because messages are only appended, never changed, so the prefix remains stable. The cost is that outdated statuses accumulate in the context, consuming tokens and requiring the model to rely on the latest status while ignoring obsolete ones.
 
-The rule of thumb is: **when status updates are frequent and the trajectory is long, choose Implementation 2**. Replacing the status each round repeatedly invalidates cache entries over a long trajectory, which can cost more than carrying outdated status messages. **When the trajectory is short or a single status message is large** (e.g., a complete TODO list plus environment snapshot), **choose Implementation 1**. Cache invalidation over the last few rounds is cheap, and the context remains clean and unambiguous.
+The choice depends on trajectory length, status size, the suffix added between updates, and the expected number of updates. **Choose Implementation 2 when the status is small, many messages are produced between updates, and the session length is bounded**—keeping old statuses is usually cheaper than repeatedly recomputing a long suffix. **Choose Implementation 1 when the status is large, updates are frequent, or the trajectory is long**—it usually invalidates only the short suffix after the previous injection while preventing stale statuses from accumulating.
 
-> **Experiment 2-8 ★★: Several Useful Agent Status Bar Techniques**
+A rough model gives the break-even point. Let each status contain $S$ tokens, let $R$ tokens be added between updates, let $N$ be the expected number of updates, and let cached input cost $\alpha$ times regular input. Ignoring costs shared by both approaches, $C_{\text{replace}} \approx (N-1)(1-\alpha)R$ and $C_{\text{append}} \approx \alpha S N(N-1)/2$. Thus, prefer Implementation 2 when $\alpha SN/2 < (1-\alpha)R$; otherwise prefer Implementation 1. This estimate excludes context occupancy and ambiguity from stale states, so the final choice should also reflect the provider's cache pricing and measured hit rate.
+
+> **Experiment 2-9 ★★: Several Useful Agent Status Bar Techniques**
 >
 > The `agent-status-bar` experimental framework implements five status bar techniques, each of which can be independently enabled or disabled:
 >
@@ -998,7 +1029,7 @@ The key is understanding the **timing and location** of compression. Compression
 
 ![Figure 2-16: Comparison of Context Compression Strategies](images/fig2-16.svg)
 
-> **Experiment 2-9 ★★★: Comparison of Context Compression Strategies**
+> **Experiment 2-10 ★★★: Comparison of Context Compression Strategies**
 >
 > We designed a research task: identify and track the employment status of OpenAI co-founders. This task requires multi-step information aggregation, the length of search results varies greatly (from a few thousand to over a hundred thousand characters), and there are clear success criteria. Using Kimi K3 (a reasoning model with a native context of about 1 million tokens; this experiment deliberately limited the context budget to a 128K window to trigger compression), we implemented six strategies:
 >
@@ -1035,7 +1066,7 @@ The experiment above demonstrates the performance differences among compression 
 
 ### Design Principles for Compression Strategies
 
-We have already analyzed the two motivations for compression—controlling length and improving reasoning quality—and the internal mechanism by which “in-context learning is essentially retrieval.” On that basis, we can distill four principles to guide the design of specific compression strategies. The compression discussed here serves the current task; when trajectories from multiple tasks must be consolidated offline into persistent experience, the problem becomes one of continuous evolution, as discussed in Chapter 8.
+We have already analyzed the two motivations for compression—controlling length and improving reasoning quality—and the internal mechanism by which “in-context learning is essentially retrieval.” On that basis, we can distill four principles to guide the design of specific compression strategies. The compression discussed here serves the current task; when trajectories from multiple tasks must be consolidated offline into persistent experience, the problem becomes one of continuous evolution, as discussed in Chapter 9.
 
 - **Non-Uniform Distribution of Information Value**: Key decision points, such as personnel lists, have greater value than supporting evidence, such as news details; supporting evidence, in turn, has greater value than redundant noise, such as navigation bars and footer ads.
 - **Semantic Integrity**: "Sutskever left OpenAI in May 2024" cannot be compressed to "Sutskever left"—the time and company name are critical, non-negotiable information.
