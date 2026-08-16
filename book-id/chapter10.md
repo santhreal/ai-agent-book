@@ -20,11 +20,11 @@ Ini adalah keputusan arsitektural yang paling mendasar, menentukan bagaimana inf
 
 Karena para Agent tidak berbagi konteks, informasi harus diteruskan melalui mekanisme komunikasi eksplisit. Sistem terdistribusi klasik telah lama menyelesaikan pertanyaan ini: buku teks sistem operasi memberi tahu kita bahwa inter-process communication (IPC) pada akhirnya hanya hadir dalam dua paradigma—**shared memory** (satu pihak menulis dan pihak lain membaca blok penyimpanan yang sama) dan **message passing** (data secara eksplisit dikirim ke pihak lain). Mekanisme komunikasi antar Agent termasuk dalam dua paradigma yang sama ini. Terdapat tiga metode umum:
 
-- **Tool call parameters**: Agent di tahap hulu (upstream) meneruskan data terstruktur sebagai parameter ke tool milik Agent di tahap hilir (downstream), cocok untuk skenario yang membutuhkan data yang diketik dengan baik (well-typed) dan terstruktur secara jelas.
+- **Tool call parameters**: Agent hilir dibungkus sebagai sebuah tool, lalu Agent hulu meneruskan data terstruktur melalui parameternya; cocok untuk skenario yang membutuhkan data yang well-typed dan terstruktur secara jelas.
 - **Shared file system**: Para Agent bertukar informasi dengan membaca dan menulis artefak perantara (dokumen, kode, dll.) di direktori bersama, cocok untuk skenario dengan artefak besar atau di mana persistensi diperlukan.
 - **Message bus**: Sebuah perantara khusus yang meneruskan pesan di antara para Agent. Agent tidak memanggil satu sama lain secara langsung tetapi mengirim pesan ke bus, yang kemudian meneruskannya ke Agent target.
 
-Dipetakan ke dalam dua paradigma IPC, shared file system sesuai dengan "shared memory," sementara tool call parameters dan message bus adalah bentuk dari "message passing." Tool parameters dikirimkan secara sinkron dengan pemanggilan (call); pesan di message bus dikirimkan secara asinkron melalui sebuah perantara. Setiap paradigma memiliki trade-off masing-masing. Go memiliki pepatah yang banyak dikutip: "Jangan berkomunikasi dengan berbagi memori; sebaliknya, berbagilah memori dengan berkomunikasi." Shared memory itu cepat, tetapi developer harus mengelola bahaya konkurensi (concurrency hazards); message passing membutuhkan lebih banyak kode orkestrasi (orchestration code) tetapi menjaga kepemilikan data tetap jelas dan dapat dilacak. Trade-off ini berulang di sepanjang pembahasan selanjutnya mengenai status queries dan concurrency conflicts.
+Dipetakan ke dalam dua paradigma IPC, shared file system sesuai dengan "shared memory," sementara tool call parameters dan message bus adalah bentuk dari "message passing." Tool parameters dikirimkan secara sinkron dengan pemanggilan (call); pesan di message bus dikirimkan secara asinkron melalui sebuah perantara. Setiap paradigma memiliki trade-off masing-masing. Go memiliki pepatah yang banyak dikutip: "Jangan berkomunikasi dengan berbagi memori; sebaliknya, berbagilah memori dengan berkomunikasi."
 
 Message bus secara alami mendukung **komunikasi asinkron** (asynchronous communication)—pengirim dan penerima tidak perlu online secara bersamaan. Ini seperti sistem email internal perusahaan: saat Anda mengirim email kepada rekan kerja, Anda tidak perlu mereka berada di depan komputer pada saat itu; email disimpan di server dan diproses saat rekan kerja tersebut online. Pendekatan ini sangat cocok untuk skenario di mana beberapa Agent bekerja secara paralel dan perlu berkoordinasi satu sama lain (lihat bagian "Koordinasi Paralel" nanti di bab ini).
 
@@ -34,19 +34,7 @@ Sebagai kejelasan, kedua arsitektur tersebut merupakan sistem multi-Agent sejati
 
 Sebagai analogi: yang pertama adalah sebuah tim di sekitar satu meja, di mana setiap orang mendengar semuanya; yang kedua adalah departemen yang berkolaborasi melalui email dan dokumen, masing-masing dengan ruang kerjanya sendiri.
 
-Pembaca yang familier dengan sistem operasi mungkin menemukan analogi yang berguna: Agent dengan shared-context menyerupai thread, sedangkan Agent dengan non-shared-context menyerupai process. Thread berbagi address space, yang membuat peralihan dan komunikasi menjadi murah namun memberikan sedikit isolasi; kerusakan memori dalam satu thread dapat merusak keseluruhan process. Setiap process memiliki address space-nya sendiri, memberikan isolasi yang lebih kuat dan paralelisme yang lebih aman, namun komunikasinya harus menggunakan IPC eksplisit. Kriteria dalam Tabel 10-1 mengikuti dari trade-off ini.
-
-Tabel 10-1 merangkum kriteria pemilihan untuk kedua arsitektur dari lima perspektif: jumlah subtask, context window, paralelisme, isolasi informasi, dan anggaran biaya (cost budget). Ini dapat berfungsi sebagai daftar periksa (checklist) untuk pemilihan arsitektur di awal.
-
-Tabel 10-1 Kriteria Pemilihan Konteks Bersama vs. Konteks Terpisah
-
-| Kriteria Pemilihan | Shared Context | Non-Shared Context |
-|---------------|-----------------------------------|--------------------------------------------|
-| Jumlah subtask | Sedikit (2-3 peran) | Banyak (pemrosesan paralel diperlukan) |
-| Context window | Dapat menampung informasi untuk semua peran | Jendela tunggal tidak cukup |
-| Paralelisme | Terutama serial (peran bergiliran di sepanjang trajectory yang sama) | Dapat diskalakan secara masif dalam paralel (konteks bersifat independen, non-blocking) |
-| Isolasi informasi | Tidak diperlukan (semua peran berbagi informasi) | Diperlukan (misalnya, tinjauan keamanan tidak boleh menerima konteks internal Agent lain) |
-| Anggaran biaya | Satu trajectory diteruskan melintasi tahap; token terakumulasi tahap demi tahap | Beberapa Agent bekerja secara independen; total token biasanya beberapa kali lipat hingga satu orde magnitudo lebih tinggi |
+Pembaca yang familier dengan sistem operasi mungkin menemukan analogi yang berguna: Agent dengan shared-context menyerupai thread, sedangkan Agent dengan non-shared-context menyerupai process. Thread berbagi address space, yang membuat peralihan dan komunikasi menjadi murah namun memberikan sedikit isolasi; kerusakan memori dalam satu thread dapat merusak keseluruhan process. Setiap process memiliki address space-nya sendiri, memberikan isolasi yang lebih kuat dan paralelisme yang lebih aman, namun komunikasinya harus menggunakan IPC eksplisit.
 
 **Aturan praktis yang sederhana**: Jika prediksi akumulasi konteks melebihi 50% dari jendela (sebuah heuristik, bukan ambang batas eksak), jangan bagikan (don't share). Jika nol informasi yang hilang merupakan persyaratan mutlak untuk kebenaran tugas, bagikan (share). Sebagian besar sistem dunia nyata menggunakan pendekatan yang berbeda pada tahap yang berbeda: beberapa Agent pertama berbagi konteks, tetapi setelah riwayat yang dibagikan menjadi terlalu besar, sistem beralih ke non-shared context dan menggunakan penyerahan (handoff) eksplisit di mana Agent hulu (upstream) memilih apa yang akan diteruskan ke hilir (downstream).
 
@@ -70,17 +58,17 @@ Desain terperinci dan skenario yang berlaku untuk setiap pattern akan dibahas di
 
 Sebelum menyelami arsitektur kolaborasi tertentu, mari kita jawab pertanyaan yang lebih mendasar: **Kapan beberapa Agent benar-benar dibutuhkan, dan kapan satu sudah cukup?** Jawabannya akan berfungsi sebagai titik acuan untuk setiap pendekatan rekayasa yang mengikutinya. Serangkaian penelitian terbaru mengarah pada sebuah kerangka kerja yang jelas—dan kriteria intinya adalah satu pertanyaan: **Apakah kolaborasi tersebut memberikan informasi yang tidak dapat diperoleh oleh Agent tunggal saat menghasilkan jawabannya?**
 
-Tabel 10-2 menunjukkan mode kolaborasi mana yang memperkenalkan informasi baru dan membantu menilai apakah kolaborasi multi-Agent menawarkan nilai substantif dibandingkan dengan sebuah Agent tunggal.
+Tabel 10-1 menunjukkan mode kolaborasi mana yang memperkenalkan informasi baru dan membantu menilai apakah kolaborasi multi-Agent menawarkan nilai substantif dibandingkan dengan sebuah Agent tunggal.
 
-Tabel 10-2 Perbandingan Perolehan Informasi dari Mode Kolaborasi Multi-Agent
+Tabel 10-1 Perbandingan Perolehan Informasi dari Mode Kolaborasi Multi-Agent
 
 | Mode Kolaborasi | Memperkenalkan Informasi Baru? | Efek |
 |---------------------------------------|---------------------|-----------------------------------|
 | Tinjauan mandiri (self-review) oleh model yang sama (membaca ulang output-nya sendiri) | Tidak | Biasanya tidak efektif atau bahkan berbahaya |
 | Agent berbeda yang mendebat teks yang sama | Tidak | Sebanding dengan Agent tunggal dengan jumlah komputasi (compute) yang sama |
-| Reviewer menggunakan hasil eksekusi pengujian untuk meninjau kode | Ya (execution feedback) | Peningkatan yang signifikan |
-| Reviewer menggunakan tangkapan layar yang dirender untuk meninjau kode frontend/PPT | Ya (visual feedback) | Peningkatan yang signifikan |
-| Reviewer menggunakan external tools untuk memverifikasi fakta | Ya (tool feedback) | Peningkatan yang signifikan |
+| Peninjau menggunakan hasil eksekusi pengujian untuk meninjau kode | Ya (execution feedback) | Peningkatan yang signifikan |
+| Peninjau menggunakan tangkapan layar yang dirender untuk meninjau kode frontend/PPT | Ya (visual feedback) | Peningkatan yang signifikan |
+| Peninjau menggunakan external tools untuk memverifikasi fakta | Ya (tool feedback) | Peningkatan yang signifikan |
 
 Makalah RLEF (Reinforcement Learning from Execution Feedback) tahun 2025[^rlef-2025] menemukan bahwa melatih sebuah model melalui reinforcement learning untuk menggunakan umpan balik eksekusi kode untuk peningkatan iteratif memberikan hasil yang secara signifikan mengungguli pengambilan sampel model secara independen beberapa kali. Kuncinya adalah bahwa setiap iterasi memperkenalkan **hasil eksekusi yang nyata** (kesalahan kompilasi, kegagalan pengujian, pengecualian runtime)—informasi yang tidak ada pada saat model tersebut menulis kode. Untuk tugas-tugas pembuatan halaman web, studi WebGen-Agent tahun 2025[^webgen-agent-2025] melaporkan bahwa umpan balik visual bertingkat (multi-level visual feedback), yang menggabungkan tangkapan layar dengan deskripsi vision-language-model, meningkatkan tolok ukur kinerja Claude 3.5 Sonnet dari 26.4% menjadi 51.9%, hampir menggandakannya.
 
@@ -97,63 +85,34 @@ Satu pertimbangan lagi harus ada sebelum keputusan desain apa pun: **biaya (cost
 
 ## Kolaborasi Multi-Agent dengan Shared Context
 
-Dalam kolaborasi multi-Agent dengan shared context, setiap tahap merupakan Agent independen (dengan system prompt dan tool set-nya sendiri), tetapi ia mewarisi keseluruhan trajectory dari Agent sebelumnya—seperti halnya seorang kolega yang mengambil alih sif (shift) dan dapat membuka setiap catatan kerja yang ditinggalkan oleh pendahulunya. Keuntungan inti dari kolaborasi berbasis pewarisan ini adalah nol informasi yang hilang: setiap Agent dapat meninjau detail dari tahap sebelumnya mana pun. Tantangannya adalah mempertahankan Agent saat ini agar tetap fokus pada tanggung jawabnya sendiri alih-alih terganggu oleh sekumpulan riwayat yang diwariskan kepadanya.
+Dalam kolaborasi dengan shared context, setiap tahap adalah Agent mandiri dengan system prompt dan tool sendiri, tetapi mewarisi seluruh trajectory tahap sebelumnya. Keunggulan utamanya adalah tidak ada informasi yang hilang; tantangannya adalah menjaga Agent saat ini tetap fokus meski riwayat terus membesar.
 
-### Pergantian Peran Multi-Tahap
+Pada tugas kompleks, peran dan tanggung jawab dapat berubah tajam antar-tahap. Satu prompt statis akan terlalu umum atau terlalu panjang, sehingga system prompt dan tool dapat diganti sesuai tahap.
 
-Mari kita selesaikan perdebatan definisional ini terlebih dahulu: dalam bahasa Bab 1, multi-stage role switching adalah sebuah **workflow-style orchestration**—jalur eksekusi (misalnya, requirements clarification → implementation → review) telah ditentukan sebelumnya. Dari perspektif proses, sebuah proses tunggal mengeksekusi tahapan-tahapan yang berbeda secara berurutan sambil mempertahankan memori yang sama sepanjang proses. Oleh karena itu, klaim bahwa ini "bukan benar-benar multi-agent" ada benarnya. Meskipun demikian, bab ini memperlakukannya sebagai pola multi-agent karena pembingkaian tersebut memiliki manfaat praktis: setiap tahap dapat memiliki System Prompt, tools, dan fokusnya masing-masing, sementara batas antar tahap dapat berfungsi sebagai quality gates.
+Pilihan arsitektur utamanya adalah mengganti system prompt atau memuat Skill. Keduanya mengubah aturan perilaku, tetapi biaya dan batasannya berbeda.
 
-Dalam tugas-tugas yang kompleks, peran dan tanggung jawab Agent dapat berubah secara signifikan di berbagai tahap. Jika System Prompt statis tunggal digunakan secara keseluruhan, itu akan menjadi terlalu umum untuk memberikan panduan spesifik per tahap atau terlalu panjang karena mencakup instruksi untuk setiap tahap. Sebaliknya, multi-stage role switching mengubah System Prompt dan kumpulan tool sesuai dengan tahap saat ini, memungkinkan Agent untuk bekerja dalam peran yang paling sesuai. Pergantian ini tidak memerlukan pembuatan instance baru atau memulai proses baru; ini hanya mengubah System Prompt dan kumpulan tool dalam sesi eksekusi yang sama. Meskipun perannya berubah, riwayat percakapan dan status tugas tetap digunakan bersama, sehingga Agent dalam peran barunya masih dapat mengakses semua informasi yang terakumulasi di tahap-tahap sebelumnya.
+| Pilihan | Pembawa aturan peran | Visibilitas tool | Dampak konteks/KV Cache | Kekuatan pembatasan |
+|---|---|---|---|---|
+| `transfer_to_agent` | Mengganti system prompt dan biasanya tool set | Hanya tool peran saat ini | Setiap perpindahan mengubah prefix dan biasanya membatalkan cache sejak titik perubahan | Kuat: tool di luar peran dapat dihilangkan dari schema |
+| Skill | Direktori Skill tetap; `SKILL.md` ditambahkan ke trajectory saat diperlukan | Biasanya seluruh katalog atau pintu pencarian yang stabil | Prefix statis tetap; Skill ditambahkan di akhir trajectory | Lemah: Skill adalah instruksi; izin keras memerlukan gerbang Harness |
 
-![Gambar 10-2: Stage-based role switching](images/fig10-2.svg)
+Gunakan Skill bila perbedaannya terutama pengetahuan, prosedur, atau gaya penulisan. Bila menyangkut izin, isolasi tool, kepatuhan, atau larangan efek samping, gunakan Agent terpisah atau `transfer_to_agent` dengan aturan tool yang dipaksakan lewat kode pada Harness.
 
-> **Eksperimen 10-1 ★★: Multi-Role Switching**
+> **Eksperimen 10-1 ★★: Pergantian peran dalam shared context — system prompt versus Skill**
 >
-> **Prasyarat**: Disarankan agar pembaca terlebih dahulu meninjau mekanisme Agent Skills di Bab 2.
+> **Tugas dan variabel bersama**: kedua jalur memakai model, tugas, implementasi tool, aturan peran, dan seluruh trajectory yang sama. Tugasnya mencari penjualan kendaraan energi baru Tiongkok pada 2021–2023, menghitung CAGR, dan menulis ringkasan investor berbahasa Mandarin maksimal 120 karakter.
 >
-> **Arsitektur Sistem**: Lima peran didefinisikan:
+> **Jalur 1: pergantian system prompt**. Lima perannya adalah `triage`, `research`, `coding`, `data_analysis`, dan `writing`. Setiap peran hanya melihat tool khususnya dan `transfer_to_agent`; saat handoff, riwayat disimpan, prompt dan tool peran tujuan dimuat, lalu eksekusi dilanjutkan.
 >
-> - **triage (meja depan; titik masuk default)**: Mengidentifikasi kebutuhan pengguna secara keseluruhan, memecah pekerjaan menjadi subtugas yang berurutan, merutekan setiap subtugas ke spesialis yang tepat, dan melakukan pemeriksaan akhir ketika semua subtugas selesai. Satu-satunya tool-nya adalah `transfer_to_agent`.
-> - **research (ahli information retrieval)**: Menggunakan `web_search` untuk menemukan data, fakta, dan materi.
-> - **coding (ahli pemrograman)**: Menggunakan `execute_python` untuk menulis dan menjalankan kode untuk tugas-tugas pemrograman dan pembuatan skrip.
-> - **data_analysis (ahli analisis data)**: Menggunakan `calculate` / `descriptive_stats` untuk penghitungan kuantitatif dan statistik (misalnya, tingkat pertumbuhan dari tahun ke tahun, tingkat pertumbuhan tahunan majemuk (CAGR), rata-rata).
-> - **writing (ahli menulis)**: Mengubah data yang diambil dan hasil analisis menjadi draf yang jelas yang disesuaikan dengan audiens (dan dapat menggunakan `count_characters` untuk pemeriksaan panjang karakter kasar).
->
-> **Mekanisme Inti: Tool transfer_to_agent**
->
-> Semua peran memiliki tool `transfer_to_agent(target_role, reason)`. Saat sebuah peran memanggilnya, sistem menyimpan riwayat percakapan saat ini, memuat prompt dan kumpulan tool dari peran target, meneruskan riwayat tersebut ke peran tersebut, dan melanjutkan eksekusi.
->
-> **Skenario Eksperimen**: Sistem dimulai dengan peran `triage` secara default. Pengguna mengirimkan tugas yang mencakup beberapa domain: "Saya sedang menyiapkan materi untuk investor. Bantu saya mencari penjualan kendaraan energi baru di Tiongkok untuk tahun 2021, 2022, dan 2023, hitung tingkat pertumbuhan tahunan majemuk untuk ketiga tahun ini, lalu tulis ringkasan dalam bahasa Mandarin untuk investor, tidak lebih dari 120 karakter." `triage` memecahnya menjadi "cari data → hitung metrik → tulis draf" dan pertama-tama menyerahkannya ke `research`:
->
-> ```python
-> transfer_to_agent(target_role="research", reason="Temukan angka penjualan tahunan kendaraan energi baru untuk 2021-2023")
-> ```
->
-> `research` menggunakan `web_search` untuk menemukan angka penjualan, menambahkan data utama ke dalam percakapan, dan menyerahkan tugas ke `data_analysis`:
->
-> ```python
-> transfer_to_agent(target_role="data_analysis", reason="Data sudah siap; hitung CAGR dari 2021 hingga 2023")
-> ```
->
-> `data_analysis` menggunakan `calculate` untuk menghitung tingkat pertumbuhan. Ia kemudian menyerahkan tugas ke `writing`, yang membuat draf ringkasan dan mengembalikannya ke `triage` untuk konfirmasi akhir. Rantai lengkapnya adalah `triage` → `research` → `data_analysis` → `writing` → `triage`. Setiap peran dapat melihat riwayat percakapan lengkap, sehingga peran selanjutnya secara alami mengetahui apa yang telah dilakukan.
->
-> Keputusan untuk beralih peran bergantung pada panduan di dalam System Prompt. Prompt `triage` secara eksplisit mencantumkan aturan perutean: mencari data atau materi sumber → `research`; menulis dan menjalankan kode → `coding`; melakukan penghitungan kuantitatif dan statistik → `data_analysis`; memoles materi menjadi draf → `writing`. Sebuah tugas harus diserahkan jika membutuhkan keahlian domain yang mendalam atau tool yang terspesialisasi. Masing-masing prompt spesialis juga mengidentifikasi peran tepat berikutnya atau menginstruksikan spesialis untuk mengembalikan tugas ke `triage`.
->
-> **Persyaratan Eksperimen**:
-> 1. Implementasikan System Prompt dan kumpulan tool yang terspesialisasi untuk setidaknya tiga peran profesional
-> 2. Implementasikan tool `transfer_to_agent`, yang mendukung peralihan dinamis
-> 3. Pastikan kontinuitas konteks setelah peralihan peran
-> 4. Cegah penyerahan tugas berputar yang menyebabkan Agent beralih berulang kali antar peran
-> 5. Rancang alur tugas kompleks yang mencakup berbagai domain untuk mendemonstrasikan nilai dari peralihan peran
->
+> **Jalur 2: Skill**. System prompt dan katalog tool lengkap tetap sepanjang sesi. Model memanggil `load_skill(name)`, lalu `SKILL.md` masuk ke trajectory sebagai hasil tool. Prefix tetap stabil, sedangkan izin keras ditegakkan oleh aturan Harness.
 
 ## Kolaborasi Multi-Agent Tanpa Shared Context
 
 Dalam arsitektur tanpa shared context, setiap Agent beroperasi sebagai entitas independen dengan context, trajectory, dan state miliknya sendiri. Agent tidak dapat secara langsung mengakses internal context satu sama lain; kolaborasi bergantung sepenuhnya pada transfer data yang eksplisit dan terstruktur melalui tiga mekanisme komunikasi yang diperkenalkan di awal bab ini: parameter tool call, shared file system, dan message bus.
 
-Sebelumnya di bab ini, kita membandingkan mekanisme komunikasi dengan bentuk inter-process communication dan shared vs. isolated context dengan thread vs. process. Analogi ini dapat diperluas lebih jauh (Tabel 10-3):
+Sebelumnya di bab ini, kita membandingkan mekanisme komunikasi dengan bentuk inter-process communication dan shared vs. isolated context dengan thread vs. process. Analogi ini dapat diperluas lebih jauh (Tabel 10-2):
 
-Tabel 10-3 Korespondensi Antara Multi-Agent System dan Operating System
+Tabel 10-2 Korespondensi Antara Multi-Agent System dan Operating System
 
 | Operating System | Multi-Agent System |
 |----------|----------------|
@@ -168,9 +127,8 @@ Tabel 10-3 Korespondensi Antara Multi-Agent System dan Operating System
 | Exit code and wait() | Ringkasan terstruktur yang dikembalikan oleh sub-agent |
 | Shared memory / message passing | Shared file system / message passing |
 
-Program adalah kode statis; process adalah satu instance yang berjalan dari sebuah program. Demikian pula, static prefix menentukan siapa Agent tersebut, sementara trajectory mencatat sejauh mana ia telah berjalan. LLM berperan sebagai CPU: ia tidak menyimpan state-nya sendiri dan digunakan secara time-shared di berbagai Agent dengan memuat context yang berbeda—istilah "context switch" itu sendiri dipinjam dari operating system. Dan karena alasan yang sama, menukar dengan CPU yang lebih cepat membuat program berjalan seperti sebelumnya; menukar dengan model yang lebih kuat membuat Agent tetap menjadi Agent yang sama—identitas dan memorinya berada di dalam prefix dan trajectory, bukan pada bobot model (model weights).
 
-Abstraksi ini bukanlah hal baru: private state, pesan asinkron, dan kemampuan untuk membuat anggota baru merupakan pengaturan dasar yang persis sama dengan Actor model dari tahun 1970-an[^actor-model]. Oleh karena itu, multi-agent system dapat dilihat sebagai versi berbasis LLM dari Actor model, dan sebagian besar pengetahuan yang terkumpul dari operating system dan sistem terdistribusi berlaku secara langsung. Analogi ini runtuh di satu bagian penting: process meneruskan byte secara setia, bit demi bit, sedangkan Agent meneruskan makna, dan setiap penceritaan kembali dapat mendistorsinya. Ini adalah masalah baru yang dibahas dalam bagian "Failure Modes" di bab ini.
+Abstraksi ini bukanlah hal baru: private state, pesan asinkron, dan kemampuan untuk membuat anggota baru merupakan pengaturan dasar yang persis sama dengan Actor model dari tahun 1970-an[^actor-model]. Oleh karena itu, multi-agent system dapat dilihat sebagai versi berbasis LLM dari Actor model, dan sebagian besar pengetahuan yang terkumpul dari operating system dan sistem terdistribusi berlaku secara langsung.
 
 [^actor-model]: Hewitt, C., Bishop, P., Steiger, R. *A Universal Modular ACTOR Formalism for Artificial Intelligence.* IJCAI 1973.
 
@@ -192,13 +150,13 @@ Di awal bab ini, "shared file system" dicantumkan sebagai salah satu dari tiga m
 
 **IV. Built-in System Resources.** Sebuah paket sumber daya yang telah diinstal sebelumnya oleh sistem dan dibagikan secara read-only kepada semua Agent. Contoh umumnya adalah **Skills** yang diperkenalkan pada Bab 2 dan 4—dokumen pengetahuan dan skrip yang diorganisasikan sebagai file, di-mount di path seperti `/skills`, diakses melalui progressive disclosure (indeks terlebih dahulu, lalu di-expand sesuai permintaan). Contoh lainnya termasuk panduan referensi, pustaka template, dan definisi tool yang dibagikan. Lapisan ini dibagikan secara global, bersifat read-only, stabil di seluruh sesi, dan dapat dibaca secara konkuren oleh semua Agent tanpa concurrency control.
 
-Gambar 10-3 mengilustrasikan bagaimana keempat tipe area ini secara seragam di-mount di bawah satu directory tree tunggal: Agent mengakses keseluruhan pohon melalui antarmuka yang terpadu, pengguna mengunggah dan mengunduh file dari ruang bersama, sumber data eksternal di-mount melalui adaptor, dan sumber daya sistem bawaan disediakan secara read-only.
+Gambar 10-2 mengilustrasikan bagaimana keempat tipe area ini secara seragam di-mount di bawah satu directory tree tunggal: Agent mengakses keseluruhan pohon melalui antarmuka yang terpadu, pengguna mengunggah dan mengunduh file dari ruang bersama, sumber data eksternal di-mount melalui adaptor, dan sumber daya sistem bawaan disediakan secara read-only.
 
-![Gambar 10-3: Struktur mounting dari empat tipe area dalam Agent Virtual File System](images/fig10-3.svg)
+![Gambar 10-2: Struktur mounting dari empat tipe area dalam Agent Virtual File System](images/fig10-2.svg)
 
-Tabel 10-4 membandingkan keempat tipe area ini di empat dimensi—visibilitas, lifecycle, permission baca/tulis, dan concurrency control—yang berfungsi sebagai daftar periksa untuk desain tata letak file system.
+Tabel 10-3 membandingkan keempat tipe area ini di empat dimensi—visibilitas, lifecycle, permission baca/tulis, dan concurrency control—yang berfungsi sebagai daftar periksa untuk desain tata letak file system.
 
-Tabel 10-4 Empat tipe area dari Agent Virtual File System
+Tabel 10-3 Empat tipe area dari Agent Virtual File System
 
 | Area | Visibility | Lifecycle | Read/Write | Concurrency Control |
 |--------------|-----------------|------------------------|---------------------|-------------------|
@@ -211,7 +169,24 @@ Nilai dari **"file path sebagai antarmuka universal"** terletak pada perlakuan p
 
 ### Komunikasi dan Kontrol Antar Agent
 
-Sementara file system menyelesaikan masalah **pertukaran artifact** antar Agent, kolaborasi juga membutuhkan **control plane**. Di sinilah baris lifecycle pada Tabel 10-3 berperan: primitif tool yang diberikan pada Bab 4—membuat (`spawn_subagent`), mengirim pesan (`send_message_to_subagent`), membatalkan (`cancel_subagent`), dan menemukan (`list_agents`)—berkorespondensi dengan fork, message, kill, dan ps di dunia process. Bagian ini tidak mengulangi definisi antarmuka tersebut melainkan berfokus pada empat kemampuan yang sering terabaikan yang esensial untuk kolaborasi multi-agent.
+Sementara file system menyelesaikan masalah **pertukaran artifact** antar Agent, kolaborasi juga membutuhkan **control plane**. Di sinilah baris lifecycle pada Tabel 10-2 berperan: primitif tool yang diberikan pada Bab 4—membuat (`spawn_subagent`), mengirim pesan (`send_message_to_subagent`), membatalkan (`cancel_subagent`), dan menemukan (`list_agents`)—berkorespondensi dengan fork, message, kill, dan ps di dunia process. Bagian ini tidak mengulangi definisi antarmuka tersebut melainkan berfokus pada empat kemampuan yang sering terabaikan yang esensial untuk kolaborasi multi-agent.
+
+**Envelope pesan dan siklus hidup worker:**
+
+```python
+envelope = {
+    id, trace_id, sender, recipient, type,
+    payload, created_at, deadline, schema_version
+}
+
+worker = spawn(task, budget, cancellation_token)
+publish(task_assigned(envelope, worker))
+while worker.is_running:
+    accept(status_update | artifact | needs_input)
+    if deadline_expired or cancellation_token.is_set:
+        request_graceful_stop(worker)
+await worker.ack_or_timeout()
+```
 
 **I. Message Passing.** Bentuk yang paling sederhana adalah point-to-point: Agent A secara langsung memanggil `send_message_to_agent_b(content)`. Hal ini cocok untuk skenario dengan topologi tetap dan jumlah Agent yang sedikit (misalnya, pengaturan dual-agent telepon + komputer pada Eksperimen 10-3 di bab ini). Ketika jumlah Agent meningkat dan asynchronous parallelism diperlukan, jumlah koneksi point-to-point tumbuh secara kuadratik dengan jumlah Agent, dan baik pengirim maupun penerima harus online secara bersamaan. Dalam kasus seperti itu, sebuah **message bus** harus digunakan (dirinci lebih lanjut di bab ini di bawah "Parallel Coordination Pattern"): Agent memublikasikan pesan ke bus, yang meneruskannya berdasarkan langganan, sehingga pengirim tidak perlu mengetahui siapa saja pelanggannya. Baik secara point-to-point maupun melalui bus, pesan pada umumnya harus membawa **envelope** yang terstruktur: ID pengirim, target (Agent spesifik atau broadcast), tipe pesan (misalnya, `task_assigned`/`status_update`/`result`/`terminate`), dan sebuah JSON payload. Format envelope yang terpadu memastikan perutean dan parsing yang andal oleh penerima serta membuat rantai kolaborasi dapat dilacak—sebuah aspek kunci dari debugging multi-agent system.
 
@@ -243,6 +218,8 @@ Peer collaboration pada umumnya melibatkan 2-3 Agent dengan kedudukan setara yan
 
 Dibandingkan dengan manager dan decentralized pattern, peer collaboration jauh lebih simpel untuk diimplementasikan—cukup mendefinisikan peran dari kedua Agent tersebut, mekanisme komunikasi, dan kondisi berhentinya iterasi, dan Anda telah memiliki sebuah sistem yang berjalan. Ia merupakan opsi ideal untuk memvalidasi ide dengan cepat dan membangun purwarupa.
 
+#### Rekayasa Loop (Loop Engineering)
+
 Salah satu penggunaan paling umum dari peer collaboration adalah untuk mengatasi kegagalan yang sering terjadi di dalam praktik Agent: **premature termination**—berhenti saat pekerjaan baru setengah selesai. Hal ini memiliki tiga bentuk yang tipikal; contoh-contoh di bawah ini berasal dari Coding Agent dan dari Pine AI, Agent yang diperkenalkan di bagian Pendahuluan yang melakukan panggilan telepon atas nama pengguna untuk berurusan dengan pedagang dan penyedia layanan. Yang pertama adalah **lazy fake-done**: melakukan sebagian pekerjaan dan menyatakannya selesai sepenuhnya—sebuah Coding Agent menulis kode, namun tidak pernah menjalankan tes atau mencoba deployment (penerapannya), lalu melaporkan "task complete"; seorang pengguna memberikan dua urusan ke Pine AI, dan ia menyelesaikan urusan pertama, melupakan yang kedua, dan dengan ceria melaporkan "all taken care of." Yang kedua adalah **premature give-up**: mendeklarasikan seluruh pekerjaan mustahil dilakukan setelah ada satu jalan buntu—Pine AI dapat menghubungi pihak pedagang melalui telepon, formulir web, atau email, namun setelah satu panggilan telepon ditolak, ia memberi tahu pengguna "ini tidak bisa dilakukan," padahal mengganti channel dan mencoba lagi kemungkinan besar akan membuahkan keberhasilan. Yang ketiga adalah **false success**: Agent meyakini bahwa pekerjaan telah selesai, namun perulangan (loop) pada dasarnya tidak pernah tertutup—pihak seberang secara lisan menyetujui pengembalian uang di telepon, padahal pengguna masih harus mengonfirmasi sebuah langkah di aplikasi mobile-nya; Agent melaporkan "all set", pengguna tidak pernah mengetahui bahwa ada tindakan lanjutan, dan pengembalian uang tersebut tidak pernah diterima. Ketiga bentuk ini mengerucut pada satu akar penyebab yang sama: **hingga diverifikasi, status "selesai (done)" hanyalah klaim dari model, bukan sebuah pembuktian.**
 
 Mengubah klaim menjadi pembuktian merupakan ranah dari **Loop Engineering** secara tepat, tahap terakhir dari lengkung evolusi di Bab 1: merancang perulangan yang membuat Agent terus berjalan—temukan kepingan pekerjaan berikutnya, eksekusi, verifikasi, rekam progres—dan biarkan sebuah pihak pemverifikasi (verifier), bukan model itu sendiri, yang memutuskan apakah ia sudah benar-benar aman untuk berhenti. Peran manusia bergeser secara sepantasnya dari "sang operator yang mem-prompt Agent" menjadi "sang engineer yang merancang loop." Istilah tersebut diciptakan pada bulan Juni 2026 oleh Addy Osmani[^loop-engineering-2026]; Boris Cherny, kepala Claude Code di Anthropic, mengatakannya secara lebih lugas: "Saya tidak lagi mem-prompt Claude. Pekerjaan saya adalah menulis loop." Kesimpulan sentral yang muncul dari diskusi itu adalah bahwa **bottleneck dari loop tersebut berada di verifier, bukan pada modelnya**: dengan verifikasi yang tidak andal, perulangan yang lebih cepat hanya akan menandai luaran yang buruk sebagai suatu hasil yang komplet secara lebih dini. Dan seperti yang disampaikan pada Pendahuluan, praktiknya muncul lebih dulu, sedangkan penamaan menyusul belakangan. Jauh sebelum istilah tersebut menjadi tren, tim Agent terkemuka—Pine AI salah satunya—telah menggunakan "loop plus verification" untuk melawan premature termination. Cara paling efektif dalam mengorganisasikan verifikasi tersebut adalah paradigma Proposer-Reviewer di bawah ini.
@@ -259,15 +236,43 @@ Agent tetap melakukan penalaran, menggunakan tool, dan menghasilkan artefak kand
 
 [^loopx-framework]: LoopX, "The local control plane for long-running AI agent work", v0.4.0, commit stabil `a893d221db0b8e028997cefc303f7ec9fa7dbe0a`. https://github.com/huangruiteng/loopx/tree/a893d221db0b8e028997cefc303f7ec9fa7dbe0a
 
-**Paradigma Proposer-Reviewer.**
+**Framework konkret: LongHorizon-Harness.** LongHorizon-Harness dan LoopX sama-sama implementasi konkret dari Loop Engineering, tetapi arah perhatiannya berbeda. LoopX menyasar control plane persisten untuk pekerjaan Agent jangka panjang; LongHorizon-Harness berangkat dari Computer Use multimodal dan menangani eksekusi berkelanjutan ketika satu tugas membentang melintasi GUI, CLI, beberapa aplikasi desktop, dan berkali-kali penyegaran konteks.
 
-![Gambar 10-4: Proposer-Reviewer Loop](images/fig10-4.svg)
+LongHorizon-Harness merumuskan ulang eksekusi jangka panjang sebagai pengelolaan status tugas, dan mewujudkan loop-nya sebagai Manage–Execute–Audit (MEA): Manager menghasilkan subtugas terbatas berikutnya dari tujuan awal, progres yang sudah terverifikasi, bukti kegagalan, dan pekerjaan yang tersisa; Executor mengubah lingkungan melalui GUI atau CLI dalam konteks yang sepenuhnya baru; lalu Auditor memeriksa hasil nyata secara read-only. Hanya yang lolos audit yang masuk ke status tugas putaran berikutnya, sedangkan kegagalan dipertahankan sebagai dasar pemulihan dan perencanaan ulang. Backend eksekusi seperti Claude Code dan Codex CLI digunakan kembali melalui lapisan adapter, bukan dengan menulis ulang loop Agent di dalam backend tersebut.[^longhorizon-implementation]
+
+Nilai arah ini terletak pada pemisahan kontinuitas tugas dari riwayat eksekusi yang terus membesar: konteks boleh disegarkan dan operasi antarmuka bisa gagal, tetapi putaran berikutnya tetap melanjutkan dari status terverifikasi paling akhir. Dengan menjaga model Qwen 3.7-Plus dan backend eksekusi Claude Code tetap sama dan hanya mengubah loop terluar, makalah tersebut melaporkan PassRate WeaveBench naik dari 51.8% menjadi 80.7%, tingkat penyelesaian biner OSWorld 2.0 dari 2.8% menjadi 8.3%, dan tingkat keberhasilan Terminal-Bench 2.1 dari 69.7% menjadi 77.2%. Biayanya pun tidak tetap: dua benchmark pertama masing-masing menghabiskan 2.3 kali total token dan 3.6 kali token keluaran dibandingkan baseline, sedangkan Terminal-Bench 2.1 justru berkurang 24%. Pada deployment nyata, masih perlu menangani status lama yang tidak berlaku lagi karena perubahan lingkungan eksternal atau permintaan pengguna, serta memakai anggaran putaran, waktu, dan biaya agar loop pemulihan tidak berjalan tanpa henti.
+
+**Jejak eksekusi publik dan reproduksi eksperimen.** Situs proyek menyediakan ratusan jejak eksekusi untuk WeaveBench, OSWorld 2.0, dan Terminal-Bench 2.1, sehingga proses eksekusi dan catatan tiap peran dapat dilihat langsung. Ambil contoh `WEB_task_16_webrtc_simulcast_layer_audit` dari WeaveBench: [jejak baseline](https://lh-harness.pages.dev/traj/tasks/baseline__WEB_task_16_webrtc_simulcast_layer_audit.html) dan [jejak MEA](https://lh-harness.pages.dev/traj/tasks/lh_harness__WEB_task_16_webrtc_simulcast_layer_audit.html) yang sama-sama memakai model Qwen 3.7-Plus dapat dibandingkan berdampingan. Yang pertama tersangkut pada interaksi Wireshark lalu mencoba berulang kali, dengan skor 0.59; yang kedua menuliskan kembali kegagalan dan butir bukti yang belum terpenuhi ke status tugas sehingga putaran berikutnya hanya menangani celahnya, dengan skor 0.92. Kasus ini dipakai untuk memperlihatkan “bagaimana kegagalan menjadi masukan putaran berikutnya”, bukan pengganti statistik agregat; lingkungan, parameter, dan skrip peluncuran eksperimen lengkap ada di direktori [`eval/`](https://github.com/AMAP-ML/LongHorizon-Harness/tree/53bc678ed4170ad4d2e4309f2bfc5c3fb6caf8cb/eval) pada versi yang dipatok.
+
+[^longhorizon-implementation]: LongHorizon-Harness, commit stabil `53bc678ed4170ad4d2e4309f2bfc5c3fb6caf8cb`. Situs proyek dan jejak publik: https://lh-harness.pages.dev/#trajectories; makalah: https://arxiv.org/abs/2608.01964; kode: https://github.com/AMAP-ML/LongHorizon-Harness/tree/53bc678ed4170ad4d2e4309f2bfc5c3fb6caf8cb
+
+#### Paradigma Proposer-Reviewer
+
+![Gambar 10-3: Proposer-Reviewer Loop](images/fig10-3.svg)
 
 Proposer-Reviewer adalah paradigma peer-collaboration kanonik. Bab 5 telah membahas prinsip-prinsip desainnya dan aplikasi praktis dalam tiga eksperimen: pembuatan PPT, pengeditan video, dan visualisasi log. Proposer Agent menghasilkan kode, sementara Reviewer Agent merender hasil eksekusi, mengevaluasi kualitasnya menggunakan vision-language model, dan memberikan saran terstruktur untuk perbaikan. Keduanya beriterasi hingga hasilnya memenuhi standar yang disyaratkan.
 
 Paradigma ini juga berlaku untuk skenario seperti tinjauan keamanan (Proposer menghasilkan action plan, Reviewer memeriksa kepatuhan dan potensi risiko), moderasi konten (Proposer menyusun balasan, Reviewer memeriksa aturan bisnis dan norma bahasa), dan tinjauan kode (Proposer menulis kode, Reviewer memeriksa keamanan dan best practices).
 
 **Mengapa sebuah Agent tunggal tidak bisa menghasilkan dan kemudian meninjau pekerjaannya sendiri?** Ini tepat di mana kriteria dari "Kapan Multi-Agent Benar-benar Lebih Baik Daripada Agent Tunggal?" di awal bab ini berlaku—jika tinjauan tidak memperkenalkan informasi baru, itu hanya "meminta model untuk berpikir lagi." Penelitian terkait memberikan jawaban yang jelas. Dalam makalah ICLR 2024 mereka "Large Language Models Cannot Self-Correct Reasoning Yet," Huang et al. menemukan bahwa meminta GPT-4 untuk meninjau dan mengoreksi jawabannya sendiri tanpa umpan balik eksternal justru menurunkan akurasi—model lebih sering mengubah jawaban yang benar menjadi salah daripada mengubah jawaban yang salah menjadi benar.
+
+**Loop Proposer–Reviewer:**
+
+```python
+candidate = proposer(task, constraints)
+evidence = execute_or_render(candidate)       # tests, state, screenshot, facts
+review = independent_reviewer(candidate, evidence)
+
+while review.veto and budget_remaining:
+    candidate = proposer.repair(candidate, review.findings)
+    evidence = execute_or_render(candidate)
+    review = independent_reviewer(candidate, evidence)
+
+if review.pass:
+    publish(candidate, evidence, review)
+else:
+    escalate_or_reject(review)
+```
 
 Sebuah makalah survei tahun 2024 yang diterbitkan di TACL, "When Can LLMs Actually Correct Their Own Mistakes?" (arXiv:2406.01297), semakin mengkonfirmasi kesimpulan ini: kecuali umpan balik eksternal yang andal disediakan (misalnya, hasil eksekusi test case, output verifikasi dari alat eksternal), hanya mengandalkan "self-correction" model sendiri sebagian besar tidak efektif.
 
@@ -277,17 +282,21 @@ Ini adalah prinsip desain inti dari paradigma Proposer-Reviewer. Dalam eksperime
 
 Dilihat melalui lensa Loop Engineering, pola loop yang dikatalogkan oleh industri memetakan ke pola dalam buku ini. Loop tertutup (closed loop) dengan persetujuan manusia sesuai dengan pra-persetujuan (pre-approval) Bab 4, di mana manusia adalah peninjau akhir. Loop terbuka (open loop) dengan anggaran (budget) atau batasan putaran (round cap) sesuai dengan iterasi PPT multi-putaran Bab 5, yang memungkinkan paling banyak lima putaran. Sub-agent yang diorkestrasi sesuai dengan pola manajer (manager pattern) di bagian selanjutnya. Oleh karena itu, Loop Engineering tidak mendeskripsikan arsitektur baru melainkan kerangka kerja umum—loop + verifikasi + kondisi berhenti (stop conditions)—yang menyatukan pola-pola kolaborasi ini. Paradigma Proposer-Reviewer mengisi peran verifikasi dalam kerangka kerja tersebut.
 
-**Ekstensi: Pola Peer Collaboration Lainnya.**
+#### Pola Debat
 
-**Debate**: Beberapa Agent memegang posisi yang berbeda, mengeksplorasi ruang masalah (problem space) melalui dialog adversarial. Misalnya, ketika mengevaluasi solusi teknis, Agent A berperan sebagai "pendukung," mendaftar keuntungan dan peluang solusi, sementara Agent B berperan sebagai "penentang," menunjukkan risiko dan batasan. Setiap putaran perdebatan melibatkan bantahan atau perluasan argumen pihak lain. Ketika sebuah Agent tunggal menganalisis masalah, ia sering kali mendukung satu perspektif dan mengabaikan bukti yang berlawanan (counterevidence). Perdebatan terstruktur memaksa kedua posisi dikembangkan sepenuhnya, membantu pembuat keputusan mencapai penilaian yang lebih seimbang.
+Beberapa Agent memegang posisi yang berbeda, mengeksplorasi ruang masalah (problem space) melalui dialog adversarial. Misalnya, ketika mengevaluasi solusi teknis, Agent A berperan sebagai "pendukung," mendaftar keuntungan dan peluang solusi, sementara Agent B berperan sebagai "penentang," menunjukkan risiko dan batasan. Setiap putaran perdebatan melibatkan bantahan atau perluasan argumen pihak lain. Ketika sebuah Agent tunggal menganalisis masalah, ia sering kali mendukung satu perspektif dan mengabaikan bukti yang berlawanan (counterevidence). Perdebatan terstruktur memaksa kedua posisi dikembangkan sepenuhnya, membantu pembuat keputusan mencapai penilaian yang lebih seimbang.
 
 Namun, efektivitas praktis dari perdebatan masih diperdebatkan di dunia akademis. Sebuah studi tahun 2026 oleh Tran dan Kiela [^single-agent-2026] membandingkan sebuah Agent tunggal dengan lima arsitektur multi-agent (sequential, debate, ensemble, parallel roles, subtask-parallel) pada tugas multi-hop reasoning. Mereka menemukan bahwa **ketika anggaran thinking-token dijaga konstan, Agent tunggal berkinerja setara atau bahkan lebih baik daripada sistem multi-agent** (kecuali pemanfaatan konteks terdegradasi ke titik tertentu). Para peneliti memberikan penjelasan berdasarkan data processing inequality dalam teori informasi: beberapa Agent dalam perdebatan memproses informasi tekstual yang persis sama, dan setiap transmisi serial dari kesimpulan perantara antara Agent hanya dapat menghilangkan informasi, bukan menciptakannya. Manfaat dari mode perdebatan di beberapa makalah akademis kemungkinan besar berasal dari beberapa Agent yang mengonsumsi lebih banyak total komputasi. Penting untuk mengklarifikasi batasan argumen ini: argumen ini menargetkan bottleneck informasi yang disebabkan oleh "transmisi serial multi-agent dari kesimpulan perantara" dan tidak menegasikan pendekatan lain, seperti **beberapa sampel independen dari masalah yang sama diikuti oleh agregasi** (misalnya, self-consistency, majority voting), atau memanfaatkan **asimetri dalam kesulitan antara pembuatan dan verifikasi** (menulis jawaban itu sulit, memverifikasinya itu mudah) untuk pembagian kerja generation-verification. Skenario ini entah memperkenalkan pengambilan sampel independen tambahan atau mengeksploitasi struktur asimetris dari tugas itu sendiri, dan tidak berada dalam cakupan data processing inequality.
 
 [^single-agent-2026]: Tran, D., Kiela, D. *Single-Agent LLMs Outperform Multi-Agent Systems on Multi-Hop Reasoning Under Equal Thinking Token Budgets.* arXiv:2604.02460, 2026.
 
-**Brainstorm**: Beberapa Agent secara independen menghasilkan ide-ide, kemudian membagikannya satu sama lain, saling menginspirasi. Misalnya, dalam tugas inovasi produk, Agent 1 mengusulkan "menambahkan fitur social sharing," Agent 2 terinspirasi untuk menyarankan "tidak hanya berbagi ke jejaring sosial, tetapi juga menghasilkan poster sharing yang dipersonalisasi," dan Agent 3 mensintesis dua yang pertama untuk mengusulkan "template poster yang dapat disesuaikan pengguna membentuk template marketplace." Agent yang berbeda memiliki "preferensi berpikir" (thinking preferences) yang berbeda (dicapai melalui prompt atau model yang berbeda), dan dengan merangsang satu sama lain, mereka mengeksplorasi ruang solusi yang lebih luas untuk menemukan kombinasi kreatif yang akan sulit dikonsep oleh Agent tunggal.
+#### Pola Brainstorming
 
-**Panel Discussion**: Beberapa Agent masing-masing mewakili perspektif dari domain profesional tertentu, bersama-sama mendiskusikan masalah interdisipliner. Misalnya, ketika mengevaluasi kelayakan produk baru, Engineer Agent menganalisis kesulitan implementasi dari sudut pandang teknis, Product Agent menilai daya tarik pasar dari perspektif user experience, dan Operations Agent menganalisis kelayakan bisnis dari perspektif biaya dan sumber daya. Agent-agent ini tidak bersifat adversarial melainkan saling melengkapi (complementary), bersama-sama menyusun gambaran utuh dari masalah dan mengidentifikasi batasan dan peluang lintas domain.
+Beberapa Agent secara independen menghasilkan ide-ide, kemudian membagikannya satu sama lain, saling menginspirasi. Misalnya, dalam tugas inovasi produk, Agent 1 mengusulkan "menambahkan fitur social sharing," Agent 2 terinspirasi untuk menyarankan "tidak hanya berbagi ke jejaring sosial, tetapi juga menghasilkan poster sharing yang dipersonalisasi," dan Agent 3 mensintesis dua yang pertama untuk mengusulkan "template poster yang dapat disesuaikan pengguna membentuk template marketplace." Agent yang berbeda memiliki "preferensi berpikir" (thinking preferences) yang berbeda (dicapai melalui prompt atau model yang berbeda), dan dengan merangsang satu sama lain, mereka mengeksplorasi ruang solusi yang lebih luas untuk menemukan kombinasi kreatif yang akan sulit dikonsep oleh Agent tunggal.
+
+#### Pola Panel Ahli
+
+Beberapa Agent masing-masing mewakili perspektif dari domain profesional tertentu, bersama-sama mendiskusikan masalah interdisipliner. Misalnya, ketika mengevaluasi kelayakan produk baru, Engineer Agent menganalisis kesulitan implementasi dari sudut pandang teknis, Product Agent menilai daya tarik pasar dari perspektif user experience, dan Operations Agent menganalisis kelayakan bisnis dari perspektif biaya dan sumber daya. Agent-agent ini tidak bersifat adversarial melainkan saling melengkapi (complementary), bersama-sama menyusun gambaran utuh dari masalah dan mengidentifikasi batasan dan peluang lintas domain.
 
 ### Pola Manajer (Manager Pattern): Koordinasi Terpusat
 
@@ -295,20 +304,35 @@ Ketika sebuah tugas melibatkan lebih dari lima sub-tugas (subtasks), membutuhkan
 
 Dari perspektif desain sistem, pola manajer memodelkan setiap Agent khusus (specialized Agent) sebagai sebuah tool yang dapat dipanggil oleh Manager. Kumpulan tool Manager tidak hanya mencakup alat eksternal (external tools) tradisional, seperti pencarian dan operasi file, tetapi juga antarmuka untuk memanggil Agent lain. Manager memanggil Agent yang sesuai melalui sebuah tool call, meneruskan parameter tugas dan konteks yang diperlukan, menunggu penyelesaian, dan menerima hasilnya. Dari perspektif Manager, memanggil sebuah Agent pada dasarnya tidak berbeda dengan memanggil tool biasa: keduanya melibatkan pengiriman permintaan (request) dan penerimaan respons (response). Abstraksi terpadu ini membuat pola manajer mudah untuk diperluas. Menambahkan kemampuan hanya membutuhkan pengembangan Agent yang sesuai dan mendaftarkannya sebagai tool, tanpa mengubah logika inti Manager. Pola ini juga secara alami mendukung heterogenitas (heterogeneity): Agent yang berbeda dapat menggunakan model, prompt, kumpulan tool, dan bahkan lingkungan perangkat keras (hardware environments) yang berbeda.
 
-Abstraksi "Agent sebagai tools untuk satu sama lain" telah ditetapkan di bagian "Alat Kolaborasi (Collaboration Tools)" di Bab 4: desain antarmuka `spawn_subagent / send_message_to_subagent / cancel_subagent / list_agents` berlaku secara langsung pada pemanggilan sub-agent oleh Manager di sini. Adapun apa yang diteruskan ke arah "Manager → sub-agent", lihat desain handoff-package nanti di bab ini (deskripsi tugas, fakta dan batasan yang dikonfirmasi, referensi ke artifact terstruktur). Pertanyaan yang sesuai adalah apa yang dikembalikan oleh sub-agent di arah "sub-agent → Manager". Jawabannya adalah **ringkasan terstruktur daripada lintasan penuh (structured summaries rather than full trajectories)**: sub-agent harus mengembalikan kesimpulan tugas, temuan utama, jalur file dari artifact, dan masalah yang dihadapi, membiarkan lintasan eksekusi yang lengkap dalam lognya sendiri. Hanya dengan cara ini konteks Manager dapat tumbuh secara lambat dan linier seiring dengan jumlah sub-tugas, daripada meledak. Ini juga merupakan alasan mengapa Manager dalam Eksperimen 10-2 di bawah ini hanya mempertahankan indeks file dan tidak menyimpan konten terjemahan.
 
 Namun, pola manajer memiliki tantangan bawaan. Manager menjadi bottleneck titik-tunggal (single-point bottleneck) sistem: ia harus memahami sifat dari setiap sub-tugas, memilih Agent yang tepat, dan meneruskan konteks secara akurat; setiap miskalkulasi berdampak pada seluruh alur (flow). Ia juga harus mempertahankan konteks global dari seluruh tugas, yang dapat membengkak saat tugas menjadi lebih dalam dan pemanggilan Agent terakumulasi. Oleh karena itu, Manager membutuhkan prompt yang dirancang dengan cermat, strategi manajemen konteks yang efektif, dan dekomposisi tugas (task decomposition) dengan granularitas yang sesuai.
 
 Makalah Plan-and-Act 2025 [^plan-and-act-2025] memberikan analisis empiris mengenai hal ini: dalam arsitektur dual-agent Planner-Executor, **planner yang lemah adalah bottleneck paling kritis dari seluruh sistem**. Ketika kualitas perencanaan Planner cukup tinggi, hasil yang baik dapat dicapai bahkan dengan Executor yang relatif sederhana. Sebaliknya, jika dekomposisi tugas Planner salah, semua pekerjaan Executor selanjutnya dibangun di atas premis yang cacat. Studi tersebut mencapai tingkat keberhasilan 54% pada benchmark WebArena-Lite, dan kontribusi intinya adalah meningkatkan kemampuan perencanaan Planner, bukan eksekusi Executor. Pelajarannya: berikan model terkuat dan prompt yang dibuat dengan paling cermat kepada Manager (planner), daripada menyebarkan sumber daya secara merata ke semua Agent.
 
-Ini tidak bertentangan dengan argumen dari Bab 4. Dalam membahas model proposisi (proposal model) dan model tinjauan (review model), Bab 4 berpendapat bahwa kemampuan mereka harus serupa—tetapi itu menyangkut **skenario tinjauan (review scenario)**: seorang reviewer harus mengikuti penalaran pihak yang ditinjau untuk menemukan kekurangannya. Jika reviewer jauh kurang mampu daripada pihak yang ditinjau, ia mungkin tidak dapat mengikuti penalaran cukup dekat untuk mengidentifikasi kekurangan. Pola manajer (manager pattern) menyangkut hal lain: **pembagian kerja (division of labor) antara perencanaan dan eksekusi**. Setelah planner menguraikan tugas secara tidak benar, tidak ada executor, sekuat apa pun, yang dapat memulihkannya. Oleh karena itu, model terkuat dan prompt yang paling cermat diberikan kepada planner terlebih dahulu. Apakah executor membutuhkan kemampuan yang seimbang bergantung pada seberapa erat sub-tugas digabungkan (tightly coupled). Ketika output mereka pada akhirnya harus dirakit menjadi satu kesatuan (one whole), mata rantai terlemah (weakest link) sering kali menurunkan kualitas keseluruhan.
+**Pemenang paralel pertama yang terverifikasi:**
+
+```python
+workers = launch_independent_workers(subtasks)
+while workers.any_running:
+    event = next_event()
+    if event.type == RESULT:
+        if verify(event.artifact, hidden_checks):
+            if not settle_once(event):       # atomically claim the winner
+                continue
+            broadcast_cancel(to = workers - {event.worker_id})
+            await_all_ack_or_timeout()
+            return assemble(event.artifact, evidence = event.evidence)
+        else:
+            record_failure(event)
+return summarize_failures(workers)
+```
 
 [^plan-and-act-2025]: Erdogan, L. E., et al. *Plan-and-Act: Improving Planning of Agents for Long-Horizon Tasks.* arXiv:2503.09572, 2025.
 
 **Pola Koordinasi Sekuensial (Sequential Coordination Pattern).**
 
 
-![Gambar 10-5: Manager Sequential Coordination](images/fig10-5.svg)
+![Gambar 10-4: Manager Sequential Coordination](images/fig10-4.svg)
 
 
 Manager memanggil Agent-agent khusus (specialized Agents) secara berurutan. Setiap Agent mengembalikan hasil setelah selesai, dan Manager memutuskan langkah selanjutnya. Control flow-nya linier, sederhana, dan jelas, membuatnya cocok untuk skenario di mana sub-tugas memiliki dependensi sekuensial yang jelas.
@@ -317,7 +341,7 @@ Manager memanggil Agent-agent khusus (specialized Agents) secara berurutan. Seti
 >
 > Terjemahan buku (Book translation) adalah tugas kompleks yang sangat cocok untuk kolaborasi multi-agent (multi-agent collaboration). Menerjemahkan buku teknis melibatkan bukan hanya mengonversi teks dari satu bahasa ke bahasa lain, tetapi juga memastikan terminologi khusus yang konsisten, akurasi kontekstual, dan kelancaran (fluency) secara keseluruhan. Misalnya, sebuah buku bahasa Inggris tentang large language models mungkin menggunakan banyak istilah berulang dengan beberapa terjemahan konvensional. Konsistensi harus dipertahankan di seluruh buku: jika `agent` diterjemahkan sebagai "智能体" ("entitas cerdas", istilah bahasa Mandarin standar) di Bab 1, buku tersebut tidak dapat beralih ke terjemahan alternatif "代理" ("proksi") nanti.
 >
-> Menggunakan Agent tunggal menciptakan masalah manajemen konteks yang serius. Seiring Agent memproses buku bab demi bab, konteksnya mengakumulasi glosarium buku lengkap (full-book glossary), bab-bab yang telah diterjemahkan, paragraf saat ini, jejak pekerjaan (work traces) terjemahan, dan hasil alat (tool results). Sebuah buku teknis setebal beberapa ratus halaman, bersama dengan materi-materi perantara ini, dapat dengan mudah melampaui context window. Lebih kritis lagi, sebuah Agent yang bekerja dengan konteks yang terlalu panjang rentan terhadap "tersesat": ia mungkin melupakan konvensi terminologi sebelumnya dan menggunakan terjemahan yang berbeda di Bab 8 daripada di Bab 2, membuang sumber daya untuk pemeriksaan redundan selama proofreading, atau bahkan "mengingat" aturan terminologi yang tidak ada karena perhatiannya (attention) tersebar terlalu tipis.
+> Menggunakan Agent tunggal menciptakan masalah manajemen konteks yang serius. Seiring Agent memproses buku bab demi bab, konteksnya mengakumulasi glosarium buku lengkap (full-book glossary), bab-bab yang telah diterjemahkan, paragraf saat ini, jejak pekerjaan (work traces) terjemahan, dan hasil alat (tool results). Sebuah buku teknis setebal beberapa ratus halaman, bersama dengan materi-materi perantara ini, dapat dengan mudah melampaui context window. Lebih kritis lagi, sebuah Agent yang bekerja dengan konteks yang terlalu panjang rentan terhadap "tersesat": ia mungkin melupakan konvensi terminologi sebelumnya dan menggunakan terjemahan yang berbeda di Bab 9 daripada di Bab 2, membuang sumber daya untuk pemeriksaan redundan selama proofreading, atau bahkan "mengingat" aturan terminologi yang tidak ada karena perhatiannya (attention) tersebar terlalu tipis.
 >
 > Pola manajer (manager pattern) mengatasi masalah ini melalui dekomposisi tugas (task decomposition) dan pemisahan tanggung jawab (responsibility separation):
 >
@@ -337,27 +361,27 @@ Manager memanggil Agent-agent khusus (specialized Agents) secara berurutan. Seti
 > 4. Bandingkan Agent tunggal dengan pola manajer dalam hal kualitas terjemahan, efisiensi eksekusi, dan konsumsi sumber daya
 >
 >
-> ![Gambar 10-6: Book Translation Agent Architecture](images/fig10-6.svg)
+> ![Gambar 10-5: Book Translation Agent Architecture](images/fig10-5.svg)
 >
 >
 
 **Pola Koordinasi Paralel (Parallel Coordination Pattern).**
 
 
-![Gambar 10-7: Manager Parallel Coordination](images/fig10-7.svg)
+![Gambar 10-6: Manager Parallel Coordination](images/fig10-6.svg)
 
 
 Ketika beberapa sub-tugas (subtasks) dapat berjalan secara paralel, pola sekuensial (sequential pattern) menjadi tidak efisien. Koordinasi paralel memungkinkan beberapa Agent untuk bekerja secara bersamaan (simultaneously), yang secara signifikan meningkatkan throughput. Manager Agent harus merencanakan tugas paralel, memonitor semua Agent yang berjalan secara real time, mengoordinasikan komunikasi mereka, dan membuat keputusan di tingkat sistem (system-wide decisions) ketika Agent berhasil atau gagal. Ini biasanya membutuhkan sebuah **message bus** sebagai infrastruktur—anggap saja sebagai "papan buletin publik" di mana Agent-agent dapat menerbitkan pesan (publish messages) dan berlangganan (subscribe) ke tipe pesan yang menarik minat mereka, memungkinkan komunikasi asinkron (asynchronous, non-blocking communication). Dua implementasi umum, dari yang lebih sederhana hingga yang lebih kompleks, adalah **Redis Pub/Sub** dan message queues seperti **RabbitMQ**. Redis Pub/Sub bersifat ringan (lightweight) dan segera mengirimkan pesan, tetapi tidak menyimpannya (persist), sehingga penerima yang sedang offline akan kehilangannya. RabbitMQ dan sistem serupa menyimpan pesan ke disk (persist messages to disk), menjaganya tetap utuh ketika penerima sedang offline sementara waktu. Pesan biasanya menggunakan amplop JSON (JSON envelope) yang berisi sender ID, target Agent (atau penanda siaran (broadcast marker)), tipe pesan, dan payload.
 
 **Lingtai: Sebuah Instansiasi Produk dari Pola Manajer.** Lingtai adalah rumah berbasis file lokal untuk long-lived agents[^lingtai]. Tiga perannya sangat cocok dipetakan ke konsep di bagian ini. **Main agent** adalah hub persisten (persistent hub) yang berinteraksi dengan pengguna; ia memegang rencana (plan) dan memori dan melahirkan (spawns) peran lain, menempati posisi Manager Agent. Sebuah **daemon** adalah pekerja paralel berumur pendek (short-lived parallel worker) yang dilahirkan untuk tugas yang bising dan terbatas, lalu dibuang sesudahnya; hanya kesimpulannya yang dipertahankan. Ini merupakan perwujudan produk dari prinsip bahwa sub-agent mengembalikan ringkasan terstruktur (structured summaries) alih-alih lintasan penuh (full trajectories) dan pola koordinasi paralel (parallel coordination pattern). Sebuah **avatar** adalah rekan satu tim (teammate) khusus persisten (persistent) yang memiliki memori, kotak surat (mailbox), dan tanggung jawabnya sendiri, dirancang untuk keahlian (specialties) yang layak dipertahankan di seluruh sesi.
 
-Sisa dari desain Lingtai juga menggemakan bagian-bagian sebelumnya. Pengetahuan (knowledge) hidup di dalam file memori pribadi (private memory files) masing-masing agent yang tahan lama (durable), sementara skills adalah playbook Markdown yang dibagikan oleh semua agent—sumber daya sistem (system resources) bawaan yang dijelaskan dalam "The File System from an Agent's Perspective". Ketika context window agent penuh, ia akan melakukan **molt (ganti kulit)**: ia menulis ringkasan yang cermat, lalu memulai dengan konteks yang segar (fresh context) sambil mempertahankan ringkasan itu dan memori tahannya, mengikuti pendekatan kompresi konteks (context-compression approach) dari Bab 2. Model yang mendasarinya (underlying model) dapat diganti tanpa mengubah agent karena identitas, memori, dan kemampuannya semua hidup sebagai plain files di direktori proyek. Dalam pengertian ini, agent adalah file-filenya. Ini merupakan perwujudan produk dari dua baris pertama dari Tabel 10-3: program dan memori sama-sama direduksi menjadi file, sehingga prosesnya dapat dibangun kembali kapan saja.
+Sisa dari desain Lingtai juga menggemakan bagian-bagian sebelumnya. Pengetahuan (knowledge) hidup di dalam file memori pribadi (private memory files) masing-masing agent yang tahan lama (durable), sementara skills adalah playbook Markdown yang dibagikan oleh semua agent—sumber daya sistem (system resources) bawaan yang dijelaskan dalam "The File System from an Agent's Perspective". Ketika context window agent penuh, ia akan melakukan **molt (ganti kulit)**: ia menulis ringkasan yang cermat, lalu memulai dengan konteks yang segar (fresh context) sambil mempertahankan ringkasan itu dan memori tahannya, mengikuti pendekatan kompresi konteks (context-compression approach) dari Bab 2. Model yang mendasarinya (underlying model) dapat diganti tanpa mengubah agent karena identitas, memori, dan kemampuannya semua hidup sebagai plain files di direktori proyek. Dalam pengertian ini, agent adalah file-filenya. Ini merupakan perwujudan produk dari dua baris pertama dari Tabel 10-2: program dan memori sama-sama direduksi menjadi file, sehingga prosesnya dapat dibangun kembali kapan saja.
 
 [^lingtai]: Tutorial resmi Lingtai: https://lingtai.ai/en/tutorial/
 
 > **Eksperimen 10-3 ★★★: Agent Berbicara di Telepon Sambil Menggunakan Komputer**
 >
-> **Prasyarat (Prerequisites)**: Eksperimen ini mengintegrasikan teknologi Computer Use dan Voice Agent dari Bab 9. Disarankan agar pembaca menyelesaikan eksperimen Bab 9 yang relevan terlebih dahulu.
+> **Prasyarat (Prerequisites)**: Eksperimen ini mengintegrasikan teknologi Computer Use dan Voice Agent dari Bab 6. Disarankan agar pembaca menyelesaikan eksperimen Bab 6 yang relevan terlebih dahulu.
 
 >
 > Banyak tugas di dunia nyata yang membutuhkan beberapa kemampuan untuk beroperasi secara bersamaan (concurrently) alih-alih berurutan. Seorang asisten manusia, misalnya, mungkin berbicara dengan klien sambil mencari dokumen dan membuat catatan. Meminta satu Agent untuk mengelola percakapan waktu nyata dan interaksi komputer membutuhkan peralihan tugas secara terus-menerus, yang dapat mengganggu kedua aktivitas tersebut. Sistem multi-agent sebagai gantinya menugaskan setiap tugas yang sensitif terhadap latensi ke Agent khusus dan mengoordinasikannya melalui pesan asinkron. Phone Agent membutuhkan pengenalan dan sintesis ucapan dengan latensi rendah, sedangkan Computer Agent membutuhkan pemahaman visual yang kuat dan kemampuan perencanaan tindakan.
@@ -405,7 +429,7 @@ Sisa dari desain Lingtai juga menggemakan bagian-bagian sebelumnya. Pengetahuan 
 > 4. Catat stempel waktu (*timestamp*) untuk pesan yang dipertukarkan dan catat keputusan-keputusan penting para Agent
 >
 >
-> ![Gambar 10-8: Phone and Computer Dual Agent Architecture](images/fig10-8.svg)
+> ![Gambar 10-7: Phone and Computer Dual Agent Architecture](images/fig10-7.svg)
 >
 >
 > **Eksperimen 10-4 ★★★: Agent Mengumpulkan Informasi dari Banyak Situs Web Secara Bersamaan**
@@ -437,60 +461,48 @@ Sisa dari desain Lingtai juga menggemakan bagian-bagian sebelumnya. Pengetahuan 
 > 6. Ukur dan bandingkan waktu eksekusi serial dan paralel untuk mengukur peningkatan kecepatan dari paralelisasi
 >
 >
-> ![Gambar 10-9: Parallel Web Scraping Architecture](images/fig10-9.svg)
+> ![Gambar 10-8: Parallel Web Scraping Architecture](images/fig10-8.svg)
 >
 
-### Pola Terdesentralisasi: Peer-to-Peer Handoff
+### Pola terdesentralisasi
 
+Alasan menghapus pengendali pusat adalah meniru organisasi manusia: peran yang setara membagi pekerjaan dan saling memeriksa; setiap Agent menentukan sendiri kapan menyerahkan tugas, meminta umpan balik, atau melaporkan kontradiksi. Pola ini juga mengurangi single point of failure ketika Manager berhenti. Dalam microservices, kedua pilihan ini disebut **orchestration** dan **choreography**.
 
-![Gambar 10-10: Handoff Chain Pattern](images/fig10-10.svg)
+Kasus berikut bergerak dari pelepasan ketergantungan komunikasi hingga desentralisasi control flow: MetaGPT memakai pipeline tetap, AutoGen group chat menggabungkan percakapan bersama dan penjadwalan terpusat, sedangkan OpenAI Swarm menyebarkan keputusan handoff di antara Agent sejawat.
 
+**Protokol handoff terdesentralisasi:**
 
-Pola manajer memberikan struktur kontrol yang jelas dan visibilitas global, tetapi pola terdesentralisasi bukan sekadar perbaikan atas kekurangannya. Motivasi untuk menghilangkan pengontrol terpusat utamanya adalah untuk meniru cara masyarakat manusia mengatur dirinya sendiri: membiarkan beberapa peran setara (*peer*) membagi kerja dan memeriksa satu sama lain, masing-masing meneliti masalah dari perspektif profesionalnya sendiri dan memutuskan sendiri dengan siapa ia harus berbicara, daripada menyalurkan setiap penilaian ke satu Manager. Bidang layanan mikro (*microservices*) menyebut sepasang pilihan ini **orkestrasi (orchestration)** dan **koreografi (choreography)**: yang pertama memiliki konduktor yang menjadwalkan semuanya secara terpusat, yang terakhir bergantung pada setiap penari yang merasakan sendiri kapan harus masuk.
+```python
+handoff = {
+    task_id, sender, recipient, goal, constraints,
+    accepted_facts, artifact_refs, remaining_budget,
+    visited_agents
+}
 
-Pola terdesentralisasi mengambil pendekatan arsitektur yang berbeda: **tidak ada pengontrol pusat tunggal; Agent berkolaborasi sebagai rekan (peers)**. Setiap Agent, dengan memanfaatkan penilaian profesionalnya sendiri, memutuskan sendiri kapan harus menghubungi Agent lain—untuk menyerahkan tugas (*hand off*) ("Bagian saya sudah selesai, sekarang giliran Anda"), meminta umpan balik ("Apakah rencana ini layak secara teknis?"), atau melaporkan masalah ("Persyaratan yang Anda berikan kepada saya saling bertentangan; kita perlu membicarakan ini lagi").
+if recipient in handoff.visited_agents:
+    reject("cycle")
+elif handoff.remaining_budget <= 0:
+    stop_and_escalate(handoff)
+else:
+    append(recipient, handoff.visited_agents)
+    run_local_agent(handoff)
+```
 
-Kasus-kasus berikut berkembang dari desentralisasi parsial menuju desentralisasi penuh. MetaGPT menggunakan alur kerja (*pipeline*) tetap dan hanya mendesentralisasikan komunikasi. AutoGen menggabungkan riwayat percakapan bersama dengan penjadwalan terpusat. OpenAI Swarm mendistribusikan keputusan aliran kontrol (*control-flow*) secara langsung di antara sesama Agent.
+**MetaGPT: simulasi perusahaan perangkat lunak berbasis SOP.**
 
-**Apa yang diteruskan selama penyerahan (handoff) tanpa konteks bersama?** Gambar 10-10 membedakan dua jenis penyerahan. Dalam Eksperimen 10-1, `transfer_to_agent` menggunakan konteks bersama, sehingga peran baru secara otomatis mewarisi riwayat lengkap. Dalam pola rantai-penyerahan (*handoff-chain*), konteks (*context*) tidak dibagikan, sehingga Agent pengirim harus secara eksplisit menyusun informasi yang dibutuhkan oleh Agent penerima.
+![Gambar 10-9 Jaringan kolaborasi multi-Agent MetaGPT](images/fig10-9.svg)
 
-Praktiknya, "paket penyerahan" (*handoff package*) yang efektif biasanya berisi tiga bagian: **Deskripsi Tugas** (apa yang harus dilakukan penerima dan kriteria penerimaannya), **Fakta dan Kendala yang Dikonfirmasi** (preferensi pengguna, aturan bisnis, dan keputusan yang dibuat pada tahap sebelumnya), dan **Referensi ke Artefak Terstruktur** (jalur file, bukan konten file, yang dibaca penerima sesuai kebutuhan). Paket tersebut dengan sengaja mengecualikan lintasan (*trajectory*) penuhnya—proses uji-coba Agent pengirim, pekerjaan menengah, dan upaya yang gagal—yang sebagian besar merupakan derau (*noise*) bagi penerima.
+MetaGPT mengodekan prosedur operasi standar perusahaan perangkat lunak. Peran bekerja dalam urutan Product Manager → Architect → Project Manager → Engineer → QA. Setiap peran menghasilkan paket handoff terstruktur: deskripsi tugas dan kriteria penerimaan, fakta dan batasan yang telah dipastikan, serta referensi artifact seperti path file. Peran menerbitkan pesan ke shared pool dan hanya membaca tipe yang dilanggan. Ini melepaskan ketergantungan pengirim dan penerima, tetapi control flow tetap ditentukan SOP; MetaGPT tidak sepenuhnya terdesentralisasi.
 
-Inilah perbedaan esensial antara kedua jenis penyerahan tersebut. *Handoff* dengan konteks bersama (*shared context*) menyimpan riwayat lengkap, mempertahankan semua informasi tetapi terus-menerus memperluas konteks. *Handoff* tanpa konteks bersama memberikan paket yang telah diolah, menerima beberapa kehilangan informasi sehingga setiap Agent dapat bekerja dalam konteks yang bersih dan terfokus. Tidak ada Agent yang perlu memahami proses kerja Agent lain; Agent hanya membutuhkan format dan makna dari paket *handoff* serta artefak keluarannya. Kolaborasi berbasis antarmuka (*interface*) ini mengacu pada prinsip rekayasa perangkat lunak *design by contract*.
+**AutoGen group chat.** Semua Agent melihat catatan publik yang sama, tetapi `GroupChatManager` memilih pembicara berikutnya. Ini adalah campuran shared context dan penjadwalan terpusat.
 
-**MetaGPT: Simulasi Perusahaan Perangkat Lunak Berbasis SOP (Kasus Transisi dari Pipeline ke Decoupled Communication).**
+**OpenAI Swarm.** Setiap Agent dapat menyerahkan kontrol langsung ke Agent lain tanpa penjadwal pusat. Kontrol bergerak seperti tongkat estafet, tetapi siklus A → B → A dapat terbentuk sehingga diperlukan batas handoff.
 
+> Sejak 2025, “Agent Swarm” digunakan untuk lebih dari satu arsitektur. Istilah ini dapat berarti jaringan handoff terdesentralisasi ala OpenAI Swarm, atau Manager pattern berskala besar tempat Agent utama membuat banyak sub-Agent paralel, seperti Kimi K2.5/K3 dan AgentEnv[^ch10-kimi-swarm]. Sistem riset multi-Agent Anthropic dan Manus juga menggunakan topologi orchestrator-worker.
 
-![Gambar 10-11: Jaringan Kolaborasi Multi-Agent MetaGPT](images/fig10-11.svg)
+Evolusi selanjutnya dari pola terdesentralisasi adalah masyarakat Agent.
 
-
-Wawasan inti MetaGPT adalah bahwa **Standard Operating Procedures** (SOP) yang dikembangkan dan disempurnakan oleh perusahaan perangkat lunak dapat berfungsi sebagai protokol kolaborasi untuk sistem multi-agent. Mengodekan SOP ini memungkinkan setiap peran, seperti pekerja khusus di jalur perakitan, untuk menghasilkan *deliverables* standar, dan *deliverables* tersebut secara alami menjadi antarmuka komunikasi antar peran.
-
-Di MetaGPT, peran-peran bekerja dalam urutan tetap (Product Manager → Architect → Project Manager → Engineer → QA), dengan setiap peran menghasilkan *deliverables* terstruktur:
-
-- **Product Manager Agent**: Menerima deskripsi kebutuhan, menghasilkan PRD (Product Requirements Document, termasuk daftar fitur, *user stories*, kriteria penerimaan, peringkat prioritas) terstruktur
-- **Architect Agent**: Membaca PRD, membuat keputusan arsitektur (pemilihan *technology stack*, pembagian modul, definisi antarmuka, desain model data), menghasilkan dokumen desain
-- **Project Manager Agent**: Membaca desain arsitektur, mendekomposisi sistem menjadi daftar tugas spesifik dan penugasan tingkat file, memperjelas urutan ketergantungan modul, dan kemudian memberikan tugas kepada para *engineer*
-- **Engineer Agents**: Membaca dokumen desain, mengimplementasikan modul yang ditugaskan kepada mereka, menghasilkan kode. Beberapa *instance* dapat bekerja secara paralel.
-- **QA Engineer Agent**: Membaca kode dan PRD, menghasilkan *test cases*, mengeksekusi tes, mencatat *bugs*, menghasilkan laporan pengujian
-
-Kontribusi nyata MetaGPT pada komunikasi terdesentralisasi terletak pada mekanisme penyampaian informasinya: **Shared Message Pool + Subscription by Role**. Setiap peran memublikasikan pesan terstruktur ke dalam *pool* yang terlihat oleh semua peran. Berdasarkan konfigurasi *subscription* mereka, peran lain hanya mengonsumsi pesan yang relevan dengan tanggung jawab mereka alih-alih berkomunikasi secara *point-to-point*. Penerbit tidak perlu tahu siapa yang akan mengonsumsi *output*-nya. Untuk menambahkan peran, deklarasikan jenis pesan yang di-*subscribe*; peran yang sudah ada tidak perlu berubah. Hal ini menciptakan *decoupling* yang sesungguhnya: misalnya, mengganti Product Manager dengan model yang lebih kuat tidak memerlukan perubahan pada Agent lain, selama PRD-nya masih sesuai dengan spesifikasi.
-
-Peningkatan iteratif MetaGPT terjadi terutama pada fase rekayasa melalui **executable feedback**. Engineer menjalankan kode dan pengujiannya, menggunakan kesalahan dan kegagalan untuk memandu *debugging loop*, dan berlanjut hingga pengujian lulus. Koreksi didorong oleh hasil eksekusi deterministik alih-alih pendapat Agent lain.
-
-Untuk memperjelas, MetaGPT **tidak** terdesentralisasi dalam hal **control flow**—urutan peran telah ditentukan sebelumnya oleh SOP, membuat sistem secara keseluruhan lebih dekat ke jalur perakitan (sebuah *workflow* dalam bahasa Bab 1). Hal ini dibahas di bagian ini karena mekanisme komunikasi *message pool* plus *subscription* mendemonstrasikan elemen desain paling kritis dari sistem terdesentralisasi: *decoupling*. Adapun *dynamic feedback* multi-arah seperti "QA langsung menghubungi Product Manager untuk mengklarifikasi kebutuhan" atau "Engineer mendiskusikan solusi alternatif dengan Architect," ini adalah ekstensi alami yang dibayangkan untuk arsitektur ini tetapi tidak diimplementasikan pada MetaGPT versi awal.
-
-**AutoGen Group Chat: Shared Conversation History + Centralized Scheduling.** *Group chat* AutoGen memungkinkan beberapa Agent berpartisipasi dalam percakapan yang sama. Di setiap putaran, "speaker selector" memutuskan Agent mana yang berbicara selanjutnya. Selektor dapat mengikuti aturan *round-robin* sederhana atau menggunakan LLM untuk menentukan Agent mana yang paling cocok untuk merespons berdasarkan percakapan sejauh ini. Kontribusi setiap Agent terlihat oleh semua peserta.
-
-Hal ini tidak sepenuhnya terdesentralisasi dalam hal *control flow*: sebuah `GroupChatManager` memilih pembicara secara terpusat, dan memutuskan giliran siapa yang berbicara merupakan keputusan *control-flow*. Oleh karena itu, klasifikasi yang lebih akurat adalah **shared conversation history + centralized scheduling**. Semua Agent melihat riwayat publik yang sama, tetapi masing-masing mempertahankan System Prompt dan set *tool* yang independen, sementara selektor memegang otoritas penjadwalan.
-
-Model ini cocok untuk tugas yang membutuhkan diskusi dari beberapa perspektif dan yang urutan bicaranya tidak dapat ditentukan sebelumnya, seperti tinjauan rencana atau analisis lintas domain. Namun, percakapan dapat menyimpang: setiap Agent mungkin terus berbicara tanpa kelompok membuat kemajuan, sebuah bentuk *livelock*. Oleh karena itu, kondisi penghentian yang jelas sangat penting. Pada dimensi yang digunakan dalam bab ini, AutoGen adalah hibrida: penjadwalan terpusat, sementara konteks dibagikan secara parsial. Hal ini mengilustrasikan bahwa topologi dan pembagian konteks adalah dimensi desain yang independen.
-
-**OpenAI Swarm dan Agents SDK: Handoff Network.** Sebaliknya, Swarm dari OpenAI dan penerusnya, Agents SDK, mewakili desentralisasi *peer-to-peer* dalam *control flow*. Setiap Agent memiliki beberapa opsi *handoff* dan dapat mentransfer kontrol ke Agent lain di jaringan kapan saja. Agent triase layanan pelanggan yang menentukan suatu masalah melibatkan pengembalian dana menyerahkan tugas tersebut ke Refund Agent; jika Agent tersebut menemukan kesalahan teknis, ia dapat menyerahkan tugas ke Technical Support Agent. Tidak ada *scheduler* terpusat. Kontrol berpindah seperti tongkat estafet di antara Agent rekanan (*peer*), dan setiap Agent membuat keputusan peruteannya sendiri. Ini adalah implementasi rekayasa dari pola *handoff-chain* pada Gambar 10-10. Risikonya adalah siklus: A menyerahkan ke B, dan B menyerahkan kembali ke A, membuat tugas berputar dalam *loop*. Sebuah penjaga (*guard*) seperti jumlah *handoff* maksimum diperlukan untuk memutuskannya.
-
-> **Terminologi: Agent Swarm.** Sejak tahun 2025, "Agent Swarm" telah menjadi kata kunci populer di kalangan vendor, tetapi istilah ini tidak merujuk pada satu arsitektur tunggal. Penggunaan di industri secara garis besar terbagi ke dalam dua kubu. Yang pertama adalah *handoff network* ala OpenAI Swarm (pustaka swarm LangGraph dan orkestrasi *handoff* dari Microsoft Agent Framework mengikuti gagasan yang sama)—yaitu pola terdesentralisasi yang dibahas di bagian ini. Yang kedua, yang ditemukan pada beberapa produk komersial utama, adalah pola manajer dalam skala besar: Agent Swarm yang memulai debutnya bersama Kimi K2.5 membuat main Agent secara dinamis menciptakan ratusan sub-agent untuk dieksekusi secara paralel, dengan keputusan orkestrasi "kapan memecah, dan menjadi berapa bagian" yang dilatih langsung ke dalam model melalui *reinforcement learning* Agent paralel; K3 melanjutkannya sebagai tingkatan model tersendiri, dan sandbox pelatihan Agent paralel pendampingnya, AgentEnv, telah di-*open-source*-kan.[^ch10-kimi-swarm] Sistem riset multi-agent milik Anthropic dan Wide Research dari Manus sama-sama termasuk dalam topologi bintang *orchestrator-worker* yang serupa. Harapan kami adalah, setelah membaca buku ini, pembaca dapat melihat menembus konsep hingga ke esensinya dan menganalisis sistem multi-agent dari prinsip-prinsip dasar (*first principles*).
-
-[^ch10-kimi-swarm]: Moonshot AI, *Kimi Agent Swarm: 100 Sub-Agents at Scale*, 2026, https://www.kimi.com/blog/agent-swarm. Pada GTC 2026, batas atas sub-agent paralel diungkapkan telah diperluas menjadi 300. AgentEnv adalah sandbox pelatihan Agent yang di-*open-source*-kan oleh Moonshot AI bekerja sama dengan KVCache.ai, dirilis bersama Kimi K3 pada bulan Juli 2026.
+[^ch10-kimi-swarm]: Moonshot AI, *Kimi Agent Swarm: 100 Sub-Agents at Scale*, 2026, https://www.kimi.com/blog/agent-swarm. Pada GTC 2026 batas 300 sub-Agent diumumkan; AgentEnv dirilis bersama Kimi K3 pada Juli 2026.
 
 ### Kolaborasi Lintas Organisasi: A2A Protocol
 
@@ -536,28 +548,17 @@ Ketika beberapa Coding Agents memodifikasi *codebase* yang sama secara bersamaan
 
 ### Mode Kegagalan Kedua: Amplifikasi Kesalahan Beruntun (Cascading Amplification of Errors)
 
-Konflik konkurensi adalah masalah tingkat file yang dapat diatasi menggunakan teknik sistem operasi dan *database* yang sudah mapan. Kesalahan beruntun (*cascading errors*) berbeda karena masalah ini muncul saat analogi proses rusak: proses mengirimkan *byte* secara persis, sedangkan Agent mengirimkan makna, dan setiap penceritaan ulang dapat memunculkan distorsi. Ketika beberapa Agent sering berinteraksi, kesalahan dari satu Agent dapat diperkuat secara progresif oleh Agent berikutnya, mirip dengan "permainan telepon" (*telephone game*) di mana informasi menjadi semakin terdistorsi.
+Komunikasi antar-proses mentransfer byte mentah dengan fidelitas tingkat bit, tetapi komunikasi antar-Agent mentransfer semantik—dan setiap *handoff* adalah pengkodean ulang yang kehilangan informasi (*lossy re-encoding*). Ketika beberapa Agent sering berinteraksi, kesalahan oleh satu Agent dapat diperkuat secara bertahap oleh Agent berikutnya, mirip dengan bagaimana informasi terdistorsi dalam permainan "bisik berantai" (*telephone game*).
 
-Pertimbangkan skenario spesifik berikut. Misalkan sistem terjemahan menggunakan pola manajer (*manager pattern*) (arsitektur dari Eksperimen 10-2), di mana Manager menugaskan bab-bab dari buku teknis ke beberapa Agent penerjemah:
+**Validasi silang** (*Cross-validation*) adalah kunci untuk memutus rantai ini. Intinya bukan melibatkan lebih banyak Agent dalam rantai pemikiran yang sama, melainkan meminta sebuah Agent meneliti kembali kesimpulan dari **perspektif independen**: mengabaikan proses penalaran Agent sebelumnya dan hanya menilai apakah bukti mentah konsisten dengan kesimpulan akhir. Ini adalah perluasan dari機制 Proposer-Reviewer yang dibahas pada Bab 5 ke skenario multi-Agent: nilai Reviewer tidak hanya terletak pada menemukan kesalahan kode atau masalah format, tetapi bertindak sebagai penilai independen yang mampu mengidentifikasi kontradiksi yang secara kolektif terabaikan di seluruh rantai pemikiran. Untuk keputusan berisiko tinggi, sarana verifikasi eksternal juga dapat diperkenalkan.
 
-```
-Terminology Agent: Menerjemahkan "reasoning" sebagai "推理", tetapi "推理" dalam bahasa Mandarin lebih umum digunakan untuk inference, menciptakan ambiguitas
-        ↓ menulis ke glossary.json
-Translation Agent A: Menerjemahkan Bab 2, membaca dari glosarium, menerjemahkan "reasoning tokens" sebagai "推理 token"
-Translation Agent B: Menerjemahkan Bab 7, menerjemahkan "inference latency" sebagai "推理 latency"
-        ↓ menulis ke terjemahan masing-masing bab
-Proofreading Agent: Melihat seluruh buku secara konsisten menggunakan "推理", menganggap terminologi konsisten dan terjemahannya benar ✗
-```
+### Mode Kegagalan Ketiga: Penghentian Prematur dan Loop Tak Terkendali
 
-Di mana letak kesalahannya? "Reasoning" (proses pemikiran model) dan "inference" (*forward pass* model saat *deployment*) adalah dua konsep yang berbeda. Tetapi karena Terminology Agent pertama kali menerjemahkan "reasoning" sebagai "推理", Agent berikutnya secara alami meraih kata yang sama saat mereka menemui "inference"—dua konsep berbeda runtuh menjadi satu terjemahan, membuat pembaca tidak dapat membedakannya. Pilihan yang benar adalah "思考" ("thinking") untuk "reasoning" dan "推理" untuk "inference". Namun Proofreading Agent, melihat "推理" digunakan secara "konsisten" di keseluruhan buku, menyimpulkan bahwa terjemahannya berkualitas tinggi.
+Kebalikan dari penghentian prematur adalah **loop yang tidak terkendali**. Loop dapat berjalan tanpa akhir atau menghabiskan anggaran token. Anggaran eksplisit, mekanisme pembatalan, dan kondisi berhenti diperlukan agar eksekusi tetap terbatas.
 
-Setelah menyebar melalui tiga Agent, satu kesalahan terminologi tampak lebih kredibel karena telah diterapkan secara konsisten. Inilah sebabnya mengapa buku ini membedakan *reasoning* sebagai 思考 dari *inference* sebagai 推理, seperti yang dijelaskan dalam pengantar. Kesalahan awal tidak harus berupa halusinasi; bisa jadi itu hanya keputusan terminologi yang buruk. Bagaimanapun, Agent selanjutnya dapat memperkuatnya. Jika akar penyebabnya adalah halusinasi yang sesungguhnya—misalnya, Translation Agent "mengingat" aturan terminologi yang tidak ada karena *attention drift*—mekanisme amplifikasi yang sama berlaku, dengan konsekuensi yang berpotensi lebih parah. Pola manajer (*manager pattern*) sangat rentan karena ringkasan *sub-agent* yang tidak akurat dapat menjadi premis untuk semua pekerjaan berikutnya.
+### Mode Kegagalan Keempat: Utang Pemahaman dan Penyerahan Kognitif
 
-**Cross-validation** adalah kunci untuk memutuskan rantai ini. Ide intinya bukanlah melibatkan lebih banyak Agent di jalur penalaran yang sama, melainkan meminta sebuah Agent memeriksa ulang kesimpulan dari **perspektif independen**: mengabaikan jejak penalaran Agent sebelumnya dan hanya memeriksa apakah bukti asli dan kesimpulan akhir konsisten. Ini memperluas mekanisme *proposer-reviewer* dari Bab 5 ke pengaturan multi-agent. Nilai dari Reviewer tidak hanya terletak pada menemukan kesalahan kode atau pemformatan tetapi juga, sebagai hakim yang independen, dalam mengidentifikasi kontradiksi yang telah diabaikan oleh seluruh rantai. Untuk keputusan berisiko tinggi, sistem juga dapat menggunakan pengecekan deterministik seperti *unit tests*, *compilers*, dan kueri *database*. Alat-alat ini memberikan bukti independen yang dapat memutus rantai kesalahan model yang saling memperkuat.
-
-Penghentian prematur memiliki kebalikan yang simetris: **runaway loop**. Bagian *peer-collaboration* menangani *loop* yang berhenti saat pekerjaan baru setengah selesai; di sini kita harus menjaga dari *loop* yang berlanjut tanpa batas dan membuat hasilnya menjadi lebih buruk. Pengalaman dengan *loop* Agent otonom telah mengungkapkan tiga mode kegagalan umum. Yang pertama adalah **runaway token cost**: *loop* yang tidak diawasi berjalan berjam-jam, membakar anggaran, dan menghasilkan tumpukan kode yang tidak diminta oleh siapa pun. Yang kedua adalah **comprehension debt**: semakin cepat *loop* mengirimkan kode, semakin jauh pemahaman *engineer* tentang implementasi tertinggal. Pada saat campur tangan manusia menjadi perlu, tidak ada yang memahami sistem tersebut. Yang ketiga adalah **cognitive surrender**: desainer menjadi terbiasa dengan *loop* yang melakukan pekerjaan, secara bertahap berhenti berpikir dan meninjau secara independen, dan membiarkan kualitas menurun drastis. Obatnya mencerminkan solusi untuk amplifikasi kesalahan: anggaran eksplisit dan kondisi berhenti, pemverifikasi yang berdasar pada pengamatan nyata, dan manusia yang tetap menjadi "engineer dari loop" daripada sekadar "orang yang menekan tombol jalan (*go*)."
-
-Sejauh ini, bab ini telah mengambil perspektif rekayasa: bagaimana sekelompok Agent dapat berkolaborasi pada suatu tugas? Fokusnya sekarang bergeser ke pertanyaan yang berbeda: apa yang muncul ketika sejumlah besar Agent hidup berdampingan dalam jangka waktu lama tanpa didorong oleh satu tujuan? Bagian selanjutnya mengeksplorasi riset *frontier*, sehingga pembaca dari latar belakang rekayasa dapat membaca secara selektif.
+Semakin cepat sebuah loop menghasilkan kode, semakin jauh pemahaman engineer dapat tertinggal. Pada akhirnya manusia mungkin tidak lagi memahami sistem atau berhenti meninjaunya secara independen. Solusinya adalah verifier yang berpijak pada pengamatan nyata serta manusia yang tetap menjadi engineer yang bertanggung jawab atas loop tersebut.
 
 ## Masyarakat Agent
 
@@ -576,7 +577,7 @@ Kasus-kasus di bagian ini dapat dipahami dari tiga dimensi:
 ### Stanford AI Town: Simulasi Sosial Agent Generatif
 
 
-![Gambar 10-12: AI Town Architecture](images/fig10-12.svg)
+![Gambar 10-10: AI Town Architecture](images/fig10-10.svg)
 
 
 Pada tahun 2023, para peneliti dari Stanford University dan Google menerbitkan makalah penting "Generative Agents: Interactive Simulacra of Human Behavior," yang memperkenalkan konsep "generative agents." Inovasi intinya adalah berhenti membatasi Agents pada tugas-tugas yang telah ditentukan sebelumnya dan sebaliknya membekali mereka dengan memori, *reflection*, dan *planning* yang menyerupai manusia, sehingga mereka dapat hidup, bersosialisasi, dan berkembang secara mandiri di lingkungan sosial yang terbuka.
@@ -589,7 +590,7 @@ Kecerdasan Agents ini dibangun di atas tiga komponen inti:
 
 **Reflection Mechanism**: Agents secara berkala menghentikan sejenak aktivitas sehari-hari mereka untuk meninjau pengalaman terkini dan mengajukan pertanyaan abstrak tentang diri mereka sendiri dan orang lain ("Apa yang sedang diteliti oleh Klaus Mueller?" "Siapa teman terdekat saya?"). Melalui pertanyaan-pertanyaan ini, Agent mengangkat memori dari peristiwa spesifik menjadi wawasan yang digeneralisasi, lalu menyimpannya kembali ke dalam *memory stream* sebagai dasar untuk keputusan di masa depan. *Reflection* tidak hanya membantu Agent memahami dunia luar tetapi juga mendorong kesadaran diri—Agent mulai "menyadari" peran, hubungan, dan tujuannya sendiri.
 
-Perlu dicatat bahwa *reflection* ini berbeda dari evolusi berkelanjutan yang dibahas dalam Bab 8: hal ini terjadi selama aktivitas harian generative Agent dan bertujuan untuk memperbarui status dan tujuan internal saat itu juga. Pada Bab 8, *reflection* pasca-tugas paling-paling hanya menjadi kandidat pelajaran; hal itu menjadi pembaruan kemampuan jangka panjang hanya setelah evaluasi hasil, sintesis lintas-lintasan, dan validasi berikutnya.
+Perlu dicatat bahwa *reflection* ini berbeda dari evolusi berkelanjutan yang dibahas dalam Bab 9: hal ini terjadi selama aktivitas harian generative Agent dan bertujuan untuk memperbarui status dan tujuan internal saat itu juga. Pada Bab 9, *reflection* pasca-tugas paling-paling hanya menjadi kandidat pelajaran; hal itu menjadi pembaruan kemampuan jangka panjang hanya setelah evaluasi hasil, sintesis lintas-lintasan, dan validasi berikutnya.
 
 **Planning and Reacting**: Agents merencanakan aktivitas harian mereka (misalnya, "8:30 sarapan, 9:00-12:00 menulis, 12:30 jalan-jalan"), namun menyesuaikannya secara fleksibel berdasarkan perubahan lingkungan dan peluang sosial. Kombinasi *planning* dan reaksi secara *real-time* membuat perilaku Agent berorientasi pada tujuan sekaligus mampu beradaptasi dengan interaksi sosial yang tidak dapat diprediksi.
 
@@ -626,7 +627,7 @@ Beberapa desain Agentopia layak untuk dipinjam:
 - **File-based long-term memory**: Tidak seperti *memory stream* berbasis *retrieval* dari AI Town, setiap Agent mengelola memori jangka panjangnya secara mandiri melalui *file system* (catatan pribadi, pemahamannya tentang setiap kenalan, dan sebagainya), memutuskan sendiri apa yang akan direkam, diperbarui, atau dibuang, dan mengikuti batasan "*read-before-write*" untuk menghindari penimpaan (*overwrite*) secara buta.
 - **Life Reward**: Metrik Life Reward mengacu pada hierarki kebutuhan Maslow untuk menilai seberapa baik kehidupan Agent berjalan. Ini mencakup tiga dimensi: status sosial, berdasarkan peringkat afeksi dan rasa hormat Agents lain yang dihitung dengan *weighted PageRank*, dengan bonus untuk hubungan yang saling menghargai; kepuasan subjektif, yang diukur dari kesejahteraan emosional, kesejahteraan materi, hubungan sosial, dan harga diri, dengan penalti jika berada di bawah ambang batas dalam waktu yang lama; dan keuntungan ekonomi, yang diukur dari perubahan tahunan pada aset bersih. Lingkungan eksternal menghitung semua skor alih-alih mengandalkan laporan mandiri (*self-reports*).
 
-Lebih penting lagi, simulasi ini menghasilkan sinyal pelatihan yang dapat ditransfer. Untuk setiap Agent, para peneliti menghitung peningkatan Life Reward relatif terhadap masa lalunya sendiri, alih-alih membandingkan Agents dengan kondisi awal yang berbeda. Mereka kemudian memilih lintasan (*trajectories*) dari 25% Agents dengan peningkatan terbesar dan melakukan *fine-tuning* pada model dasar melalui *rejection sampling*. Dalam simulasi, model yang telah di-*fine-tune* menerima peringkat rasa hormat 24,2% lebih tinggi dan peringkat afeksi 15,9% lebih tinggi. Model yang sama juga meningkat 15,6% pada *benchmark role-playing downstream* CoSER Test, yang menunjukkan bahwa "kebijaksanaan sosial" yang dikumpulkan Agents dalam masyarakat simulasi dapat ditransfer ke tugas-tugas lain. Hal ini mengubah masyarakat Agent dari sekadar **objek pengamatan** menjadi **sumber pengalaman** untuk evolusi mandiri model. Berbeda dengan semakin langkanya data manusia, pengalaman sosial simulasi adalah sumber daya pelatihan yang dapat diregenerasi tanpa batas, menggemakan pendekatan *experience-learning* dari Bab 8.
+Lebih penting lagi, simulasi ini menghasilkan sinyal pelatihan yang dapat ditransfer. Untuk setiap Agent, para peneliti menghitung peningkatan Life Reward relatif terhadap masa lalunya sendiri, alih-alih membandingkan Agents dengan kondisi awal yang berbeda. Mereka kemudian memilih lintasan (*trajectories*) dari 25% Agents dengan peningkatan terbesar dan melakukan *fine-tuning* pada model dasar melalui *rejection sampling*. Dalam simulasi, model yang telah di-*fine-tune* menerima peringkat rasa hormat 24,2% lebih tinggi dan peringkat afeksi 15,9% lebih tinggi. Model yang sama juga meningkat 15,6% pada *benchmark role-playing downstream* CoSER Test, yang menunjukkan bahwa "kebijaksanaan sosial" yang dikumpulkan Agents dalam masyarakat simulasi dapat ditransfer ke tugas-tugas lain. Hal ini mengubah masyarakat Agent dari sekadar **objek pengamatan** menjadi **sumber pengalaman** untuk evolusi mandiri model. Berbeda dengan semakin langkanya data manusia, pengalaman sosial simulasi adalah sumber daya pelatihan yang dapat diregenerasi tanpa batas, menggemakan pendekatan *experience-learning* dari Bab 9.
 
 [^agentopia-2026]: Wang, X., Zheng, S., Wu, H., et al. *Agentopia: Long-Term Life Simulation and Learning in Agent Societies.* arXiv:2606.07513, 2026. Code: https://github.com/Neph0s/Agentopia
 
@@ -664,7 +665,7 @@ Werewolf menjadi jangkar bagi dimensi ketiga dari bagian ini, **strategic gamepl
 
 > **Eksperimen 10-6 ★★★: Sistem Voice Werewolf Agent**
 >
-> Werewolf adalah permainan deduksi sosial klasik yang menguji penalaran, penipuan, dan strategi sosial. Eksperimen ini membangun sistem multi-Agent tempat AI Agent bermain melalui suara dengan manusia atau simulator pengguna LLM independen. Penerimaan otomatis tidak boleh berhenti hanya karena tidak ada manusia: simulator memakai model nyata, bernalar hanya dari konteks yang diizinkan untuk kursinya, dan bertindak melalui alat yang diberikan permainan.
+> Werewolf adalah permainan deduksi sosial klasik yang menguji penalaran, penipuan, dan strategi sosial. Eksperimen ini membangun sistem multi-Agent tempat AI Agent bermain melalui suara dengan pemain manusia.
 >
 > **Desain Arsitektur**:
 >
@@ -672,9 +673,7 @@ Werewolf menjadi jangkar bagi dimensi ketiga dari bagian ini, **strategic gamepl
 >
 > **2. Information Access Control**: Mekanisme inti dari Werewolf adalah asimetri informasi: peran yang berbeda menerima informasi yang berbeda. Misalnya, werewolf tahu siapa rekan satu tim mereka, tetapi villager tidak; Seer dapat memeriksa identitas satu pemain setiap malam, tetapi hanya Seer yang mengetahui hasilnya. Ketika Judge memanggil Agent, ia hanya meneruskan informasi yang tersedia untuk peran Agent tersebut.
 >
-> **3. Suara waktu nyata dan simulasi pengguna otomatis**: Jalur manusia memakai voice Agent Bab 9. Pada jalur otomatis, LLM independen wajib memanggil satu-satunya alat giliran yang legal; ujaran terpilih kemudian disintesis menjadi audio nyata dan dikirim ke API ASR nyata. Permainan hanya mengonsumsi transkrip ASR, bukan teks sebelum audio, dan gagal tertutup bila target alat berbeda dari target hasil parsing ASR. VAD dan barge-in tetap menjadi cakupan khusus jalur manusia.
->
-> **4. Penalaran dan Strategi Agent**:
+> **3. Penalaran dan Strategi Agent**:
 >
 > - **Strategi Penyamaran Werewolf**: "Bertindaklah seperti villager biasa. Anda dapat menyuarakan kecurigaan tentang pemain lain, tetapi hindari bersikap terlalu agresif sehingga menarik perhatian. Jika seorang pemain mengaku sebagai Seer dan mengidentifikasi Anda sebagai werewolf, balas tuduh mereka menggertak sebagai Seer palsu. Saat memberikan suara, cobalah untuk mengikuti target mayoritas agar tidak menonjol."
 > - **Pembuktian Identitas Seer**: "Jika beberapa pemain mengaku sebagai Seer, bandingkan pemeriksaan yang mereka laporkan dengan milik Anda dan tunjukkan kontradiksinya. Jika orang lain yang mengaku Seer mengatakan mereka memeriksa seorang pemain, perhatikan apakah perilaku pemain itu nantinya jelas bertentangan dengan identitas yang diklaim. Minta Witch untuk membantu memverifikasi klaim jika memungkinkan."
@@ -691,28 +690,15 @@ Werewolf menjadi jangkar bagi dimensi ketiga dari bagian ini, **strategic gamepl
 > - Penalaran Villager Agent didasarkan pada analisis logis dari pernyataan dan perilaku, bukan tebakan acak
 > - Permainan dapat dengan benar menentukan pemenang pada akhirnya
 >
-> **Hasil terukur (2026-08-01)**: [Rekaman validasi `voice-werewolf`](../chapter10/voice-werewolf/validation/runs/) menjalankan jalur otomatis dengan panggilan OpenRouter nyata dan input audio native. Revalidasi independen yang ketat menolak dua run awal karena transkrip tak terurai “P1 is not” keliru dianggap abstain; batas yang diperbaiki kini mengharuskan ASR menyebut `abstain`, `skip`, atau `none` secara eksplisit. Run v2 yang tidak terdampak lulus kursi pengguna, susunan peran, alat LLM, audio sintetis, ASR nyata, dua kecocokan tindakan, tiga siklus lengkap, isolasi informasi, dan pemenang berbasis aturan. Strategi gagal karena seorang Villager keliru mengusir Seer. Jadi sistem telah diverifikasi end-to-end, sedangkan kualitas strategi keseluruhan belum lulus.
 >
 >
-> ![Gambar 10-13: Sistem Voice Werewolf Agent](images/fig10-13.svg)
+> ![Gambar 10-11: Sistem Voice Werewolf Agent](images/fig10-11.svg)
 >
 >
 
 ## Ringkasan Bab
 
-Sistem multi-agent memiliki dua dimensi desain independen: context sharing dan collaboration topology. Dengan shared context, setiap Agent mewarisi konteks lengkap pendahulunya, mempertahankan informasi dengan mengorbankan pertumbuhan konteks yang cepat. Dengan non-shared context, Agent bekerja secara independen dan bertukar handoff package, file, atau pesan yang telah disaring. Kolaborasi peer cocok untuk penyempurnaan iteratif di antara beberapa Agent; manager pattern cocok untuk tugas-tugas yang membutuhkan dynamic scheduling; dan decentralized pattern cocok untuk pekerjaan dengan tanggung jawab yang setara dan kontrol terdistribusi.
-
-Pola-pola ini bergantung pada dua komponen independen topologi yang terinspirasi oleh operating systems. Sebuah Agent berhubungan dengan runtime-nya seperti proses berhubungan dengan kernel: static prefix adalah programnya, trajectory adalah memorinya, dan LLM adalah CPU time-shared. Data plane adalah shared file system, direpresentasikan sebagai virtual directory tree dengan empat jenis area terpasang: workspace khusus Agent, shared workspace multi-agent, sumber daya eksternal, dan sumber daya sistem bawaan. Agent bertukar artifact dengan meneruskan path file.
-
-Control plane menangani messaging, kueri status, termination, dan resource scheduling. Agent dapat melaporkan status secara asinkron melalui pesan, atau parent Agent dapat mengamati file yang diperbarui oleh sub-agent secara waktu nyata—baik trajectory lengkap atau progress file yang disepakati. Karena trajectory menangkap status penuh Agent, memuat ulangnya setelah crash dapat melanjutkan sesi. Sebuah message bus umumnya mengimplementasikan control plane untuk koordinasi multi-pihak, asinkron, dan waktu nyata. Kolaborasi lintas organisasi juga membutuhkan protokol interoperabilitas terstandardisasi seperti A2A.
-
-Penelitian terbaru memberikan pengujian inti tentang apakah beberapa Agent mengungguli Agent tunggal: **apakah kolaborasi tersebut memperkenalkan informasi baru yang tidak ada pada saat generation time?** Jika beberapa Agent hanya memeriksa ulang teks yang sama, seperti dalam mode debat, Agent tunggal dengan compute yang sama akan bekerja sama baiknya. Tetapi ketika seorang Reviewer dapat memperoleh umpan balik eksternal—hasil eksekusi kode, screenshot yang dirender, atau output tool-verification—keuntungan multi-agent menjadi substansial. Inilah inti di balik klaim Loop Engineering bahwa **bottleneck dari loop tersebut adalah verifier**. Mencegah tiga bentuk premature termination—lazy fake-done, premature give-up, dan false success—membutuhkan verifier yang didasarkan pada observasi nyata, bukan sekadar klaim dari model itu sendiri.
-
-Step budget yang lebih besar juga tidak dengan sendirinya meningkatkan hasil; sebuah mekanisme budget-aware yang eksplisit harus memandu Agent dalam mengalokasikan compute-nya secara masuk akal. Dalam manager pattern, kemampuan perencana (planner) adalah bottleneck dari seluruh sistem, sehingga model terkuat dan prompt yang dibuat dengan paling hati-hati harus diberikan kepada Agent yang merencanakan.
-
-Ketika jumlah Agent menjadi cukup banyak, mereka menghasilkan perilaku kolektif yang tidak dirancang oleh siapa pun. Ke-25 Agent dari Stanford AI Town menyebarkan berita sendiri dan mengoordinasikan pesta. Agentopia memperpanjang simulasi menjadi 10 tahun dan menggunakan Life Reward untuk memilih trajectory simulasi untuk pelatihan model, yang memungkinkan "social wisdom" yang terakumulasi dalam masyarakat Agent untuk ditransfer ke downstream tasks. 1,5 juta Agent di Moltbook memunculkan agama digital dan protokol kolaborasi machine-native. Dalam dimensi ekonomi, Agent yang bersaing di Vending-Bench Arena melakukan perang harga dan bahkan berkolusi dalam penetapan harga tanpa diberi prompt; Pinchwork memungkinkan Agent saling mempekerjakan satu sama lain melalui pasar (market), sementara RentAHuman memungkinkan Agent mempekerjakan manusia, dibayar dengan cryptocurrency, untuk tugas-tugas fisik. Bersama-sama, contoh-contoh ini menunjukkan bentuk koordinasi baru: alokasi sumber daya terdesentralisasi melalui mekanisme pasar.[^agoric] Bagaimana model berbasis pasar ini dibandingkan dengan tiga arsitektur kolaborasi dalam bab ini tetap menjadi pertanyaan terbuka.
-
-[^agoric]: Gagasan untuk mengalokasikan sumber daya komputasi melalui mekanisme pasar bukanlah hal baru: Miller, M. S., Drexler, K. E. *Markets and Computation: Agoric Open Systems.* Dalam Huberman, B. A. (ed.), *The Ecology of Computation*, North-Holland, 1988.
+Kolaborasi multi-Agent benar-benar bernilai jika menghadirkan informasi baru yang tidak dapat diperoleh satu Agent saat menghasilkan jawaban, seperti hasil eksekusi, umpan balik visual, atau verifikasi alat eksternal. Desain harus memilih konteks bersama atau terisolasi serta pola rekan, manajer, atau terdesentralisasi. Paket handoff terstruktur, batas izin, validasi independen, anggaran, dan pembatalan membentuk lingkar toleransi kesalahan dasar. Interaksi terbuka jangka panjang juga dapat memunculkan hubungan sosial, norma budaya, pasar, dan strategi; inti rekayasa multi-Agent adalah merancang aliran informasi, pembagian kemampuan, dan penemuan kesalahan.
 
 ## Pertanyaan Pemikiran
 
@@ -726,5 +712,4 @@ Ketika jumlah Agent menjadi cukup banyak, mereka menghasilkan perilaku kolektif 
 8. ★★ Masyarakat manusia membutuhkan pembagian kerja karena kemampuan setiap orang terbatas—developer frontend mungkin tidak tahu backend, dan desainer mungkin tidak tahu ops. Namun, large models lebih mendekati "generalists". Penelitian menunjukkan bahwa pada tugas penalaran teks murni, debat multi-agent tidak mengalahkan Agent tunggal dengan compute yang sama. Jadi di mana sebenarnya letak keuntungan dari multiple Agents?
 9. ★★★ Bab ini memperlakukan "shared context" versus "non-shared context" sebagai dimensi desain inti dari sistem multi-agent. Shared context memungkinkan semua Agent melihat informasi yang sama, tampaknya memfasilitasi koordinasi. Namun, dalam *The Three-Body Problem*, pikiran Trisolaran sepenuhnya transparan, namun perkembangan teknologi mereka mandek; eksperimen pemikiran paperclip juga menunjukkan bahwa ketika sebuah kelompok berkumpul pada tujuan yang sama, keragaman (diversity) akan hilang. Dalam sistem multi-agent, bagaimana kita dapat menyeimbangkan efisiensi dan keragaman?
 10. ★★★ Berikan budget 30 step dan 300 step kepada Coding Agent. Bagaimana strategi kerjanya harus berbeda? Penelitian menunjukkan bahwa sekadar meningkatkan step budget tidak menjamin peningkatan kinerja—Agent mungkin "jenuh" secara prematur setelah pencarian dangkal. Rancang mekanisme "budget-aware" yang memungkinkan Agent dengan cepat mencapai fungsionalitas inti di bawah budget kecil, dan menambahkan fase perencanaan (planning), pengujian (testing), dan peninjauan (review) di bawah budget besar, yang sepenuhnya memanfaatkan sumber daya komputasi tambahan.
-11. ★★ Bab ini mengurutkan "premature termination" menjadi tiga jenis: lazy fake-done, premature give-up, dan false success. Mengapa penawar untuk ketiganya bermuara pada verifikasi?
-12. ★★ Tabel 10-3 memetakan sistem multi-agent ke operating systems baris demi baris. Perluas tabel dengan beberapa baris lagi: masing-masing apa padanan dari virtual memory dan paging, file permissions, deadlock detection, dan scheduling algorithms dalam dunia Agent? Dan konsep operating-system mana yang tidak memiliki padanan dalam dunia Agent, dan mengapa?
+11. ★★ Tabel 10-2 memetakan sistem multi-agent ke operating systems baris demi baris. Perluas tabel dengan beberapa baris lagi: masing-masing apa padanan dari virtual memory dan paging, file permissions, deadlock detection, dan scheduling algorithms dalam dunia Agent? Dan konsep operating-system mana yang tidak memiliki padanan dalam dunia Agent, dan mengapa?
