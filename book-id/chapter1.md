@@ -12,7 +12,7 @@ Bab ini dimulai dengan contoh-contoh praktis dan menelusuri kembali ke komponen 
 
 Inti dari sistem Agent modern cocok dengan satu formula ringkas: **Agent = LLM (Large Language Model) + Context + Tool**. Formula ini sederhana dan praktis—asalkan setiap istilah dibaca secara luas:
 
-- **LLM adalah mesin penalaran Agent**: Ini lebih dari sekadar kumpulan parameter model; ini adalah inti pengambilan keputusan Agent, yang bertanggung jawab untuk memahami niat, penalaran, perencanaan, dan penilaian. Kemampuan LLM berasal dari pengetahuan dunia dan kemampuan bahasa yang diperoleh selama **pre-training**, ditambah strategi pengambilan keputusan yang dienkode melalui **post-training** (teknik seperti supervised fine-tuning dan reinforcement learning dibahas di Bab 7).
+- **LLM adalah mesin penalaran Agent**: Ini lebih dari sekadar kumpulan parameter model; ini adalah inti pengambilan keputusan Agent, yang bertanggung jawab untuk memahami niat, penalaran, perencanaan, dan penilaian. Kemampuan LLM berasal dari pengetahuan dunia dan kemampuan bahasa yang diperoleh selama **pre-training**, ditambah strategi pengambilan keputusan yang dienkode melalui **post-training** (teknik seperti supervised fine-tuning dan reinforcement learning dibahas di Bab 8).
 - **Context adalah sekumpulan informasi kerja Agent**: Bukan sekadar teks yang dimasukkan ke dalam model, tetapi sekumpulan informasi kerja yang tersedia untuk Agent pada setiap titik keputusan—lingkungan, memori pengguna, pengetahuan domain, state-nya sendiri, dan kemajuan tugas. Sama seperti seseorang yang membuat keputusan perlu menilai situasi, mengingat kembali pengalaman yang relevan, dan berkonsultasi dengan referensi, context window Agent berisi informasi yang dapat digunakannya pada saat itu.
 - **Tool adalah antarmuka tindakan Agent**: Bukan sekadar beberapa fungsi API yang dapat dipanggil, tetapi serangkaian cara Agent dapat bertindak—mulai dari panggilan tool yang telah ditentukan sebelumnya hingga Skill yang dimuat sesuai permintaan, dari menghasilkan kode untuk menciptakan kemampuan baru dengan cepat hingga mendelegasikan pekerjaan ke sub-agent, dari menghubungi pengguna hingga merespons event eksternal.
 
@@ -26,7 +26,7 @@ Gambar 1-1 menunjukkan dua tingkat abstraksi. Tingkat luar adalah interaksi anta
 
 Formula rekayasa ini dapat diuraikan sebagai berikut: LLM menjadi Model, sedangkan Context + Tool membentuk Harness minimum; sistem produksi menambahkan constrain, verify, dan correct di dalam batas tersebut. Seluruh bab ini mengikuti batas yang sama.
 
-Ketiga komponen tersebut berhubungan dengan tiga konsep inti dalam RL (reinforcement learning; lihat Bab 7), tetapi bukan padanan satu-banding-satu yang ketat: context adalah representasi internal Agent atas observasi dan riwayat, sedangkan tool mendefinisikan antarmuka observasi/tindakan yang objek dasarnya tetap berada di Environment.
+Ketiga komponen tersebut berhubungan dengan tiga konsep inti dalam RL (reinforcement learning; lihat Bab 8), tetapi bukan padanan satu-banding-satu yang ketat: context adalah representasi internal Agent atas observasi dan riwayat, sedangkan tool mendefinisikan antarmuka observasi/tindakan yang objek dasarnya tetap berada di Environment.
 
 | Intuisi | Komponen Agent | Konsep RL | Peran |
 |---------------|----------------|------------------|---------------------------------------------|
@@ -82,7 +82,7 @@ Tool calling berjalan dalam empat langkah: pertama, context memberi tahu model t
 
 Untuk kueri cuaca, representasi sederhana dari proses empat langkah di level API adalah sebagai berikut:
 
-```
+```text
 Step 1: Declare tools                  Step 2: Model decides to call
 tools: [{                             assistant: {
   name: "get_weather",                  tool_calls: [{
@@ -130,9 +130,9 @@ Pembahasan sebelumnya menunjukkan bagaimana reinforcement learning dapat mengint
 
 **Adaptasi kontekstual (Contextual adaptation)** terjadi di dalam tugas saat ini. Setelah contoh, state, dan hasil retrieval masuk ke dalam context, model dapat menyesuaikan perilakunya dengan segera, tetapi ini tidak mengubah state yang persisten dari sesi berikutnya. Keuntungannya adalah kecepatan dan biaya rendah; keterbatasannya muncul dari context window dan cara informasi diatur. Bab 2 menjelaskan secara rinci bagaimana bentuk adaptasi ini bekerja.
 
-Agar perubahan persisten di seluruh tugas, sistem dapat memperbarui **artifact eksternal**: fakta dan pengalaman dapat diatur ke dalam dokumen knowledge, strategi yang dapat diekspresikan dalam bahasa dapat ditulis ke dalam Prompt atau Skill, dan prosedur serta batasan deterministik dapat dienkode ke dalam program dan Harness. Artifact ini dapat diaudit dan direvisi, namun Agent tetap harus mengaksesnya pada waktu eksekusi melalui context atau antarmuka tool. Bab 3 hingga 5 meletakkan dasar untuk knowledge dan program, sementara Bab 8 membahas bagaimana pembaruan semacam itu dapat dihasilkan dari trajectory operasional yang dievaluasi.
+Agar perubahan persisten di seluruh tugas, sistem dapat memperbarui **artifact eksternal**: fakta dan pengalaman dapat diatur ke dalam dokumen knowledge, strategi yang dapat diekspresikan dalam bahasa dapat ditulis ke dalam Prompt atau Skill, dan prosedur serta batasan deterministik dapat dienkode ke dalam program dan Harness. Artifact ini dapat diaudit dan direvisi, namun Agent tetap harus mengaksesnya pada waktu eksekusi melalui context atau antarmuka tool. Bab 3 hingga 5 meletakkan dasar untuk knowledge dan program, sementara Bab 9 membahas bagaimana pembaruan semacam itu dapat dihasilkan dari trajectory operasional yang dievaluasi.
 
-Ketika tujuannya adalah kemampuan berdimensi tinggi—seperti pemahaman medical-image, gaya bahasa alami, atau policy keputusan implisit—yang tidak dapat diekspresikan secara penuh oleh aturan eksternal, **parameter model** harus diperbarui melalui post-training. Pembaruan parameter membawa biaya deployment yang lebih tinggi tetapi dapat menghasilkan generalisasi yang alami dan luas; Bab 7 menyajikan metodenya secara sistematis. Oleh karena itu, ketiga jalur tersebut bukanlah kategori yang saling eksklusif melainkan mekanisme terkoordinasi yang beroperasi pada skala waktu berbeda: context mendukung adaptasi segera, artifact eksternal mendukung akumulasi yang terkendali, dan parameter menginternalisasi kemampuan yang sulit diekspresikan secara eksplisit.
+Ketika tujuannya adalah kemampuan berdimensi tinggi—seperti pemahaman medical-image, gaya bahasa alami, atau policy keputusan implisit—yang tidak dapat diekspresikan secara penuh oleh aturan eksternal, **parameter model** harus diperbarui melalui post-training. Pembaruan parameter membawa biaya deployment yang lebih tinggi tetapi dapat menghasilkan generalisasi yang alami dan luas; Bab 8 menyajikan metodenya secara sistematis. Oleh karena itu, ketiga jalur tersebut bukanlah kategori yang saling eksklusif melainkan mekanisme terkoordinasi yang beroperasi pada skala waktu berbeda: context mendukung adaptasi segera, artifact eksternal mendukung akumulasi yang terkendali, dan parameter menginternalisasi kemampuan yang sulit diekspresikan secara eksplisit.
 
 ### Context: Kumpulan Kerja Agent
 
@@ -168,9 +168,30 @@ Pertimbangkan contoh konkret—mengagregasi pendapatan lintas berbagai mata uang
 
 ![Gambar 1-4: Trajectory Agent—Loop ReAct untuk tugas agregasi multi-mata uang](images/fig1-4.svg)
 
+Sketsa bergaya Python berikut adalah pseudocode penjelas, bukan kode SDK yang dapat dijalankan; penanda `python` hanya digunakan untuk penyorotan sintaks.
+
+**Loop kontrol ReAct:**
+
+```python
+trajectory = [user_request]
+
+repeat:
+    context = stable_prefix + trajectory
+    decision = Model(context)
+    trajectory.append(decision)
+
+    if decision has no tool call:
+        return decision.answer
+
+    for call in decision.tool_calls:       # independent calls may run in parallel
+        validated_call = Harness.validate(call)
+        observation = Environment.execute(validated_call)
+        trajectory.append(observation)
+```
+
 Berikut adalah struktur trajectory, dalam pseudocode:
 
-```
+```text
 trajectory = [
   {role: "user", content: "Based on the company's quarterly revenue: Q1 2.5M USD, Q2 2.1M EUR, Q3 1.8M GBP, Q4 380M JPY, calculate the company's total annual revenue and average quarterly revenue"},
 
@@ -256,6 +277,20 @@ Jika dijabarkan ke dalam bentuk persamaan, komposisi kelas produksi (production-
 >
 > **Agent ↔ Environment**
 
+**Batas produksi Harness:**
+
+```python
+decision = Model(Harness.build_context(state, trajectory))
+allowed_action = Harness.constrain(decision)
+observation = Environment.apply(allowed_action)
+evidence = Harness.verify(allowed_action, observation)
+
+if evidence passes:
+    trajectory.append(observation)
+else:
+    trajectory.append(Harness.correct(evidence))
+```
+
 Sebuah Agent minimal mampu berjalan dengan LLM, context, dan tool saja. Untuk terus berjalan andal dalam beban kerja kelas produksi yang berjalan lama, dibutuhkan ketiga lapis rekayasa eksternal ini pula—Constrain untuk mencegah jangkauan berlebih (overreach), Verify untuk menangkap error, Correct guna pemulihan dari kegagalan. Dengan kata lain: formula minimal adalah sudut pandang demo, dan formula luas adalah sudut pandang produksi—yang terakhir sudah memuat seutuhnya komponen dari formula minimal serta menambahkan sebuah jaring pengaman (safety net) di sekitarnya.
 
 Sebuah contoh memperjelas batasannya: menyematkan (embedding) kebijakan refund di context termasuk ke dalam **Context**, sementara pemeriksaan jumlah refund apakah tidak melebihi total pesanan termasuk bagian dari **Constrain**. Pengeksekusian panggilan API termasuk di bawah **Tool**, sementara pengulangan otomatis (automatic retries) setelah panggilan API time out masuk ke dalam **Correct**. Model memberikan dasar kemampuan pemahaman dan penalaran; Harness menuntun, membatasi, dan membesarkan kemampuan-kemampuan tadi menjadi sebuah penyelesaian tugas andal. Praktik rekayasa (engineering practice) untuk merancang dan mengoptimalkan infrastruktur di luar model ini adalah **Rekayasa Harness (Harness Engineering)**.
@@ -266,13 +301,13 @@ Singkat kata, sebuah model tanpa Harness mungkin sangat kapabel, tetapi ia tidak
 
 Lebih tepatnya, Harness bukanlah segala sesuatu di luar model: Harness adalah lapisan runtime dan tata kelola **di dalam batas Agent dan di luar Model**. Harness menjadi perantara interaksi Model–Environment, tetapi tidak mencakup Environment. Definisi tool, adaptor pemanggilan, serta mekanisme izin dan reset sandbox termasuk Harness; berkas dan proses yang berubah di dalam sandbox, basis data eksternal, halaman web, pengguna, dan dunia fisik termasuk Environment. Lokasi deployment tidak mengubah batas konseptual ini. Inti Harness adalah manajemen Context dan antarmuka Tool, yang di sekitarnya dibangun tiga jenis perlindungan rekayasa:
 
-| Fungsi | Tanggung Jawab Satu-Kalimat | Hubungan dengan Context/Tool |
-|----------|-------------------------------------------|------------------------------------------|
-| **Context** | Memberikan model informasi yang relevan | Kemampuan inti (Core capability) |
-| **Tool** | Memberikan model antarmuka tindakan | Kemampuan inti (Core capability) |
-| **Constrain** | Menetapkan batas perilaku—apa yang bisa dan tidak bisa dilakukan | Batas aman (Safety boundary) yang dibangun di sekitar context dan tool |
-| **Verify** | Secara otomatis menilai kebenaran dari hasil eksekusi tool | Mekanisme pengecekan yang dibangun di sekitar hasil eksekusi tool |
-| **Correct** | Secara otomatis memulihkan (recover) atau membatalkan (roll back) saat masalah ditemukan | Mekanisme pemulihan yang dibangun di sekitar kegagalan panggilan tool |
+| Fungsi | Tanggung Jawab Satu-Kalimat / Aturan Dasar Inti | Contoh Praktik | Lihat Bab |
+|---|---|---|---|
+| **Context** | Memberikan model informasi yang relevan; Kecukupan Informasi: Memastikan Agent membuat keputusan berdasarkan informasi yang cukup pada setiap titik pengambilan keputusan | System prompt, basis knowledge, status bar Agent, kueri bypass Sidecar | Bab 2 & 3 |
+| **Tool** | Memberikan model antarmuka tindakan; Antarmuka Jelas: Nama tool intuitif, parameter memiliki contoh, batasan dijelaskan | Tool MCP, code interpreter, tool pencarian | Bab 4 |
+| **Constrain** | Menetapkan batas perilaku—apa yang bisa dan tidak bisa dilakukan; Default Gagal-Aman (Fail-Safe Defaults): Semua kapabilitas nonaktif secara default dan harus diaktifkan secara eksplisit (mirip dengan manajemen permission aplikasi seluler) | Di Claude Code, setiap tool memerlukan otorisasi pengguna secara default sebelum dieksekusi | Bab 4 |
+| **Verify** | Secara otomatis menilai kebenaran dari hasil eksekusi tool; Isolasi Input: Pemeriksaan keamanan hanya melihat data terstruktur (mis., field JSON yang dikembalikan oleh tool), bukan teks bentuk bebas yang dihasilkan oleh model (karena penyerang mungkin memanipulasi output model melalui prompt injection) | Pemeriksaan linter, sistem tipe data, validasi hasil panggilan tool | Bab 5 & 6 |
+| **Correct** | Secara otomatis memulihkan (recover) atau membatalkan (roll back) saat masalah ditemukan; Jangan mengekspos state intermediate (menengah/sedang berjalan) hingga kegagalan dipastikan tidak dapat dipulihkan (misalnya, secara diam-diam mencoba kembali pemanggilan tool yang gagal alih-alih menunjukkan hasil yang setengah jadi kepada pengguna) | Percobaan ulang (retry) diam-diam, continuation generation, pengembalian (fallback) ke penilaian manusia pada kegagalan berturut-turut (mekanisme circuit breaker) | Bab 2 & 5 |
 
 Context dan Tool memungkinkan Agent menyelesaikan tugas—memahami tugas dan mengerjakannya. Constrain, Verify, dan Correct memastikan ia melakukannya dengan andal dan aman—bukan sebagai sesuatu yang terpisah dari Context dan Tool, tetapi sebagai rekayasa yang menjaganya tetap bekerja secara andal dalam produksi. Di sepanjang kurva kematangan (maturity curve) produk Agent, penekanan di antara kedua kelompok ini bergeser.
 
@@ -308,20 +343,6 @@ Kelima tahap ini tidak saling menggantikan, melainkan lapisan bersarang: Prompt 
 
 Praktik rekayasa belakangan ini mendukung pandangan tersebut. Proyek LangChain di Terminal Bench 2.0, sebuah benchmark untuk kemampuan Agent menyelesaikan tugas kompleks di lingkungan terminal, merupakan contoh mencolok: Coding Agent mereka meningkat dari 52,8% ke 66,5%, melompat dari luar 30 besar ke dalam lima besar leaderboard. Yang berubah bukan modelnya, melainkan Harness-nya—Agent memeriksa hasil eksekusinya sendiri, mendeteksi saat terjebak dalam loop berulang, dan menyempurnakan strategi penalarannya.
 
-### Prinsip Inti dari Lima Fungsi Harness
-
-Tabel sebelumnya mencantumkan kelima fungsi Harness. Tabel di bawah ini menambahkan prinsip inti desain masing-masing fungsi, dan di bab mana buku ini membahasnya, yang memetakan konsep ke praktik:
-
-| Fungsi | Aturan Dasar Inti | Contoh Praktik | Lihat Bab |
-|----------|------------------------------------------|----------------------------------|---------|
-| **Context** | Kecukupan Informasi: Memastikan Agent membuat keputusan berdasarkan informasi yang cukup pada setiap titik pengambilan keputusan | System prompt, basis knowledge, status bar Agent, kueri bypass Sidecar | Bab 2 & 3 |
-| **Tool** | Antarmuka Jelas: Nama tool intuitif, parameter memiliki contoh, batasan dijelaskan | Tool MCP, code interpreter, tool pencarian | Bab 4 |
-| **Constrain** | Default Gagal-Aman (Fail-Safe Defaults): Semua kapabilitas nonaktif secara default dan harus diaktifkan secara eksplisit (mirip dengan manajemen permission aplikasi seluler) | Di Claude Code, setiap tool memerlukan otorisasi pengguna secara default sebelum dieksekusi | Bab 4 |
-| **Verify** | Isolasi Input: Pemeriksaan keamanan hanya melihat data terstruktur (mis., field JSON yang dikembalikan oleh tool), bukan teks bentuk bebas yang dihasilkan oleh model (karena penyerang mungkin memanipulasi output model melalui prompt injection) | Pemeriksaan linter, sistem tipe data, validasi hasil panggilan tool | Bab 5 & 6 |
-| **Correct** | Jangan mengekspos state intermediate (menengah/sedang berjalan) hingga kegagalan dipastikan tidak dapat dipulihkan (misalnya, secara diam-diam mencoba kembali pemanggilan tool yang gagal alih-alih menunjukkan hasil yang setengah jadi kepada pengguna) | Percobaan ulang (retry) diam-diam, continuation generation, pengembalian (fallback) ke penilaian manusia pada kegagalan berturut-turut (mekanisme circuit breaker) | Bab 2 & 5 |
-
-Kelima fungsi tersebut membentuk sebuah siklus tertutup (closed loop): Context dan Tool mendukung pengambilan keputusan, Constrain mencegah terjadinya error, Verify mendeteksi adanya deviasi, dan Correct menutup siklus tersebut. Jika salah satu mata rantai hilang, sistem akan mengalami kesenjangan keandalan. Sebelum mengkaji orchestration pattern dan desain guardrail yang spesifik, pertama-tama kita jabarkan prinsip inti untuk membangun Agent yang efektif dan untuk memilih sebuah model—fondasi bagi setiap keputusan desain setelahnya.
-
 ### Prinsip Inti Membangun Agent yang Efektif
 
 Berdasarkan pengalaman Anthropic, sistem Agent yang sukses mengikuti tiga prinsip inti.
@@ -340,7 +361,7 @@ Sebelum membahas orchestration pattern, kita perlu terlebih dahulu menjawab sebu
 
 Model adalah fondasi dari kecerdasan Agent, dan memilih yang tepat sering kali jauh lebih penting daripada melakukan prompt tuning sebanyak apa pun. Perilisan model bergerak terlalu cepat sehingga rekomendasi versi spesifik akan cepat usang, oleh karena itu bagian ini akan menawarkan pedoman arahnya saja.
 
-**Model closed-source.** Dua penyedia model closed-source yang paling umum digunakan dalam pengembangan Agent saat ini adalah OpenAI (seri GPT/o) dan Anthropic (seri Claude). Model closed-source umumnya lebih unggul dalam kapabilitas, tetapi lebih mahal dan dibatasi oleh kebijakan API vendor. Saat memilih model, jangan hanya mengandalkan leaderboard; **evaluasilah pada tugas Anda sendiri** (lihat Bab 6).
+**Model closed-source.** Dua penyedia model closed-source yang paling umum digunakan dalam pengembangan Agent saat ini adalah OpenAI (seri GPT/o) dan Anthropic (seri Claude). Model closed-source umumnya lebih unggul dalam kapabilitas, tetapi lebih mahal dan dibatasi oleh kebijakan API vendor. Saat memilih model, jangan hanya mengandalkan leaderboard; **evaluasilah pada tugas Anda sendiri** (lihat Bab 7).
 
 **Model open-source.** Saat buku ini ditulis, kesenjangan antara model open-source dan closed-source berada dalam rentang enam bulan, sementara biaya model open-source jauh lebih rendah. Jika skenario bisnis Anda tidak menuntut kapabilitas model tertinggi, model open-source adalah pilihan pragmatis. Model ini berbiaya rendah, dapat di-deploy secara privat, dan dapat disesuaikan melalui fine-tuning, sehingga cocok untuk skenario sensitif biaya atau yang memiliki persyaratan kepatuhan data. DeepSeek, Kimi, dan GLM termasuk model Tiongkok yang kuat dalam kapabilitas Agent. Kemampuan tool calling sangat berbeda antarmodel, jadi ujilah pada skenario Anda sendiri sebelum memilih.
 
@@ -405,10 +426,10 @@ Tabel berikut ini merangkum kerangka kerja dan platform Agent yang banyak diguna
 | Ekstensi context (persitensi knowledge) | Bab 3 (Knowledge Bases) | Memori pengguna, RAG, indeks terstruktur, Agentic RAG | Eksposur informasi sensitif, perlindungan privasi |
 | Desain tool dan batasan keamanan | Bab 4 (Tool Design) | Klasifikasi tool, kontrol permission, standar MCP, arsitektur asinkron | Misoperasi, akses tidak sah, operasi ireversibel |
 | Validasi tool dan koreksi | Bab 5 (Code Generation) | Harness Coding Agent, pengembangan berbasis pengujian (test-driven development), aturan dienkode sebagai kode | Peniruan identitas, atribusi tanggung jawab |
-| Validasi tingkat sistem | Bab 6 (Evaluation) | Lingkungan evaluasi, dataset, evaluasi otomatis, observabilitas | — |
-| Koreksi tingkat model | Bab 7 (Post-training) | SFT (Supervised Fine-Tuning), reinforcement learning—menulis sinyal feedback yang terkumpul dalam Harness ke dalam parameter model, yang dapat dipandang sebagai perpanjangan dari Harness engineering | Penyimpangan tujuan, penyelarasan, dan ketahanan (robustness) |
-| Koreksi kontinu berbasis pengalaman | Bab 8 (Continuous Evolution) | Sinyal pembelajaran trajectory; pembaruan knowledge/instruksi/program/parameter; modifikasi diri; validasi dan rollback | Keracunan memori, modifikasi diri yang tidak aman, pergeseran kapabilitas (capability drift) |
-| Context dan tool multimodal | Bab 9 (Multimodality dan Real-Time Interaction) | Voice Agent, Computer Use, manipulasi robotik | Penyaringan keamanan input multimodal, kontrol permission dalam interaksi real-time |
+| Validasi tingkat sistem | Bab 7 (Evaluation) | Lingkungan evaluasi, dataset, evaluasi otomatis, observabilitas | — |
+| Koreksi tingkat model | Bab 8 (Post-training) | SFT (Supervised Fine-Tuning), reinforcement learning—menulis sinyal feedback yang terkumpul dalam Harness ke dalam parameter model, yang dapat dipandang sebagai perpanjangan dari Harness engineering | Penyimpangan tujuan, penyelarasan, dan ketahanan (robustness) |
+| Koreksi kontinu berbasis pengalaman | Bab 9 (Continuous Evolution) | Sinyal pembelajaran trajectory; pembaruan knowledge/instruksi/program/parameter; modifikasi diri; validasi dan rollback | Keracunan memori, modifikasi diri yang tidak aman, pergeseran kapabilitas (capability drift) |
+| Context dan tool multimodal | Bab 6 (Multimodality dan Real-Time Interaction) | Voice Agent, Computer Use, manipulasi robotik | Penyaringan keamanan input multimodal, kontrol permission dalam interaksi real-time |
 | Batasan dan koreksi antar banyak Agent | Bab 10 (Multi-Agent Collaboration) | Arsitektur kolaborasi, mode kegagalan, society (masyarakat) Agent | Pelanggaran batas kepercayaan antar Agent, konflik atas sumber daya bersama |
 
 Seiring dengan semakin dalamnya tren "Model sebagai Agent", nilai inti sebuah framework tidak lagi terletak pada "mengorkestrasi panggilan LLM"—model semakin mampu memutuskan sendiri. Yang menjadi jauh lebih penting adalah Rekayasa Harness di sekitar model: manajemen context, ekosistem tool, batasan keamanan, pemulihan dari error. Saat memilih framework, pertanyaannya bukanlah seberapa canggih framework tersebut, melainkan apakah framework tersebut memungkinkan Anda untuk fokus pada logika bisnis (business logic) melalui lapisan abstraksi yang setipis mungkin.
@@ -417,7 +438,7 @@ Orchestration pattern memecahkan masalah pengorganisasian context dan tool di da
 
 ### Guardrail dan Safety (Penjagaan dan Keamanan)
 
-Bagian ini memberikan tinjauan umum tingkat tinggi (high-level overview) tentang guardrail untuk membentuk gambaran besarnya. Detail implementasi dan praktiknya akan menyusul di Bab 2 (perlindungan dari prompt injection), Bab 4 (kontrol permission tool), dan Bab 5 (keamanan eksekusi kode); pembaca yang baru pertama kali membacanya tidak perlu mengikuti setiap detailnya.
+Bagian ini memberikan tinjauan umum tingkat tinggi (high-level overview) tentang guardrail untuk membentuk gambaran besarnya. Detail implementasi dan praktiknya akan menyusul di Bab 2 (lapis konteks: perlindungan dari prompt injection), Bab 4 (lapis eksekusi: kontrol permission tool), dan Bab 5 (lapis eksekusi dan data: keamanan eksekusi kode dan penurunan batas kepercayaan); pembaca yang baru pertama kali membacanya tidak perlu mengikuti setiap detailnya.
 
 Guardrail adalah cara lapisan "constrain, verify, and correct" dari Harness utamanya diimplementasikan—pertahanan berlapis yang menjaga perilaku Agent agar tetap aman dan dapat dikendalikan. **Guardrail (pagar pengaman)** yang dirancang dengan baik membantu mengelola risiko privasi data (misalnya, mencegah kebocoran system prompt) dan risiko reputasi (misalnya, menjaga agar perilaku model tetap konsisten dengan citra merek). Mulailah dengan guardrail untuk risiko yang sudah Anda identifikasi, lalu tambahkan yang baru ketika ada kerentanan (vulnerabilities) baru yang muncul.
 
@@ -427,15 +448,17 @@ Guardrail juga memiliki mode kegagalan lain: **penolakan keliru (false refusal)*
 
 #### Jenis-Jenis Guardrail
 
-Berdasarkan letaknya dalam alur eksekusi, guardrail terbagi menjadi tiga jenis: input-side (sisi input), execution-side (sisi eksekusi), dan output-side (sisi output).
+Berdasarkan letak perlindungannya, guardrail terbagi menjadi tiga lapis: **lapis konteks, lapis eksekusi, dan lapis data**. Ketiganya tidak disusun menurut urutan pemrosesan permintaan, melainkan menurut **seberapa sulit dilewati**—semakin bawah lapisnya, semakin sedikit ia bergantung pada penilaian model sendiri, sehingga semakin sulit ditembus oleh satu serangan yang berhasil. Semua pembahasan keamanan selanjutnya dalam buku ini bergantung pada pohon ini.
 
-**Guardrail sisi input** mencegat request sebelum mencapai Agent, umumnya melalui empat mekanisme. **Relevance classifiers (Pengklasifikasi relevansi)** menandai kueri yang keluar topik—misalnya, asisten coding yang ditanya, "Berapa tinggi Empire State Building?" **Safety classifiers (Pengklasifikasi keamanan)** mendeteksi jailbreak (mendorong model untuk melewati batasan keamanannya) dan prompt injection (menyematkan instruksi berbahaya di dalam input). Perbedaan utamanya: dalam jailbreak, pengguna mencoba melewati batasan model secara langsung; dalam prompt injection, seorang penyerang memanipulasi perilaku model secara tidak langsung melalui data eksternal (konten web, dokumen). **Content moderation (Moderasi konten)** menandai input yang berbahaya atau tidak pantas, seperti konten yang berbau kekerasan atau diskriminatif. **Rule-based protections (Perlindungan berbasis aturan)** menerapkan langkah-langkah deterministik—blacklist, batasan panjang input, filter regular-expression—terhadap ancaman yang sudah diketahui seperti SQL injection.
+Guardrail **lapis konteks** mengatur **apa yang boleh dilihat model**, mencegat konten sebelum masuk ke dalam konteks. Biasanya terdiri atas empat mekanisme. **Pengklasifikasi relevansi** menandai kueri yang melenceng dari topik, misalnya asisten pemrograman menerima pertanyaan "berapa tinggi Empire State Building?". **Pengklasifikasi keamanan** mendeteksi jailbreak (Jailbreak, yaitu memancing model agar melewati batas keamanannya) dan prompt injection (Prompt Injection, yaitu menyisipkan instruksi jahat ke dalam masukan); perbedaan kuncinya, jailbreak dilakukan pengguna sendiri untuk menembus batas keamanan model, sedangkan prompt injection dilakukan penyerang yang memanipulasi perilaku model secara tidak langsung lewat data eksternal seperti isi halaman web atau dokumen. **Moderasi konten** menandai masukan yang berbahaya atau tidak pantas, seperti konten kekerasan dan diskriminatif. **Perlindungan berbasis aturan** memakai langkah deterministik—daftar hitam, batas panjang masukan, filter ekspresi reguler—untuk mencegah ancaman yang sudah dikenal seperti injeksi SQL. Penandaan sumber dan pemisahan "instruksi / data" juga termasuk lapis ini, dan dibahas di Bab 2.
 
-**Guardrail sisi eksekusi** memvalidasi pemanggilan tool. Intinya adalah **tool risk rating (penilaian risiko tool)**: berdasarkan apakah suatu operasi dapat dibalikkan (reversible), tingkat permission-nya, dan dampak keuangannya, setiap tool diberi tingkat risiko (rendah/sedang/tinggi). Operasi berisiko tinggi memerlukan peninjauan tambahan atau konfirmasi manusia.
+Namun lapis ini punya batas struktural: **Agent yang berada di dalam konteks yang sama sulit menilai apakah dirinya sudah tersuntik**. Maka lapis konteks hanya bisa menurunkan tingkat keberhasilan serangan dan tidak dapat memberi jaminan—justru itulah alasan dua lapis di bawahnya diperlukan.
 
-**Guardrail sisi output** memeriksa respons sebelum dikembalikan kepada pengguna. **PII filters (Filter PII)** meninjau output untuk mencari informasi identitas pribadi (personally identifiable information, mis., nomor KTP, nomor telepon) guna mencegah eksposur yang tidak perlu; **output validation (validasi output)** memastikan bahwa balasan tersebut sejalan dengan nilai merek (brand values) melalui pemeriksaan konten.
+Guardrail **lapis eksekusi** mengatur **apa yang boleh dilakukan model**, memvalidasi tindakan sebelum benar-benar berlaku. Intinya adalah **pemeringkatan risiko tool**: setiap tool diberi tingkat risiko (rendah/sedang/tinggi) menurut dapat-tidaknya dibalik, tingkat wewenang, dan dampak finansial; operasi berisiko tinggi menuntut peninjauan tambahan atau konfirmasi manusia. Kuncinya, peninjauan semacam itu harus dijalankan oleh mekanisme **di luar konteks**—proses peninjauan independen, kredensial hak akses minimum, isolasi sandbox, manusia dalam lingkar—jika tidak, ia akan tumbang bersama Agent yang tersuntik. Balasan yang dikembalikan kepada pengguna pun merupakan sebuah tindakan (Bab 4 menggolongkannya sebagai alat komunikasi pengguna), sehingga **pemeriksaan keluaran** juga termasuk lapis ini: **filter PII** memeriksa informasi identitas pribadi dalam keluaran (nomor identitas, nomor ponsel) agar tidak terekspos tanpa perlu, sedangkan **validasi keluaran** memeriksa isi agar balasan selaras dengan nilai merek.
 
-Perhatikan bahwa beberapa mekanisme (misalnya, pemfilteran regex berbasis aturan) dapat digunakan di sisi input maupun sisi output; pengelompokan di atas mengikuti lokasi deployment yang paling umum.
+Guardrail **lapis data** mengatur **dunia pada akhirnya boleh diubah menjadi seperti apa**, dengan menyerahkan "siapa boleh melakukan apa terhadap data mana" kepada satu lapis mekanisme yang stabil dan telah ditinjau manusia: kebijakan keamanan tingkat baris pada basis data, batasan dan validator, tampilan terkontrol dan prosedur tersimpan, serta konteks akses yang diikat oleh runtime tepercaya dan tak dapat dipalsukan. Nilai lapis ini justru terletak pada ketidaktergantungannya terhadap benar-tidaknya dua lapis di atas—sekalipun prompt injection berhasil dan kode yang dihasilkan sama sekali lupa menulis pemeriksaan wewenang, operasi melampaui wewenang tetap akan ditolak di lapis data. Bab 5 membahas lapis ini dengan contoh perangkat lunak yang dihasilkan secara dinamis.
+
+Perlu dicatat, mekanisme yang sama bisa muncul di beberapa lapis—filter ekspresi reguler berbasis aturan dapat menyaring masukan sekaligus keluaran—dan penggolongan di atas mengikuti tempat ia memberikan jaminannya. Ketiga lapis bukan hubungan pengganti melainkan hubungan bertumpuk: lapis atas menahan sebagian besar serangan di luar dan memberi umpan balik sedini mungkin, lapis bawah menjaga batas yang tak boleh dilanggar ketika lapis atas jebol.
 
 Sebuah praktik industri representatif terkait guardrail berbasis pengklasifikasi (classifier-based guardrails) adalah Constitutional Classifiers dari Anthropic[^ch1-3]. Desainnya memiliki tiga elemen kunci. Pertama, **pelatihan berbasis aturan (rule-driven training)**: sebuah "konstitusi" yang ditulis dalam bahasa alami—yang secara eksplisit menetapkan apa yang diperbolehkan dan apa yang tidak—digunakan untuk menghasilkan synthetic training data (data pelatihan sintetis) untuk pengklasifikasi input dan output. Kedua, **penilaian kontekstual gabungan (joint contextual judgment)**: generasi baru ini memeriksa pertanyaan pengguna dan jawaban model secara bersama-sama, karena beberapa jawaban tampak sangat biasa saja jika berdiri sendiri (misalnya, "cara menggunakan perisa makanan"), dan barulah ketika dihadapkan dengan pertanyaan tersebut menjadi jelas bahwa "perisa makanan" adalah kode untuk reagen kimia (chemical reagents). Ketiga, **penyaringan dua tahap (two-stage screening)**: probe (alat pendeteksi) yang sangat ringan—yang membaca aktivasi internal model dengan biaya yang hampir nol—memeriksa setiap percakapan terlebih dahulu, dan apa pun yang mencurigakan di eskalasi (diteruskan) ke pengklasifikasi yang lebih kuat untuk ditinjau, bukannya langsung ditolak (refused outright). Dengan cara ini, tahap pertama dapat menoleransi lebih banyak false positive (positif palsu) tanpa merusak pengalaman pengguna, dan biaya keseluruhannya pun sangat berkurang.
 
@@ -455,11 +478,13 @@ Tetapkan batas pada percobaan ulang dan operasi Agent. Jika Agent melebihi batas
 **Operasi Berisiko Tinggi (High-Risk Operations)**
 Operasi sensitif, ireversibel, atau berisiko tinggi harus memicu pengawasan manusia—setidaknya sampai tim telah membangun kepercayaan diri yang cukup terhadap keandalan Agent. Contoh umumnya adalah mengesahkan pengembalian dana dalam jumlah besar atau memproses pembayaran.
 
-Dengan mengingat kelima elemen Harness, sisa buku ini mengikuti struktur berikut ini.
+Kembali ke alur utama lima elemen Harness—mari lihat bagaimana hubungannya dengan struktur buku ini.
 
-### Buku Ini sebagai Panduan Praktis untuk Harness Engineering
+### Lima Elemen Harness dan Bagian "Membangun"
 
-Dilihat melalui kacamata Harness engineering, setiap bab dalam buku ini secara sistematis membangun satu komponen Harness. Sementara itu, masalah keamanan (security) tidak menjadi milik satu bab saja; keamanan merupakan perhatian lintas sektoral (cross-cutting concern) di seluruh bagian buku (cross-cutting concern menyentuh banyak bagian sistem sekaligus—sebagaimana logging, dalam rekayasa perangkat lunak, harus menyatu dengan setiap modul). Tabel di bawah ini menyajikan fungsi Harness, aspek keamanan, dan bab-bab yang sesuai dalam satu tampilan tunggal:
+**Perjelas dulu hubungan kedua rumus itu, supaya pembaca tak perlu mengingat dua kerangka.** Kerangka struktural buku ini hanya satu, yaitu yang berulang kali dipakai pengantar dan epilog: **Agent = LLM + konteks + tool**—Bab 2 sampai 6 membangun, Bab 7 sampai 9 mengevaluasi dan mengembangkan, Bab 10 berkolaborasi. **Agent = Model + Harness** bukan pembagian tandingan di sampingnya, melainkan hal yang sama yang dibentangkan ke dalam bentuk produksinya: ia membentangkan "konteks" dan "tool" menjadi lima tanggung jawab—manajemen konteks, antarmuka tool, batasan, verifikasi, koreksi. Karena itu ia adalah **lensa di dalam bagian "membangun"**, bukan daftar isi yang menutupi sepuluh bab.
+
+Dalam lingkup itu, lima elemen Harness berpadanan jelas dengan Bab 2 sampai 5:
 
 | Fokus Harness | Bab Terkait | Konten Inti | Masalah Keamanan |
 |--------------------|--------------------|-------------------------------|------------------------|
@@ -467,13 +492,51 @@ Dilihat melalui kacamata Harness engineering, setiap bab dalam buku ini secara s
 | Ekstensi Context (Persistensi Knowledge) | Bab 3 (Knowledge Base) | Memori pengguna, RAG, pengindeksan terstruktur, agentic RAG | Eksposur informasi sensitif, perlindungan privasi |
 | Desain Tool dan Batasan Keamanan | Bab 4 (Tool Design) | Klasifikasi tool, kontrol permission, standar MCP, arsitektur asinkron | Misoperasi, akses tidak sah, operasi ireversibel |
 | Validasi Tool dan Koreksi | Bab 5 (Code Generation) | Harness Coding Agent, pengembangan berbasis pengujian, aturan dienkode sebagai kode | Peniruan identitas, atribusi tanggung jawab |
-| Validasi Tingkat Sistem | Bab 6 (Evaluation) | Lingkungan evaluasi, dataset, evaluasi otomatis, observabilitas | — |
-| Koreksi Tingkat Model | Bab 7 (Post-Training) | SFT (Supervised Fine-Tuning), Reinforcement Learning—mengenkode sinyal feedback yang dikumpulkan Harness ke dalam parameter model, sebagai ekstensi dari Harness engineering | Penyimpangan tujuan, penyelarasan, dan ketahanan (robustness) |
-| Koreksi Tingkat Sistem | Bab 8 (Self-Evolution) | Pembelajaran yang dieksternalisasi, pembuatan tool, akumulasi pengalaman | — |
-| Context dan Tool Multimodal | Bab 9 (Multimodal and Real-Time Interaction) | Voice Agent, Computer Use, operasi robotik | Penyaringan keamanan input multimodal, kontrol permission dalam interaksi real-time |
-| Batasan dan Koreksi Antar Banyak Agent | Bab 10 (Multi-Agent Collaboration) | Arsitektur kolaborasi, mode kegagalan, society Agent | Pelanggaran batas kepercayaan antar Agent, konflik sumber daya bersama |
+
+Bab 6 (interaksi) tidak termasuk salah satu dari lima elemen tersebut; yang diperluasnya adalah modalitas dan waktu dari ruang observasi dan ruang aksi itu sendiri. Bab 7 sampai 9 menanyakan **bagaimana kita tahu Harness sudah dibangun dengan benar, dan bagaimana membuatnya terus membaik**. Bab 10 mengganti Harness satu Agent dengan struktur kolaborasi beberapa Agent. Memaksa bab-bab itu masuk ke lima kotak hanya membuat kotaknya kehilangan daya bedanya.
+
+Keamanan pun tidak dibagi per bab: ia adalah perhatian lintas potong (cross-cutting concern, yaitu persoalan yang memengaruhi banyak bagian sistem) yang membentang di seluruh buku, ditata menurut tiga lapis guardrail pada bagian sebelumnya—lapis konteks, lapis eksekusi, lapis data. Kolom "fokus keamanan" pada tabel di atas menunjukkan di lapis mana tiap bab terutama mendarat.
 
 Praktik Anthropic dalam membangun Agent jangka-panjang (long-running Agents) menunjukkan bagaimana desain Harness dapat menyelesaikan masalah yang tidak dapat diselesaikan oleh model itu sendiri. Mereka membagi tugas kompleks antara "Initialization Agent" (menyiapkan lingkungan, memecah daftar tugas) dan "Execution Agent" (membuat kemajuan bertahap di setiap sesi dan meninggalkan artifak serah-terima yang jelas), menggunakan Harness terstruktur untuk mengatasi dua mode kegagalan dari tugas yang panjang: kehabisan context dan menyatakan tugas selesai sebelum waktunya. Bab-bab di depan akan membedah Harness komponen demi komponen—Bab 2 dimulai dengan yang paling sentral, context engineering, dan Bab 5 menjabarkan praktik lengkap dari Harness engineering pada Coding Agent.
+
+## Pola Desain yang Membentang Sepanjang Buku
+
+Sembilan bab berikutnya berulang kali memakai sekumpulan struktur yang sama. Struktur-struktur itu bukan milik satu bab tertentu, melainkan solusi berulang di bawah kendala yang sama; karena itu di sini kita menamainya sekaligus dan memberi definisi bakunya. Selanjutnya tiap bab cukup memanggilnya dengan nama dan hanya menjelaskan variannya sendiri.
+
+**Pengusul-Peninjau (Proposer-Reviewer)**: produksi dan penilaian dijalankan oleh dua peran yang tidak berbagi konteks, dan pihak penilai melihat artefaknya sendiri—hasil render, keluaran pengujian, argumen pemanggilan terstruktur—bukan proses penalaran pihak yang memproduksi. Premisnya adalah **peninjauan diri tidak dapat diandalkan**: model yang berada di dalam satu konteks tidak bisa memikirkan apa yang tak terpikirkan olehnya, dan sulit pula menilai apakah dirinya sudah tersuntik. Bab 3 memakainya untuk memperbarui pengetahuan; Bab 4 untuk persetujuan di muka dan validasi setelahnya pada pemanggilan tool (Sidecar adalah variannya yang hanya-baca); tiga eksperimen Bab 5—presentasi, video, dan log—semuanya berkerangka pola ini; Bab 7 memakainya untuk mengevaluasi UI; Bab 9 untuk meninjau usulan pembaruan; dan Bab 10 membahas bentuknya dalam kolaborasi setara serta mengapa satu Agent tidak boleh meninjau dirinya sendiri.
+
+**Pengungkapan Bertahap (Progressive Disclosure)**: alih-alih memasukkan seluruh informasi ke konteks sekaligus, sediakan dulu katalog yang dapat ditelusuri lalu muat detailnya sesuai kebutuhan. Ia mengoptimalkan dua hal sekaligus—anggaran konteks dan ketepatan pemilihan. Agent Skills di Bab 2 adalah bentuk paling khasnya (metadata menetap, isi dimuat sesuai kebutuhan); pencarian berlapis di Bab 3, penemuan tool proaktif dan pemotongan berhalaman di Bab 4, serta penemuan Agent di Bab 10 semuanya adalah variannya.
+
+**Hanya Tambah (Append-only)**: keadaan berkembang dengan cara menambahkan, dan apa yang sudah ditulis tidak diubah lagi. Imbalannya adalah dapat di-cache, dapat diputar ulang, dan dapat diaudit. Kestabilan prefiks KV Cache di Bab 2 adalah bentuk kinerjanya—makin di depan letak perubahan, makin banyak cache yang gugur; memori bergaya peristiwa di Bab 3 dan kebiasaan Bab 4 menambahkan schema tool baru di ujung trajektori alih-alih menyisipkannya kembali ke prefiks mengikuti disiplin yang sama.
+
+**Himpunan Batas + Himpunan Retensi (Boundary Set + Retention Set)**: setiap perubahan harus divalidasi sekaligus pada "kumpulan sampel yang seharusnya berubah" dan "kumpulan sampel yang tidak boleh terpengaruh". Menguji yang pertama saja membuat overfitting disangka kemajuan; menguji yang kedua saja membuat perubahan tak berguna disangka aman. Tugas regresi di Bab 7, pemisahan pelatihan dan evaluasi di Bab 8, serta validasi usulan pembaruan di Bab 9 semuanya berdiri di atas pasangan himpunan ini.
+
+**Diff Minimal + Dapat Dibalik (Minimal Diff, Reversible)**: setiap perubahan diupayakan sekecil mungkin, membawa asal-usulnya, dan dapat dibalik sendiri-sendiri, bukan ditulis ulang seluruhnya. Inilah yang membuat atribusi mungkin—ketika ada masalah, ia dapat dilacak ke satu perubahan tertentu. Pembaruan pengetahuan di Bab 3, tambalan kode di Bab 5, serta pembaruan prompt dan program di Bab 9 semuanya mengikutinya; dan tiga jalur pembaruan yang diberikan di awal bab ini (adaptasi dalam konteks, pembaruan artefak eksternal, pembaruan parameter) memang tersusun dari yang paling mudah dibalik hingga yang paling sulit.
+
+Kelima pola ini berbagi satu motif yang sama: **memindahkan penilaian dari "model sendiri yang memutuskan" ke "mekanisme di luar model yang memutuskan"**—peninjau berada di luar konteks, katalog di luar isi, cache di luar perubahan, himpunan retensi di luar himpunan batas, pembalikan di luar commit. Guardrail tiga lapis yang diberikan sebelumnya di bab ini adalah motif itu yang diterapkan pada keamanan. Ketika pola-pola ini muncul lagi nanti, buku ini cukup menyebut namanya beserta perbedaan di bab bersangkutan, tanpa menurunkannya kembali.
+
+## Lingkar Penemuan: Bukti, Usulan, Eksperimen, Umpan Balik
+
+Lima pola pada bagian sebelumnya adalah struktur lokal. Ada satu struktur yang lebih besar membentang di tiga bab, tetapi karena dibangun terpisah-pisah, ia mudah disangka tiga jalur yang berdiri sendiri.
+
+Bab 7 harus menemukan kesalahan pertama pada trajektori yang gagal dan menetapkan jenisnya. Bab 3 harus mengubah satu bukti baru menjadi perubahan basis pengetahuan yang sekecil dan seberdasar mungkin. Bab 9 harus menilai apakah sebuah perubahan benar-benar membuat sistem lebih baik, lalu memutuskan merilis atau membalikkannya. Ketiganya memakai mekanisme yang sama sekali berbeda—atribusi bersandar pada rubrik dan pelokalan kesalahan pertama, usulan pada Pengusul-Peninjau, validasi pada himpunan batas dan himpunan retensi dengan rilis kanari serta pembalikan—sehingga ketiganya **bukan tiga pengulangan satu mekanisme**, dan menyeragamkan istilahnya secara paksa justru akan menutupi perbedaan yang penting.
+
+Yang benar-benar mereka bagi adalah posisi: masing-masing menempati satu ruas dari lingkar yang sama.
+
+```text
+Bukti (Bab 7): trajektori gagal → kesalahan pertama + jenis kesalahan
+  → Usulan (Bab 3): bukti → satu perubahan minimal, dapat ditinjau, dapat dibalik
+  → Eksperimen (Bab 9): pengukuran pada himpunan batas dan retensi, rilis kanari
+  → Umpan balik: hasil pengukuran dan trajektori gagal yang baru kembali ke ruas bukti
+```
+
+Lingkar ini baru-baru ini diberi nama dan didorong ke arah otomatisasi oleh Discovery Loop, perusahaan yang didirikan Jeff Dean bersama rekan-rekannya: mengusulkan eksperimen, mengimplementasikan yang dibutuhkan, mengevaluasinya, membawa hasilnya ke putaran berikutnya, dan memparalelkan proses yang dahulu berjalan serial[^ch1-discovery-loop]. Perlu dikatakan terus terang: perusahaan itu berdiri pada Agustus 2026 dan sejauh ini hanya mengumumkan misinya, tanpa hasil teknis publik; buku ini mengutipnya karena **penamaannya atas lingkar tersebut**, bukan sebagai bukti—persis pembedaan yang akan ditegaskan berulang kali di Bab 7.
+
+Menaruh lingkar sistem Agent ini berdampingan dengan lingkar riset murni memperlihatkan dua batasan tambahan, dan justru itulah yang dibahas panjang lebar di sisa buku ini. **Pertama, eksperimen harus berakar pada observasi nyata.** Dalam lingkar riset, "eksperimen" bisa berupa satu kali proses pelatihan; dalam sistem Agent, ia mengubah sistem yang sedang melayani pengguna, sehingga putusannya harus datang dari keadaan nyata lingkungan—apakah pengujian lolos, keadaan akhir basis data, apa yang dikembalikan tool—bukan dari penuturan model tentang perbuatannya sendiri. **Kedua, setiap eksperimen harus menjawab sekaligus "apa yang diperbaikinya" dan "apa yang dirusaknya".** Lingkar riset biasanya hanya mengejar naiknya metrik; sistem Agent harus pula membuktikan perilaku yang semula benar tidak menjadi rusak. Itulah alasan keberadaan himpunan batas dan himpunan retensi pada bagian sebelumnya.
+
+Tiga bab berikutnya masing-masing hanya membahas ruasnya sendiri dan tidak mengulang seluruh lingkar: Bab 3 tentang apa yang membuat sebuah usulan berdasar, Bab 7 tentang apa yang membuat bukti tepercaya, Bab 9 tentang apa yang membuat eksperimen dan umpan balik terus berjalan dalam jangka panjang tanpa melenceng.
+
+[^ch1-discovery-loop]: Discovery Loop diumumkan pada 5 Agustus 2026 oleh Jeff Dean, Sanjay Ghemawat, Quoc Le, dan Oriol Vinyals sebagai public benefit corporation yang bermisi mengotomatiskan pembelajaran mesin, sains, dan rekayasa; deskripsi publiknya adalah mengotomatiskan lingkar eksperimen yang utuh dan memparalelkan secara besar-besaran apa yang dahulu berjalan serial. Lihat https://techcrunch.com/2026/08/05/jeff-dean-and-other-top-ai-researchers-are-leaving-google-to-launch-their-own-startup/ . Hingga buku ini ditulis, belum ada hasil teknis yang dapat direproduksi yang dipublikasikan.
 
 ## Ringkasan Bab
 
@@ -487,9 +550,13 @@ Bab ini telah membangun kerangka kerja yang mengutamakan praktik (practice-first
 
 **Dari Workflow ke Autonomous Agent**: Terapkan prompt terlebih dahulu, lalu workflow, baru autonomous Agent terakhir—urutan tersebut adalah cara paling praktis untuk mengurangi perilaku tak terduga. Setiap orchestration pattern memiliki situasi tersendiri di mana ia cocok diterapkan; tidak ada pola tunggal yang terbaik di mana-mana.
 
-**Keamanan Adalah Isu Arsitektur**: Guardrail, intervensi human-in-the-loop, alignment (menjaga perilaku model agar tetap konsisten dengan niat manusia)—keamanan harus dirancang sedari baris kode pertama, bukan ditambalkan (patched on) sebelum peluncuran. Hal ini mencakup lima tingkatan: model, context, tool, kolaborasi, dan society (masyarakat agen).
+**Lima pola membentang sepanjang buku**: Pengusul-Peninjau, pengungkapan bertahap, hanya tambah, himpunan batas + himpunan retensi, serta diff minimal yang dapat dibalik—semuanya berbagi satu motif, yaitu memindahkan penilaian dari model itu sendiri ke mekanisme di luarnya. Bab-bab berikutnya memanggilnya dengan nama, bukan menurunkannya lagi.
 
-Bab berikutnya akan membahas komponen Harness yang paling sentral secara mendalam: context engineering. Bab 7 membahas akar akademis dari konsep Agent di dalam reinforcement learning dan membandingkan RL tradisional dengan LLM Agent modern.
+**Lingkar penemuan membentang di tiga bab**: bukti (atribusi kegagalan di Bab 7) → usulan (pembaruan pengetahuan di Bab 3) → eksperimen dan umpan balik (validasi dan rilis di Bab 9). Ketiga ruas memakai mekanisme yang memang berbeda; yang mereka bagi adalah posisi, bukan istilah. Dibanding lingkar riset murni, lingkar sistem Agent menambah dua batasan—eksperimen harus berakar pada observasi nyata, dan setiap putaran harus menjawab sekaligus apa yang diperbaiki dan apa yang dirusak.
+
+**Keamanan Adalah Isu Arsitektur**: Guardrail, intervensi human-in-the-loop, alignment (menjaga perilaku model agar tetap konsisten dengan niat manusia)—keamanan harus dirancang sedari baris kode pertama, bukan ditambalkan (patched on) sebelum peluncuran. Guardrail terbagi menjadi tiga lapis—konteks, eksekusi, dan data—yang diurutkan menurut seberapa sulit dilewati, dan pembahasan keamanan pada bab-bab berikutnya bergantung pada kerangka itu.
+
+Bab berikutnya akan membahas komponen Harness yang paling sentral secara mendalam: context engineering. Bab 8 membahas akar akademis dari konsep Agent di dalam reinforcement learning dan membandingkan RL tradisional dengan LLM Agent modern.
 
 Pertanyaan pemikiran di bawah ini dirancang untuk membawa konsep-konsep inti bab ini satu tingkat lebih dalam; tidak ada jawaban standar.
 
