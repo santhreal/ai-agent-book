@@ -148,6 +148,8 @@ Las dos llamadas de la figura se refieren a **llamadas a la API del modelo**, no
 }
 ```
 
+Esta lista de `tools` está formada por metadatos estáticos de herramientas que el desarrollador registró de antemano: los nombres de las herramientas, sus descripciones y los esquemas de parámetros están escritos en el código y no tienen nada que ver con lo que el usuario pregunta en esta ocasión. Tanto si el usuario pregunta por el tiempo en Vancouver como si le pide al Agente que reserve un vuelo, se envía la misma lista; en el ejemplo solo aparecen las dos herramientas relevantes para acortar la petición, mientras que un Agente real suele declarar decenas de ellas a la vez. **No es que el Agente divida primero la entrada del usuario en dos subtareas, «consultar la hora» y «consultar el tiempo meteorológico», y genere después las descripciones de herramientas correspondientes**: esa descomposición ocurre del lado del modelo y es precisamente el campo `tool_calls` de la respuesta que aparece a continuación.
+
 **El modelo devuelve solicitudes de llamada a herramientas (no la respuesta final):**
 
 ```javascript
@@ -337,7 +339,7 @@ La lógica central de este código consta únicamente de un bucle `for` acotado 
 Sigamos la evolución de la lista `messages` en cada ronda:
 
 **Estado inicial (antes de la 1.ª llamada):**
-```
+```text
 messages = [
   { role: "system",  content: "You are a helpful assistant..." },     # Escrito por el desarrollador
   { role: "user",    content: "What's the current time and weather in Vancouver?" },  # Entrada del usuario
@@ -345,7 +347,7 @@ messages = [
 ```
 
 **Tras la 1.ª llamada (el modelo devuelve llamadas a herramientas):**
-```
+```text
 messages = [
   { role: "system",    content: "..." },
   { role: "user",      content: "What's the current time..." },
@@ -356,7 +358,7 @@ messages = [
 ```
 
 **Tras la 2.ª llamada (el modelo devuelve la respuesta final, el bucle termina):**
-```
+```text
 messages = [
   { role: "system",    content: "..." },
   { role: "user",      content: "What's the current time..." },
@@ -378,6 +380,25 @@ A través del ejemplo anterior, podemos visualizar con claridad la composición 
 La parte superior (System Prompt + Tool Definitions) se mantiene inalterada a lo largo de la conversación, mientras que la parte inferior (historial de conversación, es decir, la **trayectoria** definida en el Capítulo 1) crece continuamente a medida que avanza la interacción. Así es exactamente como se ven a nivel de API los "cinco componentes del contexto" del Capítulo 1: el prompt del sistema y las definiciones de herramientas forman el prefijo estático, mientras que los mensajes del usuario, las respuestas del modelo y los resultados de ejecución de herramientas conforman el historial dinámico de mensajes. Esta estructura de "prefijo estático + trayectoria" constituye la base para las discusiones posteriores sobre la optimización de KV Cache y la compresión de contexto; al comprender esta estructura se entiende por qué "la parte frontal no debe moverse y la posterior se puede comprimir".
 
 Las secciones siguientes del capítulo se desarrollarán en torno a cada nivel de esta estructura: cómo utilizar la inmutabilidad del prefijo estático para acelerar la inferencia (KV Cache), cómo diseñar un buen System Prompt (ingeniería de prompts), cómo prevenir el secuestro del contexto por contenidos externos (defensa contra inyección de prompts), cómo cargar conocimiento especializado a demanda (Agent Skills), cómo inyectar información dinámica de estado al final de la conversación (barra de estado del Agente) y cómo comprimir de forma inteligente el historial de mensajes cuando este se expande (estrategias de compresión).
+
+**Construcción del contexto antes de cada solicitud:**
+
+```python
+stable_prefix = system_message
+stable_tools = core_tool_schemas
+trajectory = load_message_history(session)
+status_message = make_status_message(derive_current_state(trajectory))
+
+if estimated_tokens(stable_prefix, trajectory, status_message) > budget:
+    trajectory = compress_old_evidence(
+        trajectory,
+        preserve = [decisions, constraints, failures, citations]
+    )
+
+request.messages = [stable_prefix] + trajectory + [status_message]
+request.tools = stable_tools
+response = call_model(request)
+```
 
 > **Experimento 2-1 ★: Despliegue de Servicios de LLM Locales y Llamada a Herramientas**
 >
@@ -592,7 +613,7 @@ Los métodos para reducir la carga cognitiva humana son igualmente efectivos par
 
 En contraste, los prompts orientados a procesos actúan como un excelente manual de capacitación para nuevos empleados, proporcionando Procedimientos Operativos Estándar (SOP) claros:
 
-```
+```text
 File Processing Standard Operating Procedure:
 
 Step 1: Validation
@@ -780,7 +801,7 @@ Es necesario aclarar un malentendido habitual: «favorable para la Caché KV» n
 
 ### Relación entre Skills y las herramientas
 
-Desde la perspectiva de la gestión del contexto, el mecanismo Skills resulta muy favorable para la Caché KV. Si se incluyeran en el prompt del sistema las definiciones de todas las herramientas de código especializadas, su proliferación consumiría una enorme cantidad de tokens e interferiría con la atención del modelo; en cambio, con el patrón Skill + ejecutor genérico, el número de herramientas permanece reducido (como muestra el capítulo 5, solo se necesitan siete herramientas principales), y el contenido de los Skills se carga bajo demanda mediante el mecanismo de divulgación progresiva descrito antes, sin afectar al prefijo ya almacenado en caché. La comparación detallada y el framework de elección se presentan en el capítulo 4; el capítulo 8 analiza cómo decide un Agente en evolución continua si una experiencia debe plasmarse como conocimiento, instrucciones, un programa o parámetros del modelo.
+Desde la perspectiva de la gestión del contexto, el mecanismo Skills resulta muy favorable para la Caché KV. Si se incluyeran en el prompt del sistema las definiciones de todas las herramientas de código especializadas, su proliferación consumiría una enorme cantidad de tokens e interferiría con la atención del modelo; en cambio, con el patrón Skill + ejecutor genérico, el número de herramientas permanece reducido (como muestra el capítulo 5, solo se necesitan siete herramientas principales), y el contenido de los Skills se carga bajo demanda mediante el mecanismo de divulgación progresiva descrito antes, sin afectar al prefijo ya almacenado en caché. La comparación detallada y el framework de elección se presentan en el capítulo 4; el capítulo 9 analiza cómo decide un Agente en evolución continua si una experiencia debe plasmarse como conocimiento, instrucciones, un programa o parámetros del modelo.
 
 > **Experimento 2-6 ★★: generación de una presentación a partir de un artículo mediante Agent Skills**
 >
@@ -796,6 +817,14 @@ Desde la perspectiva de la gestión del contexto, el mecanismo Skills resulta mu
 >
 > **Criterios de aceptación**: el PowerPoint generado debe cubrir el contenido principal del artículo (portada, contexto del problema, resumen del método, resultados clave y conclusiones), incluir al menos tres gráficos extraídos del artículo y coherentes con sus explicaciones textuales, tener el formato correcto y poder abrirse con normalidad en PowerPoint o en software compatible.
 >
+
+> **Experimento 2-7 ★★: creación de una Skill de escritura «sin sabor a IA» a partir de textos propios**
+>
+> **Objetivo del experimento**: generar, a partir de unos pocos textos escritos por una persona, una Skill de escritura cargable e inspeccionable, y observar si es capaz de reproducir las principales preferencias expresivas del autor en artículos nuevos.
+>
+> **Descripción del experimento**: prepare de tres a cinco artículos originales y deje que un entorno de ejecución compatible con Agent Skills genere una primera versión de `SKILL.md`; elija un tema nuevo y redacte un artículo; después de que el autor lo corrija a mano, compare el antes y el después y devuelva a la Skill los patrones estables. La aceptación solo exige que la Skill tenga condiciones de activación claras, de tres a cinco principios con ejemplos, un ámbito de aplicación y excepciones, sin convertir un juicio subjetivo aislado en regla general.
+>
+> **Qué demuestra este experimento**: el valor de una Skill está en externalizar la experiencia personal como instrucciones que se cargan bajo demanda. Una primera versión breve, legible y capaz de superar la prueba de una tarea real es mejor punto de partida para iterar que enumerar decenas de reglas desde el principio.
 
 ## Barra de estado del Agente: mejora de la gestión de trayectorias mediante metainformación
 
@@ -828,7 +857,7 @@ Además, los recursos de atención del modelo son limitados en contextos largos.
 
 La barra de estado del Agente resuelve este problema manipulando explícitamente la distribución de la atención. Cuando se coloca metainformación clave de forma estructurada al final del contexto, queda espacialmente más cerca de los nuevos tokens que el modelo está a punto de generar y, por tanto, recibe un mayor peso de atención—se trata de una forma de «orientación forzada de la atención».
 
-> **Experimento 2-7 ★★: validación del efecto de la barra de estado del Agente mediante visualización de la atención**
+> **Experimento 2-8 ★★: validación del efecto de la barra de estado del Agente mediante visualización de la atención**
 >
 > A partir del proyecto `attention_visualization`, diseñamos un experimento comparativo en el que un Agente de atención al cliente tramita una solicitud de reembolso. El Agente ya ha llamado tres veces a Xfinity, con búsquedas web intercaladas. El usuario pregunta: «¿Puedes volver a llamar para insistir?».
 >
@@ -847,7 +876,7 @@ La barra de estado del Agente resuelve este problema manipulando explícitamente
 > La atención se concentra en gran medida en la información de la barra de estado, y el proceso de pensamiento utiliza directamente la información ya destilada en lugar de calcularla a partir de los datos originales. En modelos pequeños como Qwen3-0.6B, el grupo de control A infringe con frecuencia la restricción y sigue llamando, mientras que el grupo de control B la cumple de forma estable.
 >
 
-El experimento 2-7 es una demostración cualitativa a pequeña escala que aporta una intuición. Para cuantificar hasta qué punto resulta útil este enfoque de «calcular de antemano y consultar directamente» y dónde están sus límites, el autor y sus colaboradores utilizaron un benchmark específico[^ch2-7] (este enfoque tiene un nombre unificado: **destilación de contexto, Context Distillation**; la barra de estado del Agente es su forma más cotidiana). Conclusiones:
+El experimento 2-8 es una demostración cualitativa a pequeña escala que aporta una intuición. Para cuantificar hasta qué punto resulta útil este enfoque de «calcular de antemano y consultar directamente» y dónde están sus límites, el autor y sus colaboradores utilizaron un benchmark específico[^ch2-8] (este enfoque tiene un nombre unificado: **destilación de contexto, Context Distillation**; la barra de estado del Agente es su forma más cotidiana). Conclusiones:
 
 - Al proporcionar al modelo una **barra de estado calculada de antemano**, **los modelos débiles recuperan precisión**. Los más débiles mejoran entre 40 y 54 puntos porcentuales, y un modelo local 2B llega incluso a igualar, en estas tareas, a un modelo de vanguardia sin barra de estado.
 - **Los modelos potentes ya responden correctamente; lo que ganan es eficiencia**. La misma barra de estado reduce aproximadamente un orden de magnitud el razonamiento, la latencia y el coste de cada consulta (recorta entre un 80 y un 90 % o más los tokens de pensamiento).
@@ -862,7 +891,7 @@ Sin embargo, «calcular de antemano» puede hacerse bien o mal, y la diferencia 
 
 **Tres: supervise la precisión de la barra de estado como un indicador de producción de primera línea.** El experimento constató que **el modelo confía casi incondicionalmente en la barra de estado**: si dice «se realizaron 3 llamadas», lo acepta como cierto sin comprobarlo ni volver a calcularlo. Esto explica su eficacia, pero también implica que cualquier error se transmite **sin cambios** a la respuesta final. Por ello, el riesgo de **contaminación de la barra de estado** mencionado antes merece atención.
 
-[^ch2-7]: Li, Bojie and Noah Shi. *Distill, Don't Retrieve: Inference-Time Context Distillation for LLM Agent Reasoning.* 2026. https://01.me/research/context-distillation
+[^ch2-8]: Li, Bojie and Noah Shi. *Distill, Don't Retrieve: Inference-Time Context Distillation for LLM Agent Reasoning.* 2026. https://01.me/research/context-distillation
 
 ### Componentes de la barra de estado del Agente
 
@@ -886,7 +915,7 @@ Un detalle de implementación importante es que, en la capa API, la barra de est
 
 Esta es la lista de mensajes que el framework del Agente construye realmente durante la llamada número N a la API:
 
-```
+```text
 messages: [
   { role: "system",    content: "Eres un asistente de atención al cliente..." }  ← Fijo (almacenado en la Caché KV)
   { role: "user",      content: "Ayúdame a cancelar mi plan de Xfinity" }  ← Solicitud original del usuario
@@ -913,13 +942,15 @@ Este diseño aplica al caso de la barra de estado el principio «añadir la info
 
 «Añadir no destruye la caché» solo es cierto para una única inyección. El estado cambia—en la siguiente ronda se completa un elemento TODO o se incrementa el contador de una herramienta, y el mensaje de estado queda obsoleto. Existen dos formas de actualizarlo, cada una con un coste de caché bien definido:
 
-**Implementación uno: sustituir en cada ronda**. Antes de cada llamada a la API, se elimina de la lista de mensajes el mensaje de estado de la ronda anterior y se añade al final el estado más reciente. Esto garantiza que el contexto contenga una sola copia del estado y que siempre esté actualizada. Sin embargo, eliminar el estado antiguo invalida toda la caché situada después de su posición—es el mismo mecanismo de invalidación que el «timestamp dinámico» criticado en este capítulo, con la diferencia de que el mensaje de estado se encuentra al final del contexto, de modo que la invalidación solo afecta a los mensajes de las últimas rondas y no a todo el prefijo.
+**Implementación uno: sustituir en cada ronda**. Antes de cada llamada a la API, se elimina de la lista de mensajes el mensaje de estado de la ronda anterior y se añade al final el estado más reciente. Esto garantiza que el contexto contenga una sola copia del estado y que siempre esté actualizada. Sin embargo, eliminar el estado antiguo invalida toda la caché situada después de su posición—es el mismo mecanismo de invalidación que el «timestamp dinámico» criticado en este capítulo, con la diferencia de que el mensaje de estado se encuentra al final del contexto, de modo que la invalidación solo afecta a los mensajes añadidos desde la inyección anterior del estado—normalmente una ronda—y no a todo el prefijo.
 
 **Implementación dos: adición persistente**. Una vez inyectado, el mensaje de estado permanece de forma permanente en la trayectoria, y en cada ronda solo se añade un estado nuevo al final. El `<system-reminder>` de Claude Code utiliza este método—los mensajes de estado históricos se conservan en el registro de la sesión (transcript) y nunca se eliminan ni modifican. Este método es totalmente favorable para la caché: todos los mensajes se añaden sin modificarse y el prefijo permanece estable. El coste es que los estados obsoletos se acumulan en el contexto—además de ocupar tokens, obligan al modelo a prestar atención al «estado más reciente» e ignorar los anteriores.
 
-La regla práctica para decidir es la siguiente: **cuando el estado cambia con frecuencia y la trayectoria es larga, debe elegirse la implementación dos**—las invalidaciones de caché provocadas por la sustitución en cada ronda se acumulan repetidamente a lo largo de una trayectoria extensa, con un coste muy superior al de los tokens ocupados por los estados obsoletos; **cuando la trayectoria es corta o cada mensaje de estado es grande** (por ejemplo, una lista TODO completa acompañada de una instantánea del entorno), **debe elegirse la implementación uno**—la invalidación de la caché de las últimas rondas ya es barata y, a cambio, se obtiene un contexto limpio y sin ambigüedades.
+La decisión depende de la longitud de la trayectoria, el tamaño del estado, la longitud del sufijo añadido entre actualizaciones y el número previsto de actualizaciones. **Elija la implementación dos cuando el estado sea pequeño, se generen muchos mensajes entre actualizaciones y la duración de la sesión esté acotada**—conservar los estados anteriores suele ser más barato que recalcular repetidamente un sufijo largo. **Elija la implementación uno cuando el estado sea grande, las actualizaciones sean frecuentes o la trayectoria sea larga**—por lo general, solo invalida el sufijo corto posterior a la inyección anterior y evita que se acumulen estados obsoletos.
 
-> **Experimento 2-8 ★★: varias técnicas útiles para la barra de estado del Agente**
+Un modelo aproximado permite estimar el punto de equilibrio. Sea $S$ el número de tokens de cada estado, $R$ el número de tokens añadidos entre actualizaciones, $N$ el número previsto de actualizaciones y $\alpha$ el coste de la entrada en caché respecto a la entrada normal. Omitiendo los costes comunes a ambos métodos, $C_{\text{sustituir}} \approx (N-1)(1-\alpha)R$ y $C_{\text{añadir}} \approx \alpha S N(N-1)/2$. Por tanto, conviene la implementación dos cuando $\alpha SN/2 < (1-\alpha)R$; en caso contrario, conviene la implementación uno. Esta estimación no incluye la ocupación del contexto ni la ambigüedad causada por estados obsoletos, por lo que la decisión final también debe considerar las tarifas de caché del proveedor y la tasa de aciertos medida.
+
+> **Experimento 2-9 ★★: varias técnicas útiles para la barra de estado del Agente**
 >
 > El framework experimental `agent-status-bar` implementa cinco técnicas de barra de estado, cada una de las cuales puede activarse o desactivarse de forma independiente:
 >
@@ -997,7 +1028,7 @@ La clave está en comprender el **momento y la posición** en que se produce la 
 
 ![Figura 2-16 Comparación de estrategias de compresión del contexto](images/fig2-16.svg)
 
-> **Experimento 2-9 ★★★: comparación de estrategias de compresión del contexto**
+> **Experimento 2-10 ★★★: comparación de estrategias de compresión del contexto**
 >
 > Diseñamos una tarea de investigación: identificar y seguir la situación profesional de los cofundadores de OpenAI. Esta tarea exige agregar información en varios pasos, los resultados de búsqueda presentan longitudes muy dispares —desde varios miles hasta más de cien mil caracteres— y existen criterios de éxito claros. Utilizando Kimi K3 —un modelo de razonamiento con un contexto nativo de aproximadamente un millón de tokens; en este experimento limitamos deliberadamente el presupuesto de contexto a una ventana de 128K para activar la compresión—, implementamos seis estrategias:
 >
@@ -1034,7 +1065,7 @@ El experimento anterior muestra las diferencias de eficacia entre distintas estr
 
 ### Principios de diseño de las estrategias de compresión
 
-Ya hemos analizado los dos motivos de la compresión —controlar la longitud y mejorar la calidad del razonamiento— y el mecanismo interno según el cual «el aprendizaje en contexto es esencialmente recuperación». Sobre esta base, podemos extraer cuatro principios que orientan el diseño de estrategias de compresión concretas. Aquí, la compresión está al servicio de la tarea actual; cuando las trayectorias de múltiples tareas deban organizarse sin conexión para convertirlas en experiencia persistente, entraremos en el problema de la evolución continua tratado en el capítulo 8.
+Ya hemos analizado los dos motivos de la compresión —controlar la longitud y mejorar la calidad del razonamiento— y el mecanismo interno según el cual «el aprendizaje en contexto es esencialmente recuperación». Sobre esta base, podemos extraer cuatro principios que orientan el diseño de estrategias de compresión concretas. Aquí, la compresión está al servicio de la tarea actual; cuando las trayectorias de múltiples tareas deban organizarse sin conexión para convertirlas en experiencia persistente, entraremos en el problema de la evolución continua tratado en el capítulo 9.
 
 - **Distribución no uniforme del valor de la información**: los puntos de decisión clave —como una lista de personas— tienen más valor que las pruebas de apoyo —como los detalles de una noticia—, que a su vez tienen más valor que el ruido redundante —como las barras de navegación, los anuncios del pie de página y otros elementos de una web—
 - **Integridad semántica**: «Sutskever dejó OpenAI en mayo de 2024» no puede comprimirse como «Sutskever se marchó»—la fecha y el nombre de la empresa son datos clave que no pueden perderse
