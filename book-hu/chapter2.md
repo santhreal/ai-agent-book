@@ -12,8 +12,8 @@ Képzeljünk el egy kiemelkedő képességű mérnököt, aki egy új csapathoz 
 
 Vegyünk egy Kódolási Ügynököt. Ugyanarra az utasításra, "Segíts kijavítani ezt a hibát," a kontextus minősége, amelyet az ügynök kap, meghatározza, hogy képes-e elvégezni a feladatot:
 
-- "Kód kontextus": A kódbázis struktúrája, a modulok felelősségi körei, a központi adatstruktúrák és a kódolási szabványok. Ezen információ nélkül az ügynök olyan kódot állíthat elő, amely szintaktikailag helyes, de nem konzisztens a projekt stílusával vagy architektúrájával.
-- "Folyamatkövetelmények": Git elágazási stratégia, commit konvenciók, review folyamat és CI/CD követelmények. Ezen információ nélkül az ügynök tesztelés nélküli kódot commitolhat közvetlenül a fő ágba.
+- **Kód kontextus**: A kódbázis struktúrája, a modulok felelősségi körei, a központi adatstruktúrák és a kódolási szabványok. Ezen információ nélkül az ügynök olyan kódot állíthat elő, amely szintaktikailag helyes, de nem konzisztens a projekt stílusával vagy architektúrájával.
+- **Folyamatkövetelmények**: Git elágazási stratégia, commit konvenciók, review folyamat és CI/CD követelmények. Ezen információ nélkül az ügynök tesztelés nélküli kódot commitolhat közvetlenül a fő ágba.
 - **Környezeti konfiguráció**: A fejlesztői környezet beállítása, a tesztadatbázis kapcsolati karakterláncai, a tesztkörnyezet telepítési eljárásai és az API-kulcsok kezelési gyakorlatai. Ezen információk nélkül egy lokálisan működő javítás azonnal meghiúsulhat a tesztkörnyezetben.
 
 Ez a három kategória – kód, folyamat és környezet – alkotja a minimális kontextust, amelyre egy ügynöknek szüksége van a hatékony munkához. Itt a kontextusba a Környezet megfigyelése, leírása vagy konfigurációja kerül, nem maga a Környezet; a Környezet továbbra is az a külső objektum, amellyel az Ügynök interakcióba lép. A modell eredendő képessége csak az alap; **a kontextus minősége az ügynöki képesség valódi kulcsa**. Egy közepes képességű modell jól szervezett kontextussal gyakran felülmúlhat egy erősebb modellt, amely elégtelen kontextussal dolgozik.
@@ -45,10 +45,10 @@ Ez a szakasz az OpenAI Chat Completions API-ját használja konkrét példaként
 
 A Chat Completions-stílusú API-kban a bemenet magja egy "üzenetlista", általában `messages` néven. Minden üzenetnek van egy `role` mezője, amely megmondja a modellnek, hogyan értelmezze az üzenetet és honnan származik:
 
-- "system": Fejlesztő által írt utasítások, amelyek meghatározzák az ügynök identitását, viselkedését, korlátait és munkafolyamatát. A modell ezt magas prioritású utasításként kezeli. A legtöbb beszélgetésben a rendszerüzenet egyszer jelenik meg az üzenetlista elején.
-- "user": A végfelhasználó bemenete, amely azt a kérést képviseli, amelyet az ügynöknek kezelnie kell.
-- "assistant": Korábbi modellkimenetek, beleértve a természetes nyelvű válaszokat és az eszközhívási kérelmeket. Többfordulós interakciókban ezek az üzenetek szerepelnek a későbbi kérésekben, hogy a következő állapotmentes modellhívás hozzáférjen az előző trajektóriához.
-- "tool": Az ügynök-keretrendszer által végrehajtott eszközök után visszaadott eredmények. Minden eszközeredmény a megfelelő eszközhívás `tool_call_id`-jéhez van kapcsolva, lehetővé téve a modell számára, hogy minden eredményt a létrehozó kéréshez társítson.
+- **system**: Fejlesztő által írt utasítások, amelyek meghatározzák az ügynök identitását, viselkedését, korlátait és munkafolyamatát. A modell ezt magas prioritású utasításként kezeli. A legtöbb beszélgetésben a rendszerüzenet egyszer jelenik meg az üzenetlista elején.
+- **user**: A végfelhasználó bemenete, amely azt a kérést képviseli, amelyet az ügynöknek kezelnie kell.
+- **assistant**: Korábbi modellkimenetek, beleértve a természetes nyelvű válaszokat és az eszközhívási kérelmeket. Többfordulós interakciókban ezek az üzenetek szerepelnek a későbbi kérésekben, hogy a következő állapotmentes modellhívás hozzáférjen az előző trajektóriához.
+- **tool**: Az ügynök-keretrendszer által végrehajtott eszközök után visszaadott eredmények. Minden eszközeredmény a megfelelő eszközhívás `tool_call_id`-jéhez van kapcsolva, lehetővé téve a modell számára, hogy minden eredményt a létrehozó kéréshez társítson.
 
 Az eszközdefiníciók nem üzenetek. Egy külön `tools` mezőben vannak megadva, amely deklarálja a modell számára elérhető eszközöket és meghatározza az egyes eszközök által elfogadott paramétereket.
 
@@ -146,6 +146,8 @@ Az ábrán látható mindkét hívás **a modell API-jának hívására** utal, 
   ]
 }
 ```
+
+Ez a `tools` lista statikus eszköz-metaadat, amelyet a fejlesztő előre regisztrált: az eszköznevek, a leírások és a paramétersémák a kódban szerepelnek, és semmi közük ahhoz, hogy a felhasználó éppen mit kérdezett. Akár a vancouveri időjárásról kérdez a felhasználó, akár repülőjegyet foglaltat az ügynökkel, ugyanaz a lista megy ki; a példa csak a két releváns eszközt sorolja fel, hogy rövidebb legyen a kérés, egy valódi ügynök viszont gyakran több tucat eszközt ad meg egyszerre. **Nem arról van szó, hogy az ügynök először két részfeladatra – „idő lekérdezése” és „időjárás lekérdezése” – bontja a felhasználói bemenetet, majd ehhez igazítva állítja elő az eszközleírásokat**: a felbontás a modell oldalán történik, és éppen az alábbi válasz `tool_calls` mezője.
 
 **A modell visszaad egy eszközhívási kérelmet (nem egy végső választ):**
 
@@ -334,8 +336,8 @@ A huroknak egy fő elágazása van: **ha a modell `tool_calls`-t ad vissza, hajt
 
 A `messages` lista a következőképpen változik a körök során:
 
-"Kezdeti állapot (az első hívás előtt):"
-```
+**Kezdeti állapot (az első hívás előtt):**
+```text
 messages = [
   { role: "system",  content: "You are a helpful assistant..." },     # Fejlesztő által írva
   { role: "user",    content: "What's the current time and weather in Vancouver?" },  # Felhasználói bemenet
@@ -343,7 +345,7 @@ messages = [
 ```
 
 **Az első hívás után (a modell eszközhívásokat ad vissza):**
-```
+```text
 messages = [
   { role: "system",    content: "..." },
   { role: "user",      content: "What's the current time..." },
@@ -354,7 +356,7 @@ messages = [
 ```
 
 **A második hívás után (a modell visszaadja a végső választ, a hurok véget ér):**
-```
+```text
 messages = [
   { role: "system",    content: "..." },
   { role: "user",      content: "What's the current time..." },
@@ -377,6 +379,25 @@ A felső rész (Rendszer Prompt + Eszközdefiníciók) változatlan marad a besz
 
 A fejezet hátralévő része e struktúra minden rétegét megvizsgálja: hogyan használjunk stabil statikus előtagot a következtetés gyorsítására (KV Cache), hogyan tervezzünk hatékony Rendszer Promptot (prompt tervezés), hogyan akadályozzuk meg, hogy külső tartalom eltérítse a kontextust (prompt injekció elleni védelem), hogyan töltsünk be speciális tudást igény szerint (Ügynöki Készségek), hogyan injektáljunk dinamikus állapotot a beszélgetés végére (Ügynöki Állapotsáv), és hogyan tömörítsük a beszélgetéstörténetet, ha az túl nagyra nő (tömörítési stratégiák).
 
+**Kontextus felépítése minden kérés előtt:**
+
+```python
+stable_prefix = system_message
+stable_tools = core_tool_schemas
+trajectory = load_message_history(session)
+status_message = make_status_message(derive_current_state(trajectory))
+
+if estimated_tokens(stable_prefix, trajectory, status_message) > budget:
+    trajectory = compress_old_evidence(
+        trajectory,
+        preserve = [decisions, constraints, failures, citations]
+    )
+
+request.messages = [stable_prefix] + trajectory + [status_message]
+request.tools = stable_tools
+response = call_model(request)
+```
+
 > **Kísérlet 2-1 ★: Lokális LLM Szolgáltatás Telepítése és Eszközhívás**
 >
 >
@@ -387,23 +408,23 @@ A fejezet hátralévő része e struktúra minden rétegét megvizsgálja: hogya
 >
 > A kísérlet során az olvasóknak meg kell tudniuk figyelni:
 >
-> 1. "Kis Modellek Képességei": Még egy 0,6B modell is pontosan meg tudja érteni és végrehajtani az eszközhívásokat megfelelő prompt tervezéssel (a bemeneti promptok gondos megtervezésének technikája a modell viselkedésének irányításához).
-> 2. "Teljesítmény": Apple M2 chipen a modell több mint 100 tokent képes generálni másodpercenként, ami elegendő a valós idejű interaktív alkalmazásokhoz. A token a szövegfeldolgozás alapegysége a modellek számára; egy kínai karakter általában 1-2 tokennek, egy angol szó általában 1-3 tokennek felel meg.
-> 3. "ReAct Hurok": Figyeljük meg, hogyan oldja meg a modell az összetett problémákat az érvelés és eszközhívás több fordulóján keresztül.
+> 1. **Kis Modellek Képességei**: Még egy 0,6B modell is pontosan meg tudja érteni és végrehajtani az eszközhívásokat megfelelő prompt tervezéssel (a bemeneti promptok gondos megtervezésének technikája a modell viselkedésének irányításához).
+> 2. **Teljesítmény**: Apple M2 chipen a modell több mint 100 tokent képes generálni másodpercenként, ami elegendő a valós idejű interaktív alkalmazásokhoz. A token a szövegfeldolgozás alapegysége a modellek számára; egy kínai karakter általában 1-2 tokennek, egy angol szó általában 1-3 tokennek felel meg.
+> 3. **ReAct Hurok**: Figyeljük meg, hogyan oldja meg a modell az összetett problémákat az érvelés és eszközhívás több fordulóján keresztül.
 >
-> "A ReAct Hurok a Gyakorlatban."
+> **A ReAct Hurok a Gyakorlatban.**
 >
 > A projekt többlépcsős eszközhívása követi az 1. fejezetben bevezetett ReAct (Gondolkodj-Cselekedj-Figyelj meg) hurkot, ezért annak alapelveit itt nem ismételjük meg. Az előző szakasz már megmutatta ennek a folyamatnak a teljes üzenetstruktúráját az OpenAI API JSON formátumában. Lokális telepítésben a szerver (pl. vLLM vagy Ollama) ezeket az API üzeneteket a modell belső token formátumába alakítja. A `local_llm_serving` projekt lehetővé teszi az olvasók számára, hogy megvizsgálják a modell nyers bemeneti és kimeneti token adatfolyamát, beleértve a következő, API-szinten általában rejtett részleteket:
 >
-> "Modell Belső Érvelési Folyamata": A gondolkodási láncot támogató modellek (pl. Qwen3) először a `<think>` tagek között érvelnek, mielőtt eszközhívásokat generálnának – elemzik a felhasználói szándékot, értékelik, hogy mely eszközök alkalmasak, és megtervezik a hívási sorrendet. Ez az érvelési folyamat értékes az ügynök viselkedésének hibakereséséhez.
+> **Modell Belső Érvelési Folyamata**: A gondolkodási láncot támogató modellek (pl. Qwen3) először a `<think>` tagek között érvelnek, mielőtt eszközhívásokat generálnának – elemzik a felhasználói szándékot, értékelik, hogy mely eszközök alkalmasak, és megtervezik a hívási sorrendet. Ez az érvelési folyamat értékes az ügynök viselkedésének hibakereséséhez.
 >
-> "Kimeneti Sorrend Szerkezete": A modell kimeneti tokenjei rögzített sorrendben generálódnak – először belső érvelés (a `<think>` tageken belül), majd a szöveges válasz a felhasználónak, és végül az eszközhívási kérelem. Ennek a sorrendnek a megértése kulcsfontosságú a streamelt válaszok implementálásához: amikor a `<think>` tag megjelenik, a felület válthat egy "érvelési" állapotra; amint az első eszközhívás paraméterei teljesen legenerálódtak és érvényesítésre kerültek, a végrehajtás azonnal megkezdődhet, anélkül, hogy meg kellene várni a modell további eszközhívásainak generálását.
+> **Kimeneti Sorrend Szerkezete**: A modell kimeneti tokenjei rögzített sorrendben generálódnak – először belső érvelés (a `<think>` tageken belül), majd a szöveges válasz a felhasználónak, és végül az eszközhívási kérelem. Ennek a sorrendnek a megértése kulcsfontosságú a streamelt válaszok implementálásához: amikor a `<think>` tag megjelenik, a felület válthat egy "érvelési" állapotra; amint az első eszközhívás paraméterei teljesen legenerálódtak és érvényesítésre kerültek, a végrehajtás azonnal megkezdődhet, anélkül, hogy meg kellene várni a modell további eszközhívásainak generálását.
 >
-> "Párhuzamos Eszközhívások": A szakasz vancouveri idő és időjárás példájában a modell nem talált függőséget a két részprobléma között, ezért egy kimenetben két eszközhívási kérést generált. Az ügynök-keretrendszer érzékeli ezt, és párhuzamosan hajtja végre mindkét eszközt, csökkentve a teljes késleltetést.
+> **Párhuzamos Eszközhívások**: A szakasz vancouveri idő és időjárás példájában a modell nem talált függőséget a két részprobléma között, ezért egy kimenetben két eszközhívási kérést generált. Az ügynök-keretrendszer érzékeli ezt, és párhuzamosan hajtja végre mindkét eszközt, csökkentve a teljes késleltetést.
 >
-> "Modell Megszüntetési Döntése": Amikor az ügynök-keretrendszer visszaküldi az eszközeredményeket, a modell eldönti, hogy van-e elegendő információja a felhasználó megválaszolásához. Ha igen, kiadja a végső választ anélkül, hogy újabb eszközhívást kérne; ellenkező esetben további eszközhívásokat ad ki, és új ReAct kört kezd.
+> **Modell Megszüntetési Döntése**: Amikor az ügynök-keretrendszer visszaküldi az eszközeredményeket, a modell eldönti, hogy van-e elegendő információja a felhasználó megválaszolásához. Ha igen, kiadja a végső választ anélkül, hogy újabb eszközhívást kérne; ellenkező esetben további eszközhívásokat ad ki, és új ReAct kört kezd.
 >
-> "Kísérlet Összefoglalása."
+> **Kísérlet Összefoglalása.**
 >
 > A kísérlet legfontosabb tanulsága, hogy egy 0,6B modell, ésszerű prompt tervezéssel, megbízhatóan képes végrehajtani az eszközhívásokat. A modell mérete számít, de nem ez az egyetlen meghatározó tényező. Néhány high-end mobil eszköz már képes futtatni 0,6B szintű modelleket, és a készüléken futó modellek gyakorlati képességei folyamatosan javulnak. A készüléken futó ügynökök közelebb vannak, mint sokan gondolnák.
 >
@@ -418,7 +439,7 @@ Ezzel az intuícióval a fejünkben tekintsünk egy éles incidensre. Egy csapat
 
 Ez az egy időbélyegsor minden kérésnél az időbélyeg helyétől kezdve eltérővé tette a tokensorozatot, ezért az attól a ponttól kezdődő KV-állapotokat nem lehetett újra felhasználni. Mivel a rendszer prompt a kontextus elején található, a modellnek gyakran így is újra kellett számolnia az utána következő bemeneti tokenek többségének kulcs-érték párjait (itt a "Kulcs" és az "Érték" kétféle vektor a figyelmi mechanizmusban; a 2-2. kísérlet vizuálisan demonstrálja a szerepüket). Ez a fajta láthatatlan költség ismételten megjelenik az ügynökrendszerekben: egy ártalmatlannak tűnő kódsor egy nagyságrenddel lelassíthatja a teljes következtetési csővezetéket. Ez a szakasz elmagyarázza, hogyan kerüljük el ezeket a buktatókat.
 
-> "Technikai Megjegyzés": Ez a szakasz a Transformer figyelmi mechanizmus és a KV Cache belső elveit érinti, így ez a könyv egyik legtechnikaibb része. Ha nem ismeri ezeket a mögöttes mechanizmusokat, **kihagyhatja a részletes elveket, és megjegyezheti a következő három alapvető következtetést**:
+> **Technikai Megjegyzés**: Ez a szakasz a Transformer figyelmi mechanizmus és a KV Cache belső elveit érinti, így ez a könyv egyik legtechnikaibb része. Ha nem ismeri ezeket a mögöttes mechanizmusokat, **kihagyhatja a részletes elveket, és megjegyezheti a következő három alapvető következtetést**:
 >
 > 1. **Ha a rendszer prompt és az eszközdefiníciók véglegesek, ne változtassa meg őket.** Bármilyen módosítás, még egyetlen szóköz hozzáadása is, megváltoztathatja a tokensorozatot, így az első eltérő tokentől kezdve a gyorsítótár nem használható újra; minél korábban van a változás, általában annál nagyobb a késleltetésre és a költségre gyakorolt hatása (a pontos mérték a modelltől és a konfigurációtól függ).
 > 2. **Mindig a dinamikus információkat fűzze a végére** – az olyan változó tartalmakat, mint az időbélyegek és a felhasználói állapot, új üzenetekként kell hozzáfűzni a beszélgetés végéhez, nem pedig a meglévő rendszer prompt módosításával.
@@ -428,11 +449,11 @@ Ez az egy időbélyegsor minden kérésnél az időbélyeg helyétől kezdve elt
 >
 > Jegyezze meg ezt a három alapelvet, és még ha kihagyja is az alábbi technikai részleteket, helyesen tudja megtervezni egy ügynök kontextusának szerkezetét. A következő tartalom azoknak az olvasóknak szól, akik mélyebben szeretnék megérteni a "miért"-et.
 
-> "Kísérlet 2-2 ★: Figyelmi Mechanizmus Vizualizációja"
+> **Kísérlet 2-2 ★: Figyelmi Mechanizmus Vizualizációja**
 >
 > Mielőtt elmagyaráznánk a KV Cache-t, először építsünk intuitív megértést a modell belső figyelmi mechanizmusáról egy kísérleten keresztül – ez az alapja annak, hogy megértsük, miért hatékony a KV Cache, és miért támaszt szigorú követelményeket a kontextus tervezésével szemben.
 >
-> "Mi a Figyelmi Mechanizmus?" Vegyünk egy konkrét példát. Tegyük fel, hogy a modell a "北京的天气怎么样" kínai mondatot dolgozza fel (amelynek szavai: "北京" [Peking], "的" [birtokos partikula], "天气" [időjárás] és "怎么样" [milyen]). Amikor a "怎么样" szót olvassa, a modellnek el kell döntenie: melyik korábbi szavak a legfontosabbak a "怎么样" megértéséhez?
+> **Mi a Figyelmi Mechanizmus?** Vegyünk egy konkrét példát. Tegyük fel, hogy a modell a "北京的天气怎么样" kínai mondatot dolgozza fel (amelynek szavai: "北京" [Peking], "的" [birtokos partikula], "天气" [időjárás] és "怎么样" [milyen]). Amikor a "怎么样" szót olvassa, a modellnek el kell döntenie: melyik korábbi szavak a legfontosabbak a "怎么样" megértéséhez?
 >
 > A figyelmi mechanizmus háromféle vektort használ annak eldöntésére, hogy melyik korábbi tokenek a legrelevánsabbak:
 >
@@ -463,17 +484,17 @@ Ez az egy időbélyegsor minden kérésnél az időbélyeg helyétől kezdve elt
 > A figyelmi mechanizmus alapvető megértésével most megfigyelhetjük egy valódi modell figyelmi eloszlását a `attention_visualization` kísérleten keresztül.
 >
 >
-> ![2-7. ábra: Figyelmi hőtérkép](images/fig2-7.svg)
+> ![2-7. ábra: Figyelmi hőtérkép](images/fig2-7.png)
 >
 >
 > A figyelmi hőtérkép több kulcsfontosságú mintázatot tár fel:
 >
-> 1. "Figyelmi Nyelő": A sorozat első tokenje gyakran abnormálisan magas figyelmi súlyt vonz magához, néha meghaladva a teljes figyelem 70%-át. A modell ezt a pozíciót "Figyelmi Nyelőként" használja, hogy elnyelje a maradék figyelmi tömeget, amely nem kapcsolódik erősen egyetlen más konkrét tokenhez sem. Más szóval, a modell megtanulja, hogy a másképpen el nem osztott figyelmi súlyt az első tokenhez rendelje – ez szisztematikus jelenség, nem modellhiba.
+> 1. **Figyelmi Nyelő**: A sorozat első tokenje gyakran abnormálisan magas figyelmi súlyt vonz magához, néha meghaladva a teljes figyelem 70%-át. A modell ezt a pozíciót "Figyelmi Nyelőként" használja, hogy elnyelje a maradék figyelmi tömeget, amely nem kapcsolódik erősen egyetlen más konkrét tokenhez sem. Más szóval, a modell megtanulja, hogy a másképpen el nem osztott figyelmi súlyt az első tokenhez rendelje – ez szisztematikus jelenség, nem modellhiba.
 >
 >    A matematikai ok az, hogy a figyelmi mechanizmusnak van egy kemény korlátja: az összes figyelmi súlynak pontosan 100%-ot kell kitennie (ezt egy softmax nevű matematikai függvény garantálja), így a modell nem fejezheti ki, hogy "nem figyel semmire." Még ha az aktuális szó nem is nagyon releváns egyetlen előző szóhoz sem, ezeket a súlyokat el kell helyezni valahol. A modellnek ezért szüksége van egy stabil tartályra ehhez a "maradék súlyhoz," és a sorozat elején lévő rögzített pozíció válik a legtermészetesebb választássá. Ez a softmax matematikai tulajdonságainak elkerülhetetlen következménye, amikor sok tokent dolgoz fel.
-> 2. "Érvelési Háromszög Mintázat": A modell gondolkodási lánca (a `<think>` tageken belül) egy háromszög alakú önfigyelmi mintázatot mutat: amikor új érvelési tartalmat generál, gyakran figyel a korábbi érvelési tartalomra és az eszközdefiníciókra.
-> 3. "Kimeneti Háromszög Mintázat": Az érvelés befejezése utáni kimeneti folyamat egy másik háromszöget mutat, ahol a modell az érvelési nyomot használja promptként a válasz generálásához.
-> 4. "Pozíciós Torzítás"[^lost-in-the-middle]: A modell nagyobb pontossággal idézi vissza a kontextus elején és végén lévő információkat, míg a közepén lévő információk nagyobb valószínűséggel maradnak figyelmen kívül. Ezért a kontextus tervezésekor a legkritikusabb információk elhelyezése az elején vagy a végén fontos gyakorlati alapelv.
+> 2. **Érvelési Háromszög Mintázat**: A modell gondolkodási lánca (a `<think>` tageken belül) egy háromszög alakú önfigyelmi mintázatot mutat: amikor új érvelési tartalmat generál, gyakran figyel a korábbi érvelési tartalomra és az eszközdefiníciókra.
+> 3. **Kimeneti Háromszög Mintázat**: Az érvelés befejezése utáni kimeneti folyamat egy másik háromszöget mutat, ahol a modell az érvelési nyomot használja promptként a válasz generálásához.
+> 4. **Pozíciós Torzítás**[^lost-in-the-middle]: A modell nagyobb pontossággal idézi vissza a kontextus elején és végén lévő információkat, míg a közepén lévő információk nagyobb valószínűséggel maradnak figyelmen kívül. Ezért a kontextus tervezésekor a legkritikusabb információk elhelyezése az elején vagy a végén fontos gyakorlati alapelv.
 >
 > Ez a kísérlet azt mutatja, hogy **a hosszú gondolkodási lánc generálása és az eszközhívás is nagymértékben támaszkodik a kontextuson belüli tanulásra** – a modell azon képességére, hogy alkalmazkodjon egy feladathoz a bemenetben biztosított utasítások és példák alapján, anélkül, hogy újratanítanák.
 >
@@ -522,15 +543,15 @@ KV Cache-szel az A, B, C, D K és V vektorjai gyorsítótárazásra kerülnek az
 >
 > A `kv-cache` kísérletben szisztematikusan teszteltünk több gyakori, de káros kontextuskezelési mintázatot. Ezek a mintázatok aláássák a KV Cache hatékonyságát, és néhányuk az ügynök alapvető képességeit is rontja.
 >
-> "Dinamikus Rendszer Prompt" az egyik leggyakoribb hiba. Egyes fejlesztők időbélyegeket ágyaznak be a rendszer promptba (pl. "Current time: 2025-09-14 10:30:45.123456"), hogy az ügynök "tudja" a jelenlegi időt. Bár ez hasznos kontextust biztosít, az időbélyeg minden kéréssel változik, így a tokensorozat az időbélyeg helyétől kezdve eltér, és az attól a ponttól kezdődő KV-állapotok nem használhatók újra. A helyes megközelítés az, ha az időinformációt egy felhasználói üzenet részeként a beszélgetés végéhez fűzzük hozzá, vagy csak akkor szerezzük be eszközhívással, amikor valóban szükség van rá.
+> **Dinamikus Rendszer Prompt** az egyik leggyakoribb hiba. Egyes fejlesztők időbélyegeket ágyaznak be a rendszer promptba (pl. "Current time: 2025-09-14 10:30:45.123456"), hogy az ügynök "tudja" a jelenlegi időt. Bár ez hasznos kontextust biztosít, az időbélyeg minden kéréssel változik, így a tokensorozat az időbélyeg helyétől kezdve eltér, és az attól a ponttól kezdődő KV-állapotok nem használhatók újra. A helyes megközelítés az, ha az időinformációt egy felhasználói üzenet részeként a beszélgetés végéhez fűzzük hozzá, vagy csak akkor szerezzük be eszközhívással, amikor valóban szükség van rá.
 >
-> "Dinamikus Felhasználói Konfiguráció" megkísérli a felhasználói állapotinformációk (például a fennmaradó API hívások vagy a számlaegyenleg) frissítését minden kéréssel. Ennek az információnak a kontextusba ágyazása tönkreteszi a gyorsítótárat. Jobb megoldás, ha szükség esetén egy dedikált állapotkezelő mechanizmuson keresztül kezeljük.
+> **Dinamikus Felhasználói Konfiguráció** megkísérli a felhasználói állapotinformációk (például a fennmaradó API hívások vagy a számlaegyenleg) frissítését minden kéréssel. Ennek az információnak a kontextusba ágyazása tönkreteszi a gyorsítótárat. Jobb megoldás, ha szükség esetén egy dedikált állapotkezelő mechanizmuson keresztül kezeljük.
 >
-> "Eszközdefiníciók Dinamikus Rendezése" egy másik alattomos csapda. Egyes rendszerek dinamikusan átrendezik az eszközöket a használati gyakoriság alapján, de az eszközdefiníciók gyakran a kontextus nagy részét foglalják el (minden eszköz több száz tokennyi leírást és paraméterspecifikációt tartalmazhat). A sorrend megváltoztatása az első átrendezett pozíciótól kezdve eltérővé teszi a tokensorozatot, így az onnantól kezdődő gyorsítótár nem használható újra. A kísérletek azt mutatják, hogy a rögzített sorrendnek szinte nincs hatása az eszközkiválasztás pontosságára, de jelentősen javítja a teljesítményt.
+> **Eszközdefiníciók Dinamikus Rendezése** egy másik alattomos csapda. Egyes rendszerek dinamikusan átrendezik az eszközöket a használati gyakoriság alapján, de az eszközdefiníciók gyakran a kontextus nagy részét foglalják el (minden eszköz több száz tokennyi leírást és paraméterspecifikációt tartalmazhat). A sorrend megváltoztatása az első átrendezett pozíciótól kezdve eltérővé teszi a tokensorozatot, így az onnantól kezdődő gyorsítótár nem használható újra. A kísérletek azt mutatják, hogy a rögzített sorrendnek szinte nincs hatása az eszközkiválasztás pontosságára, de jelentősen javítja a teljesítményt.
 >
-> "Csúszóablakos Beszélgetéstörténet" a kontextus hosszát úgy szabályozza, hogy csak a legutóbbi üzeneteket tartja meg. Például, ha az ablak mérete 10 üzenetre van állítva, a legkorábbi üzenet elvetődik, amikor a 11. üzenet megérkezik. Ennek a megközelítésnek két súlyos problémája van. Először is, megtöri az előtag konzisztenciáját és érvényteleníti a KV Cache-t. Másodszor, kritikus eszközeredményeket vethet el. Például egy 10 körös csúszóablaknál, ha az ügynök a 2. körben elolvas egy fontos fájlt, a 15. körre ismét szüksége lehet arra az eredményre – de az eredeti eredmény már kiesett az ablakból. A modellnek ekkor egy hiányos beszélgetésből kell következtetnie, ami növeli a hibák arányát. A kísérletekben a csúszóablakot használó ügynökök gyakran kerültek hurkokba, újra és újra végrehajtva ugyanazokat az eszközhívásokat, mert a korábbi eredményeket eltávolították.
+> **Csúszóablakos Beszélgetéstörténet** a kontextus hosszát úgy szabályozza, hogy csak a legutóbbi üzeneteket tartja meg. Például, ha az ablak mérete 10 üzenetre van állítva, a legkorábbi üzenet elvetődik, amikor a 11. üzenet megérkezik. Ennek a megközelítésnek két súlyos problémája van. Először is, megtöri az előtag konzisztenciáját és érvényteleníti a KV Cache-t. Másodszor, kritikus eszközeredményeket vethet el. Például egy 10 körös csúszóablaknál, ha az ügynök a 2. körben elolvas egy fontos fájlt, a 15. körre ismét szüksége lehet arra az eredményre – de az eredeti eredmény már kiesett az ablakból. A modellnek ekkor egy hiányos beszélgetésből kell következtetnie, ami növeli a hibák arányát. A kísérletekben a csúszóablakot használó ügynökök gyakran kerültek hurkokba, újra és újra végrehajtva ugyanazokat az eszközhívásokat, mert a korábbi eredményeket eltávolították.
 >
-> "Szövegformázási Módszer" az egyik legkárosabb mintázat. Strukturált szerep-tartalom üzeneteket alakít át egyszerű szöveges adatfolyammá, mint például "USER: ... ASSISTANT: ...". A kulcsprobléma nem a gyorsítótárazás: a gyorsítótárazás a tokenek bájt sorozatán működik, így egy bájt szinten stabil, összefűzött előtag továbbra is eltalálhatja a gyorsítótárat. A gyorsítótár csak akkor törik meg, ha maga az összefűzési módszer instabil, például amikor dinamikus tartalmat injektálnak az előtagba minden alkalommal. A valódi kár az, hogy a szövegformázás eltér a modell tanítása során használt szabványos üzenetformátumtól. A modell hatalmas mennyiségű szerepalapú párbeszédadatot látott, és megtanulta annak szerkezetét elemezni. Amikor az üzeneteket egyszerű szöveggé lapítják, a modellnek gyengébb jelekből kell kikövetkeztetnie a szerepek határait és a párbeszéd szerkezetét, ami olyan problémákhoz vezet, mint az ismétlődő műveletek, figyelmen kívül hagyott eszközeredmények, szöveges válaszok, amikor eszközhívásra lenne szükség, és elemzési hibák.
+> **Szövegformázási Módszer** az egyik legkárosabb mintázat. Strukturált szerep-tartalom üzeneteket alakít át egyszerű szöveges adatfolyammá, mint például "USER: ... ASSISTANT: ...". A kulcsprobléma nem a gyorsítótárazás: a gyorsítótárazás a tokenek bájt sorozatán működik, így egy bájt szinten stabil, összefűzött előtag továbbra is eltalálhatja a gyorsítótárat. A gyorsítótár csak akkor törik meg, ha maga az összefűzési módszer instabil, például amikor dinamikus tartalmat injektálnak az előtagba minden alkalommal. A valódi kár az, hogy a szövegformázás eltér a modell tanítása során használt szabványos üzenetformátumtól. A modell hatalmas mennyiségű szerepalapú párbeszédadatot látott, és megtanulta annak szerkezetét elemezni. Amikor az üzeneteket egyszerű szöveggé lapítják, a modellnek gyengébb jelekből kell kikövetkeztetnie a szerepek határait és a párbeszéd szerkezetét, ami olyan problémákhoz vezet, mint az ismétlődő műveletek, figyelmen kívül hagyott eszközeredmények, szöveges válaszok, amikor eszközhívásra lenne szükség, és elemzési hibák.
 >
 > **Összefoglalás**: A fenti hibás minták megoldásai mind a szakasz elején megadott három alapelvhez vezetnek vissza. Egy további megjegyzés: a modellszolgáltatók sokat optimalizálták a szabványos interfészeket, ezért a szabványos formátumtól való eltérés rendszerint problémákat okoz.
 
@@ -570,8 +591,8 @@ Az ügynökök számára a következmény az, hogy a hosszú kontextusoknak nem 
 Most, hogy megértettük, hogyan dolgozzák fel és gyorsítótárazza a kontextust, a következő kérdés az, hogyan tervezzük meg magát a tartalmat. A következő szakaszok azt tárgyalják, hogy mi tartozik a kontextusba és hogyan szervezzük azt, három összefüggő szál mentén:
 
 - **Prompt Tervezés, Prompt Injekció és Dinamikus Promptok (Ügynöki Készségek)**: Hogyan írjuk meg a rendszer promptot és mit tartalmazzon. Ez a kontextustervezés legközvetlenebb része. Az eszközdefiníciók, egy másik statikus komponens a rendszer prompt mellett, szintén közvetlenül befolyásolják az ügynök eszközhasználatának pontosságát. Ez a fejezet megadja az alapelveket, a 4. fejezet pedig részletesen kibővíti azokat. A következő kérdés a biztonság: amikor a külső tartalom megkísérli eltéríteni a gondosan megtervezett kontextust, hogyan védekezzen a rendszer kontextus szinten? Ahogy a promptok hosszabbá válnak és egyre több forgatókönyvet fednek le, mindennek egyetlen rendszer promptba helyezése kivitelezhetetlenné válik: tokent pazarl, és szétteríti a figyelmet. Ez természetesen vezet az Ügynöki Készségek progresszív feltárási mechanizmusához, ahol a tudás igény szerint töltődik be, ahelyett, hogy egyszerre lenne minden benne.
-- "Ügynöki Állapotsáv": Egy független mechanizmus, amely dinamikus metainformációkat (feladat előrehaladása, a környezet megfigyeléseinek összefoglalása, eszközhívások száma, stb.) injektál a kontextus végébe, kompenzálva a modell azon képtelenségét, hogy aktívan összegezze a burkolt állapotokat. Hasonlóan a telefon képernyőjének tetején látható időhöz, akkumulátorhoz és hálózati jelhez, az Ügynöki Állapotsáv lehetővé teszi a modell számára, hogy bármikor hozzáférjen az aktuális futásidejű állapothoz.
-- "Kontextustömörítési Stratégiák": A folyamatosan bővülő kontextus problémájának kezelése – mikor kell tömöríteni, hogyan kell tömöríteni, és hogyan fér meg a tömörítés a KV Cache mellett.
+- **Ügynöki Állapotsáv**: Egy független mechanizmus, amely dinamikus metainformációkat (feladat előrehaladása, a környezet megfigyeléseinek összefoglalása, eszközhívások száma, stb.) injektál a kontextus végébe, kompenzálva a modell azon képtelenségét, hogy aktívan összegezze a burkolt állapotokat. Hasonlóan a telefon képernyőjének tetején látható időhöz, akkumulátorhoz és hálózati jelhez, az Ügynöki Állapotsáv lehetővé teszi a modell számára, hogy bármikor hozzáférjen az aktuális futásidejű állapothoz.
+- **Kontextustömörítési Stratégiák**: A folyamatosan bővülő kontextus problémájának kezelése – mikor kell tömöríteni, hogyan kell tömöríteni, és hogyan fér meg a tömörítés a KV Cache mellett.
 
 ## Prompt Tervezés: A Rendszer Prompt Optimalizálása
 
@@ -597,7 +618,7 @@ Az emberek kognitív terhelését csökkentő módszerek egyformán hatékonyak 
 
 Ezzel szemben a folyamatvezérelt prompt hatékony oktatási kézikönyvként működik, világos szabványos működési eljárást (SOP) biztosítva:
 
-```
+```text
 File Processing Standard Operating Procedure:
 
 Step 1: Validation
@@ -783,7 +804,7 @@ Egy gyakori tévhit tisztázásra szorul: a „KV-gyorsítótár-barát” nem j
 
 ### A készségek és az eszközök kapcsolata
 
-A kontextuskezelés szempontjából a Skills mechanizmus rendkívül KV-gyorsítótár-barát. Ha minden speciális kódeszköz definícióját a rendszerpromptba tennénk, a növekvő eszközszám sok tokent fogyasztana, és zavarná a modell figyelmét. A Skill + általános végrehajtó modellben viszont az eszközkészlet kicsi marad – amint az 5. fejezet mutatja, mindössze hét alapvető eszközre van szükség –, a Skill tartalma pedig a fent leírt progresszív közzététellel, igény szerint töltődik be, anélkül hogy érintené a gyorsítótárazott előtagot. A 4. fejezet részletes összehasonlítást és választási keretet ad, a 8. fejezet pedig azt vizsgálja, hogyan dönti el egy folyamatosan fejlődő ügynök, hogy egy tapasztalatot tudásként, utasításként, programként vagy modellparaméterként rögzítsen.
+A kontextuskezelés szempontjából a Skills mechanizmus rendkívül KV-gyorsítótár-barát. Ha minden speciális kódeszköz definícióját a rendszerpromptba tennénk, a növekvő eszközszám sok tokent fogyasztana, és zavarná a modell figyelmét. A Skill + általános végrehajtó modellben viszont az eszközkészlet kicsi marad – amint az 5. fejezet mutatja, mindössze hét alapvető eszközre van szükség –, a Skill tartalma pedig a fent leírt progresszív közzététellel, igény szerint töltődik be, anélkül hogy érintené a gyorsítótárazott előtagot. A 4. fejezet részletes összehasonlítást és választási keretet ad, a 9. fejezet pedig azt vizsgálja, hogyan dönti el egy folyamatosan fejlődő ügynök, hogy egy tapasztalatot tudásként, utasításként, programként vagy modellparaméterként rögzítsen.
 
 > **2-6. kísérlet ★★: Készítsen prezentációt papírból ügynöki készségekkel**
 >
@@ -799,6 +820,14 @@ A kontextuskezelés szempontjából a Skills mechanizmus rendkívül KV-gyorsít
 >
 > **Elfogadási feltételek**: A generált PowerPoint lefedi a dolgozat fő tartalmát (címoldal, probléma háttere, módszer áttekintése, legfontosabb eredmények, következtetés), tartalmaz legalább 3, a szöveges leírással összhangban lévő, a dolgozatból kivont ábrát, és megfelelő formázással rendelkezik, amely megfelelően megnyílik PowerPointban vagy kompatibilis szoftverben.
 >
+
+> **Kísérlet 2-7 ★★: „AI-íz Nélküli" Írási Készség Létrehozása Személyes Mintaszövegekből**
+>
+> **Kísérlet célja**: kevés kézzel írt mintaszövegből olyan betölthető és ellenőrizhető írási készséget generálni, amely új cikkekben is képes reprodukálni a szerző fő kifejezésbeli preferenciáit.
+>
+> **A kísérlet leírása**: készítsen elő három-öt eredeti cikket, és hagyja, hogy egy Agent Skills-t támogató futtatókörnyezet elkészítse a `SKILL.md` első változatát; válasszon új témát és írjon vázlatot, majd miután a szerző kézzel átdolgozta, hasonlítsa össze az előtte/utána állapotot, és írja vissza a stabil szabályszerűségeket a készségbe. Az elfogadáshoz csak az kell, hogy a készségnek legyen világos aktiválási feltétele, három-öt példával ellátott alapelve, hatóköre és kivételei — egyetlen szubjektív ítéletet nem szabad általános szabállyá emelni.
+>
+> **Mit mutat meg a kísérlet**: a készség értéke abban áll, hogy a személyes tapasztalatot igény szerint betöltődő utasításokká külsőíti. Egy rövid, olvasható, valós feladaton is helytálló első változat jobb kiindulópont a további iterációhoz, mint több tucat szabály eleve való felsorolása.
 
 ## Ügynök állapotsor: Trajektóriák kezelése metainformációkkal
 
@@ -831,13 +860,13 @@ Hosszú kontextusú forgatókönyvekben a modell figyelmi erőforrásai korláto
 
 Az Ügynöki Állapotsáv ezt a problémát úgy kezeli, hogy szándékosan a kulcsfontosságú metainformációkat strukturált formátumban a kontextus végére helyezi. Mivel ez az információ közel van a tokenekhez, amelyeket a modell generálni fog, nagyobb valószínűséggel kap figyelmet. Ez a figyelem irányításának egy formája az elhelyezésen keresztül.
 
-> **Kísérlet 2-7 ★★: Az Ügynöki Állapotsáv Hatásának Ellenőrzése Figyelmi Vizualizáción Keresztül**
+> **Kísérlet 2-8 ★★: Az Ügynöki Állapotsáv Hatásának Ellenőrzése Figyelmi Vizualizáción Keresztül**
 >
 > A `attention_visualization` projektre építve terveztünk egy kontrollált kísérletet, ahol egy ügyfélszolgálati ügynök egy visszatérítési kérelmet kezel. Az ügynök már 3-szor hívta az Xfinity-t, webes keresésekkel megszakítva. A felhasználó megkérdezi: "Fel tudod hívni őket újra, hogy utánanézzenek?"
 >
-> "A kontrollcsoport (Nincs Állapotsáv):" A kontextus tartalmazza a teljes trajektóriát, de nincs aggregált állapotinformáció. A hőtérkép széles körben elszórt figyelmet mutat, jellegzetes koncentrációkkal a három telefonhívási rekord körül. Az érvelési tokenek azt mutatják, hogy a modell számol és összesít információkat a nyers rekordokból.
+> **A kontrollcsoport (Nincs Állapotsáv):** A kontextus tartalmazza a teljes trajektóriát, de nincs aggregált állapotinformáció. A hőtérkép széles körben elszórt figyelmet mutat, jellegzetes koncentrációkkal a három telefonhívási rekord körül. Az érvelési tokenek azt mutatják, hogy a modell számol és összesít információkat a nyers rekordokból.
 >
-> "B kontrollcsoport (Állapotsávval):" A következő kerül hozzáfűzésre a trajektória végéhez:
+> **B kontrollcsoport (Állapotsávval):** A következő kerül hozzáfűzésre a trajektória végéhez:
 >
 > ```xml
 > <agent_status>
@@ -850,7 +879,7 @@ Az Ügynöki Állapotsáv ezt a problémát úgy kezeli, hogy szándékosan a ku
 > A figyelem erősen koncentrálódik az állapotsáv információira. Az érvelési folyamat közvetlenül a már desztillált információkat használja, többé nem számol statisztikákat a nyers adatokból. Egy olyan kis modellnél, mint a Qwen3-0.6B, az A kontrollcsoport gyakran megsérti a korlátot és folytatja a hívást, míg a B kontrollcsoport következetesen betartja a korlátot.
 >
 
-A 2-7. kísérlet egy kis léptékű, kvalitatív bemutató, amely szemlélteti az alapötletet. A szerző és munkatársai egy erre készült benchmarkkal[^ch2-7] mérték fel, mennyire hasznos az „előre kiszámít, majd közvetlenül kiolvas” megközelítés, és hol vannak a határai (ennek egységes neve **kontextusdesztilláció, Context Distillation**; az ügynöki állapotsáv ennek hétköznapi formája). Következtetések:
+A 2-8. kísérlet egy kis léptékű, kvalitatív bemutató, amely szemlélteti az alapötletet. A szerző és munkatársai egy erre készült benchmarkkal[^ch2-8] mérték fel, mennyire hasznos az „előre kiszámít, majd közvetlenül kiolvas” megközelítés, és hol vannak a határai (ennek egységes neve **kontextusdesztilláció, Context Distillation**; az ügynöki állapotsáv ennek hétköznapi formája). Következtetések:
 
 - Az **előre kiszámított állapotsáv** a **gyenge modellek pontosságát állítja helyre**. A leggyengébb modellek 40–54 százalékpontot javultak, egy helyi 2B modell pedig ezeken a feladatokon utolérte az állapotsáv nélküli élvonalbeli modellt.
 - **Az erős modellek eleve helyesen válaszolnak; náluk a nyereség a hatékonyság.** Ugyanaz az állapotsáv nagyjából egy nagyságrenddel csökkenti a kérésenkénti gondolkodást, késleltetést és költséget (a gondolkodási tokenek 80–90%-át vagy még többet megtakarítva).
@@ -865,19 +894,19 @@ Az „előre kiszámítás” azonban jól és rosszul is elvégezhető, a kül�
 
 **3. Az állapotsáv pontosságát elsődleges production metrikaként kövesse.** A kísérlet szerint **a modell szinte feltétel nélkül megbízik az állapotsávban**: ha az „3 hívást” ír, a modell ellenőrzés és újraszámítás nélkül elfogadja. Ez teszi hatékonnyá, de emiatt egy hiba **változatlanul** átkerül a végső válaszba. Ezért a korábban említett **állapotsáv-mérgezés** kockázatát komolyan kell venni.
 
-[^ch2-7]: Li, Bojie and Noah Shi. *Distill, Don't Retrieve: Inference-Time Context Distillation for LLM Agent Reasoning.* 2026. https://01.me/research/context-distillation
+[^ch2-8]: Li, Bojie and Noah Shi. *Distill, Don't Retrieve: Inference-Time Context Distillation for LLM Agent Reasoning.* 2026. https://01.me/research/context-distillation
 
 ### Az Ügynöki Állapotsáv Összetétele
 
 A fenti elméleti alapokra építve az Ügynöki Állapotsáv a következő információtípusokat tartalmazza:
 
-"Feladattervezés": Amikor egy ügynök összetett, több lépésből álló feladatokat kezel, a trajektória nagyon hosszúvá válhat. Az ügynök hajlamos túlzottan az aktuális helyi részfeladatra összpontosítani, elfelejtve a felhasználó eredeti kérését, a kulcsfontosságú korlátokat és a későbbi munkát. Egy TODO lista elhelyezése, amely a feladatot világos lépésekre bontja, a trajektória végén folyamatosan emlékezteti a modellt az aktuális előrehaladására és a jövőbeli célokra, segítve a cselekvések összehangolását az átfogó tervvel.
+**Feladattervezés**: Amikor egy ügynök összetett, több lépésből álló feladatokat kezel, a trajektória nagyon hosszúvá válhat. Az ügynök hajlamos túlzottan az aktuális helyi részfeladatra összpontosítani, elfelejtve a felhasználó eredeti kérését, a kulcsfontosságú korlátokat és a későbbi munkát. Egy TODO lista elhelyezése, amely a feladatot világos lépésekre bontja, a trajektória végén folyamatosan emlékezteti a modellt az aktuális előrehaladására és a jövőbeli célokra, segítve a cselekvések összehangolását az átfogó tervvel.
 
-"Mellékcsatornás Információk Eseményekhez": Csatoljon metaadatokat minden eseményhez – pontos idő, földrajzi hely, az utolsó ügynökválasz óta eltelt idő, stb. A mellékcsatornás információ olyan segécinformációra utal, amely nem a fő adatcsatornában kerül továbbításra, de segít az esemény megértésében. Ez az információ segít a modellnek megérteni az események időbeli kapcsolatait és környezeti kontextusát, lehetővé téve a kontextuálisan megfelelőbb döntéseket.
+**Mellékcsatornás Információk Eseményekhez**: Csatoljon metaadatokat minden eseményhez – pontos idő, földrajzi hely, az utolsó ügynökválasz óta eltelt idő, stb. A mellékcsatornás információ olyan segécinformációra utal, amely nem a fő adatcsatornában kerül továbbításra, de segít az esemény megértésében. Ez az információ segít a modellnek megérteni az események időbeli kapcsolatait és környezeti kontextusát, lehetővé téve a kontextuálisan megfelelőbb döntéseket.
 
-"Aktuális Környezeti Megfigyelési Összefoglaló": Tartalmazza a dinamikus környezeti információkat (rendszeridő, munkakönyvtár, stb.), a rendellenes műveleti riasztásokat ("Ezt az eszközt N-szer hívták meg ismételten") és a burkolt állapot explicit megfigyeléssé alakítását. Ez a tervezési elv az emberi interfészekre is vonatkozik – mind a Parancssori Interfészek (CLI), mind a Grafikus Felhasználói Felületek (GUI) célja, hogy a felhasználók világosan érzékelhessék a rendszer aktuális állapotát.
+**Aktuális Környezeti Megfigyelési Összefoglaló**: Tartalmazza a dinamikus környezeti információkat (rendszeridő, munkakönyvtár, stb.), a rendellenes műveleti riasztásokat ("Ezt az eszközt N-szer hívták meg ismételten") és a burkolt állapot explicit megfigyeléssé alakítását. Ez a tervezési elv az emberi interfészekre is vonatkozik – mind a Parancssori Interfészek (CLI), mind a Grafikus Felhasználói Felületek (GUI) célja, hogy a felhasználók világosan érzékelhessék a rendszer aktuális állapotát.
 
-"Elérhető Képességlista": Amikor az ügynök-keretrendszer támogatja a plugin-alapú képességbővítéseket (mint az előző szakasz Készség rendszere), az összes telepített Készség metaadatlistája szintén ezen a kontextus-végi injektálási csatornán megy keresztül. Ez megmondja a modellnek, hogy mely speciális képességek állnak jelenleg rendelkezésre. Ritkán változik (csak akkor, ha a felhasználó telepít vagy eltávolít egy Készséget), és növekményes küldési mechanizmusát az előző Készségek szakasz részletezte, így itt nem ismételjük meg.
+**Elérhető Képességlista**: Amikor az ügynök-keretrendszer támogatja a plugin-alapú képességbővítéseket (mint az előző szakasz Készség rendszere), az összes telepített Készség metaadatlistája szintén ezen a kontextus-végi injektálási csatornán megy keresztül. Ez megmondja a modellnek, hogy mely speciális képességek állnak jelenleg rendelkezésre. Ritkán változik (csak akkor, ha a felhasználó telepít vagy eltávolít egy Készséget), és növekményes küldési mechanizmusát az előző Készségek szakasz részletezte, így itt nem ismételjük meg.
 
 A mellékcsatornás információk és az elérhető képességlista általában nem változnak hozzáadásuk után, így gyorsítótár-barátok, mert nem érvénytelenítik a gyorsítótárazott előtagot. A feladattervezés és a környezeti megfigyelések összefoglalója dinamikus, és speciális felhasználói üzenetként kell a kontextus végéhez fűzni, majd frissíteni a feladat előrehaladtával. A frissítési módszer közvetlenül befolyásolja a KV Cache költséget, amint azt alább tárgyaljuk.
 
@@ -889,7 +918,7 @@ Egy fontos implementációs részlet, hogy az Ügynöki Állapotsáv a kontextus
 
 Az alábbiakban az ügynök-keretrendszer által az N-edik API hívás során összeállított tényleges üzenetlista látható:
 
-```
+```text
 messages: [
   { role: "system",    content: "You are a customer service assistant..." }  ← Rögzített (KV Cache-ben)
   { role: "user",      content: "Help me cancel my Xfinity plan" }  ← Eredeti felhasználói kérés
@@ -916,25 +945,27 @@ Ez a kialakítás a KV Cache szakasz alapelvét alkalmazza az állapotsávra: di
 
 A "hozzáfűzés nem töri meg a gyorsítótárat" csak egyetlen injektálásra érvényes. Az állapot természetesen változik az idők során: a TODO elemek elkészülnek, az eszközszámlálók nőnek, és a korábbi állapotüzenetek elavulnak. Két módszer van az állapotsáv frissítésére, eltérő gyorsítótár-költségekkel:
 
-**1. Implementáció: Csere minden körben.** Minden API hívás előtt távolítsa el az előző kör állapotüzenetét az üzenetlistából, és fűzze hozzá a legfrissebb állapotot a végére. Ez csak egy aktuális állapotot tart a kontextusban. Az ára az, hogy a régi állapot eltávolítása érvényteleníti az összes gyorsítótárazott tartalmat a pozíciója után, ami ugyanaz az érvénytelenítési mechanizmus, amelyet a fejezet "dinamikus időbélyeg" szakasza tárgyal. A különbség az, hogy mivel az állapotüzenet a kontextus vége közelében van, az érvénytelenítési tartomány a legutóbbi néhány kör üzenetére korlátozódik, nem a teljes előtagra.
+**1. Implementáció: Csere minden körben.** Minden API hívás előtt távolítsa el az előző kör állapotüzenetét az üzenetlistából, és fűzze hozzá a legfrissebb állapotot a végére. Ez csak egy aktuális állapotot tart a kontextusban. Az ára az, hogy a régi állapot eltávolítása érvényteleníti az összes gyorsítótárazott tartalmat a pozíciója után, ami ugyanaz az érvénytelenítési mechanizmus, amelyet a fejezet "dinamikus időbélyeg" szakasza tárgyal. Mivel az állapotüzenet a kontextus vége közelében van, az érvénytelenítés az előző állapotbeszúrás óta hozzáadott üzenetekre—általában egy körre—korlátozódik, nem a teljes előtagra.
 
 **2. Implementáció: Tartós hozzáfűzés.** Az állapotüzenet a beinjektálás után véglegesen a trajektóriában marad, és minden körben egy új állapot kerül hozzáfűzésre a végére. A Claude Code `<system-reminder>`-je ezt a megközelítést használja: a történelmi állapotüzenetek az átiratban maradnak, és soha nem törlődnek vagy módosulnak. Ez a módszer teljesen gyorsítótár-barát, mert az üzenetek csak hozzáfűzésre kerülnek, soha nem változnak, így az előtag stabil marad. Az ára az, hogy az elavult állapotok felhalmozódnak a kontextusban, tokeneket fogyasztva, és a modellnek a legfrissebb állapotra kell támaszkodnia, miközben figyelmen kívül hagyja az elavultakat.
 
-A hüvelykujjszabály: **ha az állapotfrissítések gyakoriak és a trajektória hosszú, válassza a 2. implementációt.** Az állapot minden körben történő cseréje ismételten érvényteleníti a gyorsítótár-bejegyzéseket egy hosszú trajektória során, ami többe kerülhet, mint az elavult állapotüzenetek cipelése. **Ha a trajektória rövid vagy egyetlen állapotüzenet nagy** (pl. egy teljes TODO lista plusz környezeti pillanatkép), "válassza az 1. implementációt." A gyorsítótár érvénytelenítése az utolsó néhány kör felett olcsó, és a kontextus tiszta és egyértelmű marad.
+A választás a trajektória hosszától, az állapot méretétől, a frissítések között hozzáadott utótag hosszától és a várható frissítések számától függ. **Ha az állapot kicsi, a frissítések között sok üzenet keletkezik, és a munkamenet hossza korlátozott, válassza a 2. implementációt**—a régi állapotok megtartása általában olcsóbb, mint egy hosszú utótag ismételt újraszámítása. **Ha az állapot nagy, a frissítések gyakoriak, vagy a trajektória hosszú, válassza az 1. implementációt**—ez általában csak az előző beszúrás utáni rövid utótagot érvényteleníti, és megakadályozza az elavult állapotok felhalmozódását.
 
-> **Kísérlet 2-8 ★★: Néhány Hasznos Ügynöki Állapotsáv Technika**
+Egy durva modell megbecsüli a megtérülési pontot. Legyen minden állapot $S$ token, a frissítések között hozzáadott mennyiség $R$ token, a várható frissítések száma $N$, a gyorsítótárazott bemenet költsége pedig a normál bemenet $\alpha$-szorosa. A két módszer közös költségeit figyelmen kívül hagyva $C_{\text{csere}} \approx (N-1)(1-\alpha)R$ és $C_{\text{hozzáfűzés}} \approx \alpha S N(N-1)/2$. Így $\alpha SN/2 < (1-\alpha)R$ esetén a 2., egyébként az 1. implementációt érdemes választani. Ez a becslés nem számol a kontextus elfoglalásával és az elavult állapotok okozta kétértelműséggel; a végső döntésnél a szolgáltató gyorsítótár-árazását és a mért találati arányt is figyelembe kell venni.
+
+> **Kísérlet 2-9 ★★: Néhány Hasznos Ügynöki Állapotsáv Technika**
 >
 > Az `agent-status-bar` kísérleti keretrendszer öt állapotsáv technikát valósít meg, amelyek mindegyike egymástól függetlenül engedélyezhető vagy letiltható:
 >
-> "Időbélyeg Követés": Hozzáad egy `[2025-09-14 10:30:45]` formátumú előtagot a felhasználói üzenetekhez és az eszközválaszokhoz (megjegyzés: nem a rendszer promptba helyezve, mert az törné a KV Cache-t). Ez lehetővé teszi az ügynök számára, hogy megértse az időbeli kapcsolatokat, és információt biztosít a hibakereséshez és naplózáshoz. Ez a technika egy idő-szimulációs funkciót is megvalósít, lehetővé téve az ügynök számára, hogy megértse az olyan kapcsolatokat, mint a "tegnapi fájlok" és a "mai módosítások."
+> **Időbélyeg Követés**: Hozzáad egy `[2025-09-14 10:30:45]` formátumú előtagot a felhasználói üzenetekhez és az eszközválaszokhoz (megjegyzés: nem a rendszer promptba helyezve, mert az törné a KV Cache-t). Ez lehetővé teszi az ügynök számára, hogy megértse az időbeli kapcsolatokat, és információt biztosít a hibakereséshez és naplózáshoz. Ez a technika egy idő-szimulációs funkciót is megvalósít, lehetővé téve az ügynök számára, hogy megértse az olyan kapcsolatokat, mint a "tegnapi fájlok" és a "mai módosítások."
 >
-> "Eszközhívás Számláló": Egy globális szótárat tart fenn, amely rögzíti az egyes eszközök hívásának számát, megjegyzésekkel ellátva a válaszokat: "Tool call #3 for 'read_file'." Ez az explicit számlálás arra ösztönzi a modellt, hogy ismételt kudarcok után változtasson stratégiát: az első kudarc után ellenőrizze az elérési utat; a második kudarc után listázza a könyvtárat; a harmadik után hagyja abba az újrapróbálkozást és keressen alternatívát. Mélyebb értéke a burkolt költségtudatosságban rejlik: az ügynök következtethet arra, hogy már túl sok próbálkozást költött egy adott műveletre.
+> **Eszközhívás Számláló**: Egy globális szótárat tart fenn, amely rögzíti az egyes eszközök hívásának számát, megjegyzésekkel ellátva a válaszokat: "Tool call #3 for 'read_file'." Ez az explicit számlálás arra ösztönzi a modellt, hogy ismételt kudarcok után változtasson stratégiát: az első kudarc után ellenőrizze az elérési utat; a második kudarc után listázza a könyvtárat; a harmadik után hagyja abba az újrapróbálkozást és keressen alternatívát. Mélyebb értéke a burkolt költségtudatosságban rejlik: az ügynök következtethet arra, hogy már túl sok próbálkozást költött egy adott műveletre.
 >
-> "TODO Lista Kezelés": A Manus "figyelem manipulálása átfogalmazással" koncepciója által inspirálva, a TODO Lista Kezelés két dedikált eszközt biztosít: `rewrite_todo_list` és `update_todo_status`. Minden TODO elem tartalmaz egy egyedi azonosítót, tartalmat, állapotot (pending/in_progress/completed/cancelled) és egy időbélyeget. A kognitív terheléselmélet szempontjából a TODO lista külső memóriaként szolgál – ahogy az emberek is ellenőrzőlistákat írnak összetett projektek kezelésekor, az ügynöknek is szüksége van egy helyre, ahol rögzítheti, hogy "mi történt meg és mi van hátra." A kísérleti adatok azt mutatják, hogy a TODO támogatással rendelkező ügynökök átlagosan 15 iteráció alatt teljesítik a feladatokat, míg anélkül 21 iterációra van szükségük, és gyakran hiányoznak a részfeladatok.
+> **TODO Lista Kezelés**: A Manus "figyelem manipulálása átfogalmazással" koncepciója által inspirálva, a TODO Lista Kezelés két dedikált eszközt biztosít: `rewrite_todo_list` és `update_todo_status`. Minden TODO elem tartalmaz egy egyedi azonosítót, tartalmat, állapotot (pending/in_progress/completed/cancelled) és egy időbélyeget. A kognitív terheléselmélet szempontjából a TODO lista külső memóriaként szolgál – ahogy az emberek is ellenőrzőlistákat írnak összetett projektek kezelésekor, az ügynöknek is szüksége van egy helyre, ahol rögzítheti, hogy "mi történt meg és mi van hátra." A kísérleti adatok azt mutatják, hogy a TODO támogatással rendelkező ügynökök átlagosan 15 iteráció alatt teljesítik a feladatokat, míg anélkül 21 iterációra van szükségük, és gyakran hiányoznak a részfeladatok.
 >
-> "Részletes Hiba Információ": Négy réteget tartalmaz – hiba típusa és leírása, teljes paraméter JSON, hívási verem információ és célzott javítási javaslatok (pl. FileNotFoundError esetén javasolja az elérési út ellenőrzését, a munkakönyvtár megtekintését és abszolút elérési utak használatát). Ha engedélyezve van, ez az információ az ügynök hibából való helyreállítási sikerességi arányát 60%-ról 95%-ra emeli. Ahelyett, hogy vakon újrapróbálkozna, az ügynök diagnosztizálhatja a hibát és alternatívát választhat.
+> **Részletes Hiba Információ**: Négy réteget tartalmaz – hiba típusa és leírása, teljes paraméter JSON, hívási verem információ és célzott javítási javaslatok (pl. FileNotFoundError esetén javasolja az elérési út ellenőrzését, a munkakönyvtár megtekintését és abszolút elérési utak használatát). Ha engedélyezve van, ez az információ az ügynök hibából való helyreállítási sikerességi arányát 60%-ról 95%-ra emeli. Ahelyett, hogy vakon újrapróbálkozna, az ügynök diagnosztizálhatja a hibát és alternatívát választhat.
 >
-> "Rendszerállapot Tudatosság": Olyan információkat injektál, mint az aktuális idő, munkakönyvtár, operációs rendszer típusa, shell környezet és Python verzió. A munkakönyvtár követése különösen kritikus – automatikusan frissül, miután az ügynök végrehajt egy `cd` parancsot, biztosítva, hogy a későbbi műveletek a megfelelő kontextusban történjenek. Az operációs rendszer információ lehetővé teszi az ügynök számára, hogy platform-specifikus döntéseket hozzon (pl. `apt` használata Linuxon, `brew` macOS-en).
+> **Rendszerállapot Tudatosság**: Olyan információkat injektál, mint az aktuális idő, munkakönyvtár, operációs rendszer típusa, shell környezet és Python verzió. A munkakönyvtár követése különösen kritikus – automatikusan frissül, miután az ügynök végrehajt egy `cd` parancsot, biztosítva, hogy a későbbi műveletek a megfelelő kontextusban történjenek. Az operációs rendszer információ lehetővé teszi az ügynök számára, hogy platform-specifikus döntéseket hozzon (pl. `apt` használata Linuxon, `brew` macOS-en).
 >
 > Ezek a technikák együttesen egy emergens hatást produkálnak (azaz korlátozott hatékonyságúak egyenként, de váratlanul erősek kombinálva). Az időbélyegek és az eszközszámlálók kombinációja lehetővé teszi az ügynök számára, hogy megértse a műveletek gyakoriságát és időbeli eloszlását; a TODO listák és a rendszerállapot kombinációja lehetővé teszi az ügynök számára, hogy a feladatstratégiákat a környezethez igazítsa; a részletes hiba információk és az eszközszámlálók kombinációja lehetővé teszi az ügynök számára, hogy ne csak stratégiát váltson többszöri kudarc után, hanem megértse a kudarc okát is.
 >
@@ -1000,7 +1031,7 @@ A kulcs a tömörítés "időzítésének és helyének" megértése. A tömör�
 
 ![2-16. ábra: Kontextustömörítési stratégiák összehasonlítása](images/fig2-16.svg)
 
-> **Kísérlet 2-9 ★★★: Kontextustömörítési Stratégiák Összehasonlítása**
+> **Kísérlet 2-10 ★★★: Kontextustömörítési Stratégiák Összehasonlítása**
 >
 > Terveztünk egy kutatási feladatot: az OpenAI társalapítóinak foglalkoztatási státuszának azonosítása és nyomon követése. Ez a feladat többlépéses információ aggregálást igényel, a keresési eredmények hossza nagyon változó (néhány ezertől több mint százezer karakterig), és vannak egyértelmű sikerességi kritériumok. A Kimi K3-at használva (egy érvelő modell, amely natívan körülbelül 1 millió token kontextussal rendelkezik; ez a kísérlet szándékosan 128K ablakra korlátozta a kontextus költségvetést a tömörítés kiváltásához), hat stratégiát implementáltunk:
 >
@@ -1014,9 +1045,9 @@ A kulcs a tömörítés "időzítésének és helyének" megértése. A tömör�
 >
 > **6. stratégia: Adaptív Ablakozás** – Egy kulcsfontosságú felismerésen alapul: a feladat korai szakaszában a kontextushely bőséges, így nincs szükség a tömörítésre sietni. A tömörítési mechanizmus csak akkor aktiválódik, amikor megközelítjük a kapacitáskorlátot, ezáltal a lehető legnagyobb mértékben megőrizve az eredeti információ integritását. A konkrét implementáció három alapvető mechanizmust foglal magában:
 >
-> - "Küszöbérték Trigger": Folyamatosan figyeli a kontextushasználatot. A tömörítés csak akkor aktiválódik, ha a prompt tokenek száma meghaladja az ablak 80%-át (102 400 token egy 128K ablak esetén).
-> - "Batch Tömörítés": Aktiváláskor az összes megjelöletlen eszközeredményt egyszerre tömöríti. Például a negyedik iteráció körül, amikor a kontextus érzékeli, hogy meghaladja a 102 400 token küszöbértéket (a gyakorlatban körülbelül 135 600 token esetén aktiválódott), mind a 10 tömörítetlen eszközüzenet azonnal tömörítésre kerül.
-> - "Duplikáció Megelőzése": Hozzáad egy `[COMPRESSED]` jelölőt, hogy a tömörített tartalom soha ne kerüljön újra feldolgozásra.
+> - **Küszöbérték Trigger**: Folyamatosan figyeli a kontextushasználatot. A tömörítés csak akkor aktiválódik, ha a prompt tokenek száma meghaladja az ablak 80%-át (102 400 token egy 128K ablak esetén).
+> - **Batch Tömörítés**: Aktiváláskor az összes megjelöletlen eszközeredményt egyszerre tömöríti. Például a negyedik iteráció körül, amikor a kontextus érzékeli, hogy meghaladja a 102 400 token küszöbértéket (a gyakorlatban körülbelül 135 600 token esetén aktiválódott), mind a 10 tömörítetlen eszközüzenet azonnal tömörítésre kerül.
+> - **Duplikáció Megelőzése**: Hozzáad egy `[COMPRESSED]` jelölőt, hogy a tömörített tartalom soha ne kerüljön újra feldolgozásra.
 >
 > Bár a teljes tokenhasználat viszonylag magas (174 601), az első néhány iteráció megtartja a teljes eredeti információt, maximális rugalmasságot biztosítva a kezdeti széles körű információgyűjtéshez.
 >
@@ -1037,12 +1068,12 @@ A fenti kísérlet bemutatja a tömörítési stratégiák közötti teljesítm�
 
 ### Tömörítési Stratégiák Tervezési Elvei
 
-Már elemeztük a tömörítés két motivációját – a hossz szabályozása és az érvelés minőségének javítása – valamint azt a belső mechanizmust, hogy "a kontextuson belüli tanulás lényegében visszakeresés." Ennek alapján négy elvet desztillálhatunk, amelyek irányítják a konkrét tömörítési stratégiák tervezését. Az itt tárgyalt tömörítés a jelenlegi feladatot szolgálja; amikor több feladatból származó trajektóriákat kell offline konszolidálni tartós tapasztalattá, a probléma folyamatos evolúcióvá válik, amelyet a 8. fejezet tárgyal.
+Már elemeztük a tömörítés két motivációját – a hossz szabályozása és az érvelés minőségének javítása – valamint azt a belső mechanizmust, hogy "a kontextuson belüli tanulás lényegében visszakeresés." Ennek alapján négy elvet desztillálhatunk, amelyek irányítják a konkrét tömörítési stratégiák tervezését. Az itt tárgyalt tömörítés a jelenlegi feladatot szolgálja; amikor több feladatból származó trajektóriákat kell offline konszolidálni tartós tapasztalattá, a probléma folyamatos evolúcióvá válik, amelyet a 9. fejezet tárgyal.
 
-- "Az Információérték Nem Egyenletes Eloszlása": A kulcsfontosságú döntési pontok, mint a személyi listák, nagyobb értékkel bírnak, mint a támogató bizonyítékok, mint a hírrészletek; a támogató bizonyítékok nagyobb értékkel bírnak, mint a redundáns zaj, mint a navigációs sávok és lábléc hirdetések.
-- "Szemantikai Integritás": "Sutskever elhagyta az OpenAI-t 2024 májusában" nem tömöríthető "Sutskever elhagyta" formára – az idő és a cég neve kritikus, nem alku tárgyát képező információ.
-- "Feladat Relevancia": Ugyanaz a tartalom különböző tömörítési eredményeket kell, hogy adjon különböző feladatokhoz, mint "találd meg az alapítók listáját" versus "ismerd meg a személyes hátteret."
-- "A Tömörítés Megértés": A hatékony tömörítés mély szemantikai megértést igényel – a kontextus magjának rögzítését finomabb kifejezéssel. Ráadásul az explicit tömörítés eredményei felülvizsgálhatók és újra felhasználhatók a munkamenetek között.
+- **Az Információérték Nem Egyenletes Eloszlása**: A kulcsfontosságú döntési pontok, mint a személyi listák, nagyobb értékkel bírnak, mint a támogató bizonyítékok, mint a hírrészletek; a támogató bizonyítékok nagyobb értékkel bírnak, mint a redundáns zaj, mint a navigációs sávok és lábléc hirdetések.
+- **Szemantikai Integritás**: "Sutskever elhagyta az OpenAI-t 2024 májusában" nem tömöríthető "Sutskever elhagyta" formára – az idő és a cég neve kritikus, nem alku tárgyát képező információ.
+- **Feladat Relevancia**: Ugyanaz a tartalom különböző tömörítési eredményeket kell, hogy adjon különböző feladatokhoz, mint "találd meg az alapítók listáját" versus "ismerd meg a személyes hátteret."
+- **A Tömörítés Megértés**: A hatékony tömörítés mély szemantikai megértést igényel – a kontextus magjának rögzítését finomabb kifejezéssel. Ráadásul az explicit tömörítés eredményei felülvizsgálhatók és újra felhasználhatók a munkamenetek között.
 
 ### Következmények az Ügynökarchitektúra Tervezéséhez
 

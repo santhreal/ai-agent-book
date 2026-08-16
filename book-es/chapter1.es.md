@@ -12,7 +12,7 @@ Este capítulo comienza con ejemplos prácticos y avanza de vuelta hacia los com
 
 La esencia de un sistema de Agente moderno se resume en una fórmula concisa: **Agente = LLM (Modelo de Lenguaje Grande) + Contexto + Herramientas**. La fórmula es simple y práctica, siempre que cada término se entienda en un sentido amplio:
 
-- **El LLM es el motor de razonamiento del Agente**: Es más que un conjunto de parámetros de modelo; es el núcleo de toma de decisiones del Agente, responsable de comprender la intención, razonar, planificar y juzgar. Las capacidades de un LLM provienen del conocimiento del mundo y la habilidad lingüística adquiridos durante el **preentrenamiento**, además de las estrategias de toma de decisiones codificadas a través del **posentrenamiento** (técnicas como el ajuste fino supervisado y el aprendizaje por refuerzo se cubren en el Capítulo 7).
+- **El LLM es el motor de razonamiento del Agente**: Es más que un conjunto de parámetros de modelo; es el núcleo de toma de decisiones del Agente, responsable de comprender la intención, razonar, planificar y juzgar. Las capacidades de un LLM provienen del conocimiento del mundo y la habilidad lingüística adquiridos durante el **preentrenamiento**, además de las estrategias de toma de decisiones codificadas a través del **posentrenamiento** (técnicas como el ajuste fino supervisado y el aprendizaje por refuerzo se cubren en el Capítulo 8).
 - **El Contexto es el conjunto de información de trabajo del Agente**: No es solo el texto introducido en el modelo, sino el conjunto operativo de información disponible para el Agente en cada punto de decisión: el entorno, la memoria del usuario, el conocimiento del dominio, su propio estado y el progreso de la tarea. Al igual que una persona que toma una decisión necesita evaluar la situación, recordar experiencias relevantes y consultar referencias, la ventana de contexto del Agente contiene la información que puede utilizar en ese momento exacto.
 - **Las Herramientas son —las interfaces de acción— del Agente**: No son solo un puñado de funciones API invocables, sino el conjunto completo de formas en que el Agente puede actuar: desde llamadas a herramientas predefinidas hasta habilidades (Skills) cargadas bajo demanda, desde generar código para crear nuevas capacidades sobre la marcha hasta delegar trabajo a subagentes, pasando por comunicarse con el usuario o responder a eventos externos.
 
@@ -26,7 +26,7 @@ La Figura 1-1 muestra dos niveles de abstracción. El nivel exterior es la inter
 
 La fórmula de ingeniería puede ampliarse así: el LLM corresponde al Modelo y Contexto + Herramientas forman el Harness mínimo; los sistemas de producción añaden restricciones, verificación y corrección dentro de esos límites. El resto de este capítulo mantiene esta frontera.
 
-Estos tres componentes corresponden a tres conceptos clave del RL (aprendizaje por refuerzo; véase el capítulo 7), pero no son equivalentes estrictos uno a uno: el contexto es la representación interna que el Agente construye de las observaciones y el historial, mientras que las herramientas definen interfaces de observación y acción cuyos objetos subyacentes siguen perteneciendo al Entorno.
+Estos tres componentes corresponden a tres conceptos clave del RL (aprendizaje por refuerzo; véase el capítulo 8), pero no son equivalentes estrictos uno a uno: el contexto es la representación interna que el Agente construye de las observaciones y el historial, mientras que las herramientas definen interfaces de observación y acción cuyos objetos subyacentes siguen perteneciendo al Entorno.
 
 | Intuición | Componente del Agente | Concepto en RL | Rol |
 |---------------|----------------|------------------|---------------------------------------------|
@@ -128,9 +128,9 @@ Las modificaciones en el comportamiento de un Agente no ocurren únicamente dura
 
 La **adaptación contextual** ocurre dentro de la tarea actual. Una vez que los ejemplos, el estado y los resultados de recuperación ingresan al contexto, el modelo puede ajustar su comportamiento de inmediato, pero esto no cambia el estado persistente de la siguiente sesión. Sus ventajas son la velocidad y el bajo costo; sus limitaciones provienen de la ventana de contexto. El Capítulo 2 explica en detalle este tipo de adaptación.
 
-Para que los cambios persistan a lo largo de múltiples tareas, el sistema puede actualizar **artefactos externos**: los hechos y la experiencia se organizan en documentos de conocimiento, las estrategias expresables en lenguaje se escriben en un Prompt o Skill, y los procedimientos deterministas se codifican en programas y Harnesses. Estos artefactos son auditables y revisables. Los Capítulos 3 a 5 sientan las bases para el conocimiento y los programas, mientras que el Capítulo 8 analiza cómo generar tales actualizaciones a partir de trayectorias evaluadas.
+Para que los cambios persistan a lo largo de múltiples tareas, el sistema puede actualizar **artefactos externos**: los hechos y la experiencia se organizan en documentos de conocimiento, las estrategias expresables en lenguaje se escriben en un Prompt o Skill, y los procedimientos deterministas se codifican en programas y Harnesses. Estos artefactos son auditables y revisables. Los Capítulos 3 a 5 sientan las bases para el conocimiento y los programas, mientras que el Capítulo 9 analiza cómo generar tales actualizaciones a partir de trayectorias evaluadas.
 
-Cuando el objetivo es una capacidad de alta dimensión (como la comprensión de imágenes médicas o una política de decisión implícita) que las reglas externas no pueden expresar por completo, los **parámetros del modelo** deben actualizarse mediante posentrenamiento. Las actualizaciones de parámetros conllevan mayores costos de despliegue, pero pueden producir una generalización amplia y natural; el Capítulo 7 presenta sus métodos sistemáticamente.
+Cuando el objetivo es una capacidad de alta dimensión (como la comprensión de imágenes médicas o una política de decisión implícita) que las reglas externas no pueden expresar por completo, los **parámetros del modelo** deben actualizarse mediante posentrenamiento. Las actualizaciones de parámetros conllevan mayores costos de despliegue, pero pueden producir una generalización amplia y natural; el Capítulo 8 presenta sus métodos sistemáticamente.
 
 ### Contexto: El Conjunto de Trabajo del Agente
 
@@ -163,6 +163,27 @@ El patrón central mediante el cual un Agente ejecuta una tarea se llama **ReAct
 Consideremos la **trayectoria**: el historial de mensajes que se acumula a medida que el Agente trabaja. En cada llamada al LLM, el contexto completo es el **prefijo estático** más la **trayectoria** (historial dinámico) (Figura 1-4). De aquí se deriva una verdad clave: **Contexto del Agente = Prefijo Estático + Trayectoria**.
 
 ![Figura 1-4: Trayectoria del Agente, Bucle ReAct para una tarea de agregación multimoneda](images/fig1-4.svg)
+
+El siguiente esquema con estilo Python es pseudocódigo explicativo, no código SDK ejecutable; el marcador `python` se usa únicamente para resaltar la sintaxis.
+
+**Bucle de control ReAct:**
+
+```python
+trajectory = [user_request]
+
+repeat:
+    context = stable_prefix + trajectory
+    decision = Model(context)
+    trajectory.append(decision)
+
+    if decision has no tool call:
+        return decision.answer
+
+    for call in decision.tool_calls:       # independent calls may run in parallel
+        validated_call = Harness.validate(call)
+        observation = Environment.execute(validated_call)
+        trajectory.append(observation)
+```
 
 Estructura de una trayectoria en pseudocódigo:
 
@@ -244,6 +265,20 @@ Si expresamos mediante una ecuación la composición completa de un sistema de p
 >
 > **Agente ↔ Entorno**
 
+**Límite de producción del Harness:**
+
+```python
+decision = Model(Harness.build_context(state, trajectory))
+allowed_action = Harness.constrain(decision)
+observation = Environment.apply(allowed_action)
+evidence = Harness.verify(allowed_action, observation)
+
+if evidence passes:
+    trajectory.append(observation)
+else:
+    trajectory.append(Harness.correct(evidence))
+```
+
 Un Agente mínimo funcional solo necesita un LLM, contexto y herramientas para ponerse en marcha; sin embargo, para que funcione de manera fiable y duradera en un entorno de producción también es necesario completar la envoltura de ingeniería con los tres niveles de restricción, verificación y corrección—la restricción impide que se sobrepasen los límites, la verificación detecta errores y la corrección permite recuperarse de las anomalías. En otras palabras, la fórmula mínima corresponde a la perspectiva de una demostración, mientras que la fórmula ampliada corresponde a la perspectiva de producción; la segunda contiene por completo a la primera y añade a su alrededor una red de seguridad.
 
 Un ejemplo ayudará a entenderlo: incorporar la política de reembolsos al contexto pertenece al ámbito del «contexto», mientras que comprobar que el importe del reembolso no supere el importe del pedido pertenece al ámbito de la «restricción»; ejecutar una llamada a una API corresponde al ámbito de las «herramientas», mientras que reintentarla automáticamente después de que la API agote el tiempo de espera pertenece al ámbito de la «corrección». El modelo proporciona las capacidades básicas de comprensión y razonamiento, mientras que el Harness orienta, restringe y amplifica esas capacidades para convertirlas en una ejecución fiable de las tareas. La práctica de ingeniería consistente en diseñar y optimizar esta infraestructura externa al modelo es la **Ingeniería de Harness** (Harness Engineering).
@@ -254,13 +289,13 @@ Volvamos a la metáfora del arnés presentada al principio del capítulo: un mod
 
 Para ser más precisos, el Harness no es todo lo que queda fuera del modelo: es la capa de ejecución y gobernanza **dentro de los límites del Agente y fuera del Modelo**. Media la interacción entre Modelo y Entorno, pero no incluye el Entorno. Las definiciones de herramientas, los adaptadores de llamadas y los mecanismos de permisos y reinicio del sandbox pertenecen al Harness; los archivos y procesos que cambian dentro del sandbox, las bases de datos externas, las páginas web, los usuarios y el mundo físico pertenecen al Entorno. La ubicación del despliegue no cambia esta frontera conceptual. El núcleo del Harness es la gestión del contexto y las interfaces de herramientas, alrededor de las cuales se construyen tres tipos de mecanismos de garantía de ingeniería:
 
-| Función | Responsabilidad en una frase | Relación con el contexto/las herramientas |
-|--------------------|----------------------------------------|-----------------------------------|
-| **Context (contexto)** | Proporcionar información perceptiva al modelo | Capacidad central |
-| **Tools (herramientas)** | Proporcionar al modelo medios para actuar | Capacidad central |
-| **Constrain (restricción)** | Establecer los límites de comportamiento—qué puede y qué no puede hacer | Límite de seguridad construido alrededor del contexto y las herramientas |
-| **Verify (verificación)** | Determinar automáticamente si el resultado de una operación es correcto | Mecanismo de comprobación construido alrededor de los resultados de ejecución de las herramientas |
-| **Correct (corrección)** | Corregir automáticamente o revertir cuando se detecta un problema | Mecanismo de recuperación construido alrededor de los fallos en las invocaciones de herramientas |
+| Función | Responsabilidad en una frase / Principio fundamental | Ejemplo práctico | Véase |
+|---|---|---|---|
+| **Context (contexto)** | Proporcionar información perceptiva al modelo; Suficiencia de la información: permitir que el Agente tome decisiones basadas en información suficiente en cada punto de decisión | Prompt del sistema, base de conocimiento, barra de estado del Agente, consultas auxiliares mediante Sidecar | Capítulos 2 y 3 |
+| **Tools (herramientas)** | Proporcionar al modelo medios para actuar; Interfaz clara: nombres intuitivos para las herramientas, ejemplos de parámetros y límites documentados | Herramientas MCP, intérprete de código, herramientas de búsqueda | Capítulo 4 |
+| **Constrain (restricción)** | Establecer los límites de comportamiento—qué puede y qué no puede hacer; Valores predeterminados a prueba de fallos: todas las capacidades están desactivadas por defecto y deben habilitarse explícitamente (de forma similar a la gestión de permisos de las aplicaciones móviles) | En Claude Code, cada herramienta requiere por defecto la autorización del usuario para poder ejecutarse | Capítulo 4 |
+| **Verify (verificación)** | Determinar automáticamente si el resultado de una operación es correcto; Aislamiento de las entradas: las comprobaciones de seguridad solo examinan datos estructurados (como los campos JSON devueltos por una herramienta), no texto generado libremente por el modelo (porque un atacante podría manipular la salida del modelo mediante una inyección de prompts) | Comprobaciones mediante linter, sistema de tipos, validación de los resultados de invocaciones de herramientas | Capítulos 5 y 6 |
+| **Correct (corrección)** | Corregir automáticamente o revertir cuando se detecta un problema; No exponer estados intermedios antes de confirmar que no es posible recuperarse (por ejemplo, si falla una invocación de herramienta, reintentar primero de forma silenciosa y no mostrar al usuario resultados incompletos) | Reintentos silenciosos, continuación de la generación, derivación a una persona tras fallos consecutivos (mecanismo de disyuntor) | Capítulos 2 y 5 |
 
 El contexto y las herramientas permiten que el Agente «haga cosas»—comprender la tarea y actuar; la restricción, la verificación y la corrección permiten que el Agente «no haga las cosas mal»—no son elementos independientes y ajenos al contexto y las herramientas, sino prácticas de ingeniería que garantizan que ambos funcionen de forma fiable en un entorno de producción. En la curva de madurez de los productos de Agentes, la importancia de ambos grupos es asimétrica.
 
@@ -296,21 +331,6 @@ Estas cinco etapas no se sustituyen unas a otras, sino que cada una contiene a l
 
 Esta conclusión ha quedado confirmada por experiencias de ingeniería recientes: el trabajo de LangChain en Terminal Bench 2.0 (una prueba de referencia que evalúa la capacidad de los Agentes para completar tareas complejas en un entorno de terminal) constituye un ejemplo contundente. Su Coding Agent pasó del 52,8 % al 66,5 % (saltó de una posición inferior al puesto 30 a situarse entre los cinco primeros), y lo que cambió no fue el modelo, sino el Harness: técnicas de ingeniería para que el Agente comprobara automáticamente los resultados de sus propias ejecuciones, detectara si había caído en un bucle repetitivo y optimizara su estrategia de razonamiento, entre otras.
 
-### Principios fundamentales de las cinco funciones del Harness
-
-La tabla anterior enumera las cinco funciones del Harness. La siguiente tabla desarrolla los principios de diseño fundamentales de cada función y los capítulos correspondientes de este libro, para ayudar al lector a establecer una relación entre los conceptos y la práctica:
-
-| Función | Principio fundamental | Ejemplo práctico | Véase |
-|------|-----------------------------------------------|-----------------------------------|-------|
-| **Contexto** | Suficiencia de la información: permitir que el Agente tome decisiones basadas en información suficiente en cada punto de decisión | Prompt del sistema, base de conocimiento, barra de estado del Agente, consultas auxiliares mediante Sidecar | Capítulos 2 y 3 |
-| **Herramientas** | Interfaz clara: nombres intuitivos para las herramientas, ejemplos de parámetros y límites documentados | Herramientas MCP, intérprete de código, herramientas de búsqueda | Capítulo 4 |
-| **Restricción** | Valores predeterminados a prueba de fallos: todas las capacidades están desactivadas por defecto y deben habilitarse explícitamente (de forma similar a la gestión de permisos de las aplicaciones móviles) | En Claude Code, cada herramienta requiere por defecto la autorización del usuario para poder ejecutarse | Capítulo 4 |
-| **Verificación** | Aislamiento de las entradas: las comprobaciones de seguridad solo examinan datos estructurados (como los campos JSON devueltos por una herramienta), no texto generado libremente por el modelo (porque un atacante podría manipular la salida del modelo mediante una inyección de prompts) | Comprobaciones mediante linter, sistema de tipos, validación de los resultados de invocaciones de herramientas | Capítulos 5 y 6 |
-| **Corrección** | No exponer estados intermedios antes de confirmar que no es posible recuperarse (por ejemplo, si falla una invocación de herramienta, reintentar primero de forma silenciosa y no mostrar al usuario resultados incompletos) | Reintentos silenciosos, continuación de la generación, derivación a una persona tras fallos consecutivos (mecanismo de disyuntor) | Capítulos 2 y 5 |
-
-Las cinco funciones forman un bucle cerrado: el contexto y las herramientas sustentan las decisiones, la restricción previene errores, la verificación detecta desviaciones y la corrección cierra el bucle. Si falta cualquiera de estos eslabones, el sistema presentará una brecha de fiabilidad. Antes de profundizar en patrones específicos de orquestación y diseños de guardrails, establezcamos primero los principios fundamentales para construir Agentes y la estrategia de selección de modelos—constituyen la base de todas las decisiones de diseño posteriores.
-
-
 ### Principios fundamentales para construir Agentes eficaces
 
 Según la experiencia de Anthropic, los sistemas de Agentes de éxito siguen tres principios fundamentales.
@@ -329,7 +349,7 @@ Antes de hablar de los patrones de orquestación, respondamos a una cuestión pr
 
 El modelo es la base inteligente del Agente, y elegir el modelo adecuado suele ser más eficaz que optimizar los prompts. Dado que los modelos evolucionan con enorme rapidez, esta sección no recomienda versiones concretas, sino que ofrece algunas orientaciones para la selección.
 
-**Modelos cerrados.** Actualmente, los dos principales proveedores de modelos cerrados más utilizados en el desarrollo de Agentes son OpenAI (serie GPT/o) y Anthropic (serie Claude). Los modelos cerrados suelen ir por delante en capacidad, pero tienen un coste más elevado y están condicionados por las políticas de API de sus proveedores. Al elegir un modelo, no se limite a consultar las clasificaciones: **debe evaluarlo con sus propias tareas** (véase el capítulo 6).
+**Modelos cerrados.** Actualmente, los dos principales proveedores de modelos cerrados más utilizados en el desarrollo de Agentes son OpenAI (serie GPT/o) y Anthropic (serie Claude). Los modelos cerrados suelen ir por delante en capacidad, pero tienen un coste más elevado y están condicionados por las políticas de API de sus proveedores. Al elegir un modelo, no se limite a consultar las clasificaciones: **debe evaluarlo con sus propias tareas** (véase el capítulo 7).
 
 **Modelos de código abierto.** En el momento de escribir este libro, la diferencia entre los modelos abiertos y cerrados es inferior a seis meses, pero su coste es sensiblemente menor. Si el escenario de negocio no exige las máximas capacidades, un modelo abierto es una opción pragmática. Estos modelos tienen costes bajos, pueden desplegarse de forma privada y admiten personalización mediante ajuste fino, por lo que son adecuados para escenarios sensibles a los costes o sujetos a requisitos de conformidad de los datos. DeepSeek, Kimi y GLM se cuentan entre los modelos chinos con mayores capacidades de Agente. Conviene tener en cuenta que las capacidades de invocación de herramientas varían considerablemente entre modelos, por lo que es imprescindible probarlos en escenarios concretos antes de elegir.
 
@@ -402,7 +422,7 @@ A medida que se profundiza la tendencia del «modelo como Agente», el valor cen
 Los modelos de orquestación analizados anteriormente resuelven el problema de cómo organizar el contexto y las herramientas dentro del Harness—cómo encadenar las llamadas a LLM, las herramientas y los flujos de datos. Sin embargo, no basta con poder ejecutar tareas; también hay que garantizar que se ejecuten correctamente y de forma segura. A continuación, abordaremos el principal mecanismo práctico para implementar las restricciones, la validación y la corrección construidas en torno al contexto y las herramientas: las guardrails.
 ### Guardarraíles y Seguridad
 
-Esta sección ofrece una visión general de alto nivel sobre los guardarraíles para establecer el panorama general. Los detalles de implementación y la práctica se desarrollan en el Capítulo 2 (protección contra inyección de prompts), Capítulo 4 (control de permisos de herramientas) y Capítulo 5 (seguridad en la ejecución de código); los lectores por primera vez no necesitan seguir cada detalle inmediatamente.
+Esta sección ofrece una visión general de alto nivel sobre los guardarraíles para establecer el panorama general. Los detalles de implementación y la práctica se desarrollan en el Capítulo 2 (la capa de contexto: protección contra inyección de prompts), Capítulo 4 (la capa de ejecución: control de permisos de herramientas) y Capítulo 5 (las capas de ejecución y de datos: seguridad en la ejecución de código y descenso de la frontera de confianza); los lectores por primera vez no necesitan seguir cada detalle inmediatamente.
 
 Los guardarraíles son la forma principal en que se implementa la capa de "restricción, verificación y corrección" del Harness: una defensa en profundidad por capas que mantiene el comportamiento del Agente seguro y controlable. Unos **guardarraíles (guardrails)** bien diseñados ayudan a gestionar los riesgos de privacidad de datos (por ejemplo, prevenir la fuga del prompt del sistema) y los riesgos reputacionales (por ejemplo, mantener el comportamiento del modelo consistente con la marca). Comienza con guardarraíles para los riesgos que ya has identificado y añade otros nuevos a medida que salgan a la luz nuevas vulnerabilidades.
 
@@ -412,15 +432,17 @@ Los guardarraíles también presentan otro modo de fallo: el **falso rechazo**. 
 
 #### Tipos de barreras de protección
 
-Según el punto en el que se aplica la protección, pueden dividirse en tres categorías: de entrada, de ejecución y de salida.
+Según el lugar donde se sitúan, las barreras se dividen en tres capas: **la capa de contexto, la capa de ejecución y la capa de datos**. No están ordenadas por el momento en que intervienen en el ciclo de la petición, sino por **lo difícil que resulta esquivarlas**: cuanto más baja es la capa, menos depende del juicio del propio modelo y más difícil es que un único ataque exitoso la atraviese. Todas las discusiones de seguridad posteriores de este libro cuelgan de este árbol.
 
-Las barreras de protección **de entrada** interceptan las solicitudes antes de que lleguen al Agente y suelen incluir cuatro mecanismos. Los **clasificadores de pertinencia** marcan las consultas que se desvían del tema; por ejemplo, cuando un asistente de programación recibe una pregunta irrelevante como «¿Cuánto mide el Empire State Building?». Los **clasificadores de seguridad** detectan jailbreaks (es decir, intentos de inducir al modelo a eludir las restricciones de seguridad) e inyecciones de prompt (Prompt Injection, es decir, la inserción de instrucciones maliciosas en la entrada). La diferencia fundamental entre ambos es la siguiente: en un jailbreak, el propio usuario intenta eludir las restricciones de seguridad del modelo, mientras que, en una inyección de prompt, un atacante manipula indirectamente el comportamiento del modelo mediante datos externos, como el contenido de páginas web o documentos. La **moderación de contenido** marca entradas dañinas o inapropiadas, como contenido violento o discriminatorio. La **protección basada en reglas**, por su parte, adopta medidas deterministas, como listas negras, límites de longitud de entrada y filtros de expresiones regulares, para prevenir amenazas conocidas como la inyección SQL.
+Las barreras de la **capa de contexto** gobiernan **qué puede ver el modelo** e interceptan el contenido antes de que entre en el contexto. Suelen constar de cuatro mecanismos. El **clasificador de relevancia** marca las consultas fuera de tema, como cuando un asistente de programación recibe «¿cuánto mide el Empire State?». El **clasificador de seguridad** detecta jailbreaks (inducir al modelo a saltarse sus límites de seguridad) e inyecciones de prompt (incrustar instrucciones maliciosas en la entrada); la diferencia clave es que el jailbreak lo intenta el propio usuario, mientras que la inyección de prompt es un atacante que manipula el modelo indirectamente a través de datos externos como páginas web o documentos. La **moderación de contenido** marca entradas dañinas o inapropiadas, como contenido violento o discriminatorio. La **protección basada en reglas** aplica medidas deterministas —listas negras, límites de longitud, filtros de expresiones regulares— frente a amenazas conocidas como la inyección SQL. El etiquetado de procedencia y la separación entre «instrucciones» y «datos» también pertenecen a esta capa; el capítulo 2 los desarrolla.
 
-Las barreras de protección **de ejecución** realizan validaciones durante las llamadas a herramientas. Su elemento central es la **clasificación del riesgo de las herramientas**: a cada herramienta se le asigna un nivel de riesgo (bajo/medio/alto) en función de si la operación es reversible, del nivel de permisos y del impacto financiero; las operaciones de alto riesgo requieren una revisión adicional o confirmación humana.
+Pero esta capa tiene un techo estructural: **un Agente que vive dentro del propio contexto atacado difícilmente puede saber si ya ha sido inyectado**. La capa de contexto puede reducir la tasa de éxito de un ataque, pero no ofrece garantías; precisamente por eso hacen falta las dos capas inferiores.
 
-Las barreras de protección **de salida** realizan comprobaciones antes de devolver la respuesta al usuario. Los **filtros de PII** revisan la salida en busca de información de identificación personal, como números de documento de identidad o de teléfono, para evitar su exposición innecesaria; la **validación de la salida**, por su parte, garantiza mediante comprobaciones de contenido que la respuesta sea coherente con los valores de la marca.
+Las barreras de la **capa de ejecución** gobiernan **qué puede hacer el modelo** y validan la acción antes de que surta efecto. Su núcleo es la **clasificación de riesgo de herramientas**: cada herramienta recibe un nivel de riesgo (bajo/medio/alto) según la reversibilidad de la operación, el nivel de permisos y el impacto económico, y las operaciones de alto riesgo exigen revisión adicional o confirmación humana. Lo decisivo es que esa revisión la realice un mecanismo **externo al contexto** —un proceso de revisión independiente, credenciales de mínimo privilegio, aislamiento en sandbox, una persona en el bucle—, pues de lo contrario caerá junto con el Agente inyectado. La respuesta que se devuelve al usuario es también una acción (el capítulo 4 la clasifica como herramienta de comunicación con el usuario), de modo que las **comprobaciones de salida** pertenecen igualmente a esta capa: el **filtro de PII** revisa la salida en busca de información personal identificable (documentos de identidad, teléfonos) para evitar exposiciones innecesarias, y la **validación de salida** comprueba el contenido para mantener las respuestas alineadas con los valores de marca.
 
-Cabe señalar que ciertos mecanismos, como el filtrado mediante expresiones regulares basado en reglas, pueden utilizarse tanto en la entrada como en la salida; la clasificación anterior se basa en su ubicación de despliegue más habitual.
+Las barreras de la **capa de datos** gobiernan **en qué puede acabar convirtiéndose el mundo**, delegando «quién puede hacer qué sobre qué registro» en un mecanismo estable y revisado por personas: políticas de seguridad a nivel de fila en la base de datos, restricciones y validadores, vistas controladas y procedimientos almacenados, y un contexto de acceso vinculado por un runtime de confianza que no puede falsificarse. El valor de esta capa reside justamente en que no depende de que las dos anteriores sean correctas: aunque la inyección de prompt tenga éxito y el código generado omita por completo las comprobaciones de permisos, la operación no autorizada seguirá siendo rechazada en la capa de datos. El capítulo 5 desarrolla esta capa con el ejemplo del software generado dinámicamente.
+
+Conviene señalar que un mismo mecanismo puede aparecer en varias capas —un filtro de expresiones regulares basado en reglas sirve tanto para la entrada como para la salida— y la clasificación anterior sigue el lugar donde ofrece su garantía. Las tres capas no son alternativas sino acumulativas: las superiores dejan fuera la mayoría de los ataques y dan realimentación temprana; las inferiores sostienen el límite inviolable cuando las superiores caen.
 
 Una práctica industrial representativa de las barreras de protección basadas en clasificadores son los Constitutional Classifiers de Anthropic[^ch1-3]. Su mecanismo central consta de tres elementos: en primer lugar, un enfoque **guiado por reglas**—se utiliza una «constitución» redactada en lenguaje natural, que especifica claramente qué contenido está permitido y cuál está prohibido, para generar datos sintéticos de entrenamiento con los que se entrenan clasificadores de entrada y salida—; en segundo lugar, la **evaluación conjunta del contexto**—los sistemas de nueva generación examinan conjuntamente la pregunta del usuario y la respuesta del modelo, porque algunas respuestas no presentan ningún problema de forma aislada, como «cómo utilizar condimentos alimentarios», y solo al cotejarlas con la pregunta puede descubrirse que «condimentos alimentarios» es en realidad una expresión codificada para referirse a reactivos químicos—; en tercer lugar, un **proceso de filtrado en dos niveles**—primero, una sonda extremadamente ligera, que lee directamente las activaciones internas del modelo con un coste prácticamente nulo, comprueba todas las conversaciones y, cuando detecta algo sospechoso, lo remite a un clasificador más potente para una segunda revisión, en lugar de rechazarlo directamente—. De este modo, aunque el primer nivel genere un mayor número de falsos positivos, la experiencia del usuario no se ve afectada y el coste se reduce de forma considerable.
 
@@ -439,11 +461,13 @@ Establece límites para los reintentos y operaciones del Agente. Si el Agente su
 **Operaciones de Alto Riesgo**
 Las operaciones sensibles, irreversibles o de alto riesgo deben activar la supervisión humana, al menos hasta que el equipo haya generado suficiente confianza en la fiabilidad del Agente. Ejemplos típicos: autorizar un reembolso elevado o procesar un pago.
 
-Con los cinco elementos de Harness en mente, el resto del libro sigue esta estructura.
+Volvamos al hilo de los cinco elementos del Harness para ver qué relación guardan con la estructura de este libro.
 
-### Este Libro como Guía Práctica de Ingeniería de Harness
+### Los cinco elementos del Harness y la parte de «construcción»
 
-Visto a través de la lente de la ingeniería de Harness, cada capítulo de este libro construye de forma sistemática un componente del Harness. La seguridad, mientras tanto, no pertenece a un solo capítulo; es una preocupación transversal de todo el libro (una preocupación transversal afecta a muchas partes de un sistema a la vez, de la misma manera que el registro de logs, en ingeniería de software, debe atravesar cada módulo). La siguiente tabla presenta las funciones de Harness, las consideraciones de seguridad y los capítulos correspondientes en una sola vista:
+**Conviene aclarar primero la relación entre las dos fórmulas, para que nadie tenga que recordar dos esqueletos.** El libro tiene un único esqueleto estructural, el que la introducción y el epílogo emplean una y otra vez: **Agente = LLM + contexto + herramientas** —los capítulos 2 a 6 construyen, los capítulos 7 a 9 evalúan y hacen evolucionar, el capítulo 10 colabora—. **Agente = Modelo + Harness** no es una partición rival puesta a su lado, sino lo mismo desplegado en su forma productiva: despliega «contexto» y «herramientas» en cinco responsabilidades —gestión del contexto, interfaz de herramientas, restricciones, verificación y corrección—. Es, por tanto, **una lente interna de la parte de «construcción»**, no un índice que cubra los diez capítulos.
+
+Dentro de ese alcance, los cinco elementos del Harness se corresponden con claridad con los capítulos 2 a 5:
 
 | Enfoque del Harness | Capítulo Correspondiente | Contenido Central | Preocupaciones de Seguridad |
 |--------------------|--------------------|-------------------------------|------------------------|
@@ -451,13 +475,51 @@ Visto a través de la lente de la ingeniería de Harness, cada capítulo de este
 | Extensión de Contexto | Capítulo 3 (Base de Conocimiento) | Memoria del usuario, RAG, indexación estructurada, RAG agentizado | Exposición de información sensible, protección de la privacidad |
 | Diseño de Herramientas y Restricciones | Capítulo 4 (Diseño de Herramientas) | Clasificación de herramientas, control de permisos, estándar MCP, arquitectura asíncrona | Operaciones erróneas, acceso no autorizado, operaciones irreversibles |
 | Verificación y Corrección de Herramientas | Capítulo 5 (Generación de Código) | Harness de Coding Agents, desarrollo guiado por pruebas, reglas codificadas | Suplantación de identidad, atribución de responsabilidad |
-| Verificación a Nivel de Sistema | Capítulo 6 (Evaluación) | Entorno de evaluación, conjuntos de datos, evaluación automatizada, observabilidad |, |
-| Corrección a Nivel de Modelo | Capítulo 7 (Posentrenamiento) | SFT (Ajuste Fino Supervisado), Aprendizaje por Refuerzo | Desalineación de objetivos, alineación y robustez |
-| Corrección a Nivel de Sistema | Capítulo 8 (Autoevolución) | Aprendizaje externalizado, creación de herramientas, acumulación de experiencia |, |
-| Contexto y Herramientas Multimodales | Capítulo 9 (Interacción Multimodal y en Tiempo Real) | Agentes de voz, uso de computadoras, operación robótica | Filtrado de seguridad de entradas multimodales, control de permisos en tiempo real |
-| Restricciones y Correcciones entre Múltiples Agentes | Capítulo 10 (Colaboración Multiagente) | Arquitectura de colaboración, modos de fallo, sociedad de Agentes | Violación de límites de confianza entre Agentes, conflictos de recursos compartidos |
+
+El capítulo 6 (interacción) no pertenece a ninguno de los cinco elementos: lo que amplía es la modalidad y el momento de los propios espacios de observación y acción. Los capítulos 7 a 9 preguntan **cómo sabemos que el Harness se construyó bien y cómo lograr que siga mejorando**. El capítulo 10 sustituye el Harness de un Agente por una estructura de colaboración entre varios. Forzar esos capítulos dentro de las cinco casillas solo hace que las casillas dejen de discriminar.
+
+La seguridad tampoco se reparte por capítulos: es una preocupación transversal (cross-cutting concern, un problema que afecta a varias partes del sistema) que recorre todo el libro y se organiza según las tres capas de barreras de la sección anterior: contexto, ejecución y datos. La columna «foco de seguridad» de la tabla indica dónde aterriza principalmente cada capítulo dentro de esas tres capas.
 
 La práctica de Anthropic en la construcción de Agentes de larga duración muestra cómo el diseño de Harness puede resolver problemas que el modelo por sí solo no puede. Dividen las tareas complejas entre un "Agente de Inicialización" (que configura el entorno y descompone la lista de tareas) y un "Agente de Ejecución" (que avanza de forma incremental en cada sesión y deja artefactos de entrega claros), utilizando un Harness estructurado para abordar los dos modos de fallo de las tareas largas: quedarse sin contexto y declarar la tarea completada prematuramente. Los capítulos siguientes analizan el Harness componente por componente: el Capítulo 2 comienza con el más central, la ingeniería de contexto, y el Capítulo 5 expone la práctica completa de la ingeniería de Harness en los Coding Agents.
+## Patrones de diseño que recorren todo el libro
+
+Los nueve capítulos siguientes recurren una y otra vez al mismo puñado de estructuras. No pertenecen a ningún capítulo concreto: son soluciones repetidas bajo una misma restricción, así que aquí las nombramos de una vez y damos a cada una su definición canónica. Después, cada capítulo las invoca por su nombre y solo describe su variante local.
+
+**Proponente-Revisor (Proposer-Reviewer)**: la producción y el juicio corren a cargo de dos papeles que no comparten contexto, y quien juzga ve el artefacto en sí —el resultado renderizado, la salida de las pruebas, los argumentos estructurados de la llamada— y no el razonamiento de quien produce. Su premisa es que **la autorrevisión no es fiable**: un modelo dentro de un contexto no puede ocurrírsele lo que no se le ocurrió, ni le resulta fácil saber si ya ha sido inyectado. El capítulo 3 lo usa para actualizar conocimiento; el capítulo 4, para la aprobación previa y la validación posterior de las llamadas a herramientas (el Sidecar es una variante de solo lectura); los tres experimentos del capítulo 5 —presentaciones, vídeo y registros— se construyen sobre él; el capítulo 7 lo usa para evaluar interfaces; el capítulo 9, para revisar propuestas de actualización; y el capítulo 10 analiza su forma en la colaboración entre pares y por qué un Agente no debe revisarse a sí mismo.
+
+**Divulgación progresiva (Progressive Disclosure)**: en lugar de meter toda la información en el contexto de una vez, se ofrece primero un catálogo consultable y se cargan los detalles bajo demanda. Optimiza dos cosas a la vez: el presupuesto de contexto y la precisión de selección. Las Agent Skills del capítulo 2 son su forma arquetípica (metadatos residentes, cuerpo cargado bajo demanda); la recuperación por capas del capítulo 3, el descubrimiento proactivo de herramientas y el truncado paginado del capítulo 4, y el descubrimiento de Agentes del capítulo 10 son variantes suyas.
+
+**Solo añadir (Append-only)**: el estado avanza por adición y lo ya escrito no se reescribe. Lo que se gana es cacheabilidad, reproducibilidad y auditabilidad. La estabilidad del prefijo de la KV Cache del capítulo 2 es su forma en clave de rendimiento —cuanto antes cae el cambio, más caché invalida—; la memoria por eventos del capítulo 3 y la costumbre del capítulo 4 de añadir el esquema de una herramienta recién descubierta al final de la trayectoria en vez de reinsertarlo en el prefijo obedecen a la misma disciplina.
+
+**Conjunto de frontera + conjunto de retención (Boundary Set + Retention Set)**: toda modificación debe validarse a la vez sobre «las muestras que debe cambiar» y sobre «las muestras a las que no debe afectar». Medir solo las primeras confunde el sobreajuste con el progreso; medir solo las segundas confunde un cambio inútil con uno seguro. Las tareas de regresión del capítulo 7, el aislamiento entre entrenamiento y evaluación del capítulo 8 y la validación de propuestas de actualización del capítulo 9 se apoyan en ese par de conjuntos.
+
+**Diff mínimo y reversible (Minimal Diff, Reversible)**: cada cambio debe ser lo más pequeño posible, llevar su procedencia y poder revertirse por separado, en lugar de reescribirse en bloque. Eso es lo que hace posible la atribución: cuando algo falla, puede rastrearse hasta un cambio concreto. Las actualizaciones de conocimiento del capítulo 3, los parches de código del capítulo 5 y las actualizaciones de prompts y programas del capítulo 9 lo siguen; y las tres vías de actualización presentadas al inicio de este capítulo (adaptación en contexto, actualización de artefactos externos, actualización de parámetros) están ordenadas justamente de mayor a menor reversibilidad.
+
+Estos cinco patrones comparten un mismo motivo: **trasladar el juicio de «lo decide el modelo» a «lo decide un mecanismo externo al modelo»**: el revisor está fuera del contexto, el catálogo fuera del cuerpo del texto, la caché fuera del cambio, el conjunto de retención fuera del de frontera, la reversión fuera del commit. Las tres capas de barreras presentadas antes en este capítulo son ese mismo motivo aplicado a la seguridad. Cuando estos patrones reaparezcan, el libro los nombrará y señalará la diferencia local en vez de volver a derivarlos.
+
+## El bucle de descubrimiento: evidencia, propuesta, experimento, realimentación
+
+Los cinco patrones de la sección anterior son estructuras locales. Hay una estructura mayor que abarca tres capítulos, pero como está construida por partes se confunde fácilmente con tres tuberías independientes.
+
+El capítulo 7 tiene que localizar el primer error de una trayectoria fallida y clasificarlo. El capítulo 3 tiene que convertir una nueva evidencia en el cambio más pequeño y mejor fundamentado posible de la base de conocimiento. El capítulo 9 tiene que decidir si una modificación mejoró realmente el sistema y, después, si publicarla o revertirla. Los tres usan maquinaria completamente distinta —la atribución se apoya en rúbricas y en la localización del primer error; la propuesta, en Proponente-Revisor; la validación, en el conjunto de frontera y el de retención, con despliegue canario y reversión—, de modo que **no son tres repeticiones de un mismo mecanismo**, y unificar a la fuerza su vocabulario ocultaría precisamente las diferencias que importan.
+
+Lo que de verdad comparten es una posición: cada uno ocupa un tramo del mismo bucle.
+
+```text
+Evidencia (capítulo 7): trayectoria fallida → primer error + clase de error
+  → Propuesta (capítulo 3): evidencia → un cambio mínimo, revisable y reversible
+  → Experimento (capítulo 9): medición sobre el conjunto de frontera y el de retención, despliegue canario
+  → Realimentación: los resultados medidos y las nuevas trayectorias fallidas vuelven al tramo de evidencia
+```
+
+Este bucle acaba de ser nombrado y llevado hacia la automatización por Discovery Loop, la empresa fundada por Jeff Dean y colegas: proponer un experimento, implementar lo que necesita, evaluarlo, llevar el resultado a la ronda siguiente y paralelizar un proceso que antes era serial[^ch1-discovery-loop]. Conviene decirlo con claridad: la empresa se fundó en agosto de 2026 y hasta ahora solo ha publicado su misión, sin resultados técnicos públicos; este libro la cita por **el nombre que da al bucle**, no como evidencia—justo la distinción que el capítulo 7 subrayará una y otra vez.
+
+Poner el bucle de un sistema de Agentes junto a un bucle de investigación puro revela dos restricciones adicionales, y son precisamente aquello de lo que trata buena parte del resto del libro. **Primera: el experimento debe estar anclado en observación real.** En un bucle de investigación el «experimento» puede ser una tirada de entrenamiento; en un sistema de Agentes modifica un sistema que está atendiendo usuarios, así que el veredicto ha de venir del estado real del entorno —si pasan las pruebas, el estado final de la base de datos, lo que devolvió la herramienta— y no del relato que el modelo hace de su propia conducta. **Segunda: cada experimento debe responder a la vez «qué arregló» y «qué rompió».** Un bucle de investigación suele buscar solo que la métrica suba; un sistema de Agentes debe además demostrar que no ha estropeado el comportamiento que ya era correcto. Ésa es la razón de ser del conjunto de frontera y el de retención de la sección anterior.
+
+Los tres capítulos siguientes cubren cada uno su propio tramo y no repiten el bucle entero: el capítulo 3, qué hace que una propuesta esté bien fundamentada; el capítulo 7, qué hace que una evidencia sea fiable; el capítulo 9, qué mantiene el experimento y la realimentación funcionando a largo plazo sin dispersarse.
+
+[^ch1-discovery-loop]: Discovery Loop fue anunciada el 5 de agosto de 2026 por Jeff Dean, Sanjay Ghemawat, Quoc Le y Oriol Vinyals como una public benefit corporation cuya misión es automatizar el aprendizaje automático, la ciencia y la ingeniería; su descripción pública consiste en automatizar bucles experimentales completos y paralelizar a gran escala lo que antes se ejecutaba en serie. Véase https://techcrunch.com/2026/08/05/jeff-dean-and-other-top-ai-researchers-are-leaving-google-to-launch-their-own-startup/ . Hasta la redacción de este libro no ha publicado resultados técnicos reproducibles.
+
 ## Resumen del capítulo
 
 Este capítulo ha establecido, desde una perspectiva práctica, un marco fundamental para comprender y construir Agentes de IA.
@@ -472,11 +534,16 @@ Este capítulo ha establecido, desde una perspectiva práctica, un marco fundame
 
 **Del workflow al Agente autónomo**: primero hay que optimizar el prompt, después considerar un workflow y solo entonces introducir un Agente autónomo—este es el orden más práctico para reducir el riesgo de resultados inesperados. Cada patrón de orquestación tiene sus propios escenarios de aplicación; no existe una solución óptima universal.
 
-**La seguridad es una cuestión de arquitectura**: guardrails, intervención humana y alineación (alignment, es decir, hacer que el comportamiento del modelo sea coherente con la intención humana)—la seguridad debe tenerse en cuenta desde la primera línea de código, en lugar de abordarse mediante parches justo antes del lanzamiento. Las cuestiones de seguridad abarcan cinco niveles: modelo, contexto, herramientas, colaboración y sociedad.
+**Cinco patrones recorren el libro**: Proponente-Revisor, divulgación progresiva, solo añadir, conjunto de frontera + conjunto de retención, y diff mínimo reversible; todos comparten un mismo motivo, trasladar el juicio del propio modelo a un mecanismo externo a él. Los capítulos posteriores los invocan por su nombre en lugar de volver a derivarlos.
 
-El próximo capítulo profundizará en el componente más importante del Harness—la ingeniería de contexto. En cuanto a los orígenes académicos del concepto de Agente en el aprendizaje por refuerzo y a la comparación exhaustiva entre el RL tradicional y los Agentes LLM modernos, los abordaremos sistemáticamente en el capítulo 7.
+**El bucle de descubrimiento abarca tres capítulos**: evidencia (la atribución de fallos del capítulo 7) → propuesta (la actualización de conocimiento del capítulo 3) → experimento y realimentación (la validación y publicación del capítulo 9). Los tres tramos usan maquinaria genuinamente distinta; lo que comparten es la posición, no el vocabulario. Frente a un bucle de investigación puro, el de un sistema de Agentes añade dos restricciones: el experimento debe anclarse en observación real y cada ronda debe responder tanto qué arregló como qué rompió.
+
+**La seguridad es una cuestión de arquitectura**: guardrails, intervención humana y alineación (alignment, es decir, hacer que el comportamiento del modelo sea coherente con la intención humana)—la seguridad debe tenerse en cuenta desde la primera línea de código, en lugar de abordarse mediante parches justo antes del lanzamiento. Las barreras se agrupan en tres capas —contexto, ejecución y datos— ordenadas por lo difícil que resulta esquivarlas, y todos los capítulos posteriores cuelgan de ese esqueleto sus discusiones de seguridad.
+
+El próximo capítulo profundizará en el componente más importante del Harness—la ingeniería de contexto. En cuanto a los orígenes académicos del concepto de Agente en el aprendizaje por refuerzo y a la comparación exhaustiva entre el RL tradicional y los Agentes LLM modernos, los abordaremos sistemáticamente en el capítulo 8.
 
 Las siguientes preguntas de reflexión tienen como objetivo ayudar a los lectores a explorar con mayor profundidad los conceptos centrales de este capítulo; no tienen una respuesta única y oficial.
+
 ## Preguntas de Reflexión
 
 1. ★★ Si solo pudieras añadir una capacidad a un sistema de Agente (un modelo más fuerte, un contexto más rico o más herramientas), ¿cuál elegirías? ¿En qué condiciones cambiaría tu elección?
