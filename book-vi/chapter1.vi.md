@@ -12,7 +12,7 @@ Chương này sẽ giúp bạn hiểu các thành phần cốt lõi của AI Age
 
 Bản chất của hệ thống Agent hiện đại có thể được thể hiện bằng một công thức ngắn gọn: **Agent = LLM (Large Language Model) + Context + Tools**. Công thức này ngắn gọn và thiết thực, nhưng mỗi từ trong đó cần được hiểu theo nghĩa rộng:
 
-- **LLM là bộ não của Agent**: Nó không chỉ là một tập hợp các tham số mô hình, mà là toàn bộ cốt lõi ra quyết định của Agent - hiểu ý định, suy nghĩ và lập kế hoạch cũng như đưa ra phán đoán. Cũng giống như bộ não con người không chỉ là tập hợp các tế bào thần kinh mà còn bao gồm cách suy nghĩ được hình thành bởi kinh nghiệm. Khả năng của LLM cũng đến từ hai phần: kiến thức thế giới và khả năng ngôn ngữ được tích lũy trong **tiền đào tạo** và chiến lược ra quyết định được củng cố trong **post-training** - công nghệ cụ thể của phần sau (như tinh chỉnh có giám sát và học tăng cường) sẽ được ra mắt trong Chương 7.
+- **LLM là bộ não của Agent**: Nó không chỉ là một tập hợp các tham số mô hình, mà là toàn bộ cốt lõi ra quyết định của Agent - hiểu ý định, suy nghĩ và lập kế hoạch cũng như đưa ra phán đoán. Cũng giống như bộ não con người không chỉ là tập hợp các tế bào thần kinh mà còn bao gồm cách suy nghĩ được hình thành bởi kinh nghiệm. Khả năng của LLM cũng đến từ hai phần: kiến thức thế giới và khả năng ngôn ngữ được tích lũy trong **tiền đào tạo** và chiến lược ra quyết định được củng cố trong **post-training** - công nghệ cụ thể của phần sau (như tinh chỉnh có giám sát và học tăng cường) sẽ được ra mắt trong Chương 8.
 - **Ngữ cảnh là con mắt của Agent**: Nó không chỉ là văn bản đầu vào cho mô hình mà còn là tất cả thông tin Agent có thể nhìn thấy tại mỗi điểm quyết định - thông tin môi trường, bộ nhớ người dùng, kiến thức miền, trạng thái riêng và tiến độ nhiệm vụ. Giống như con người cần nhìn rõ tình hình hiện tại, nhớ lại những trải nghiệm liên quan và duyệt tài liệu tham khảo khi đưa ra quyết định, cửa sổ ngữ cảnh của Agent là tất cả những gì nó có thể nhìn thấy vào lúc này.
 - **Công cụ là bàn tay và bàn chân của Agent**: Nó không chỉ là một vài chức năng API có thể gọi được mà là tập hợp tất cả mọi thứ mà Agent có thể thực hiện - từ lệnh gọi công cụ được xác định trước đến các kỹ năng chuyên nghiệp (Kỹ năng) được tải theo yêu cầu, từ việc tạo mã động để tạo các khả năng mới cho đến cộng tác Agent phụ được ủy quyền, từ việc tích cực giao tiếp với người dùng đến phản hồi các sự kiện bên ngoài.
 
@@ -26,7 +26,7 @@ Hình 1-1 cho thấy hai cấp độ trừu tượng. Cấp độ bên ngoài l�
 
 Công thức kỹ thuật có thể được triển khai như sau: LLM tương ứng với Model, Context + Tools tạo thành Harness tối thiểu; hệ thống sản xuất bổ sung ràng buộc, xác minh và sửa lỗi bên trong ranh giới đó. Phần còn lại của chương này tuân theo ranh giới này.
 
-Ba thành phần này liên quan đến ba khái niệm cốt lõi trong RL (học tăng cường; xem Chương 7), nhưng không tương đương một-một nghiêm ngặt: context là biểu diễn bên trong Agent của các quan sát và lịch sử, còn tools định nghĩa giao diện quan sát/hành động; các đối tượng phía sau chúng vẫn thuộc về Môi trường.
+Ba thành phần này liên quan đến ba khái niệm cốt lõi trong RL (học tăng cường; xem Chương 8), nhưng không tương đương một-một nghiêm ngặt: context là biểu diễn bên trong Agent của các quan sát và lịch sử, còn tools định nghĩa giao diện quan sát/hành động; các đối tượng phía sau chúng vẫn thuộc về Môi trường.
 
 | Hiểu biết trực quan | Thành phần triển khai | Khái niệm học thuật | Ý nghĩa |
 |---------|---------|---------|------|
@@ -82,7 +82,7 @@ Quá trình gọi công cụ được chia thành bốn bước: đầu tiên, c
 
 Lấy kịch bản kiểm tra thời tiết làm ví dụ, cách trình bày đơn giản hóa quy trình bốn bước ở cấp độ API như sau:
 
-```
+```text
 Bước 1: Khai báo công cụ Bước 2: Mô hình lời gọi quyết định
 tools: [{                          assistant: {
   name: "get_weather",               tool_calls: [{
@@ -128,11 +128,11 @@ Trước đây chúng ta đã đề cập rằng mô hình có thể nội hóa 
 
 ![Hình 1-2: Ba mô hình học tập của Đặc vụ ](images/fig1-2.svg)
 
-- **Post-training**: Củng cố kinh nghiệm về các tham số của mô hình thông qua học tăng cường, mang lại tính linh hoạt giữa các tác vụ mạnh nhất nhưng chi phí cập nhật cao (xem Chương 7 để biết chi tiết).
+- **Post-training**: Củng cố kinh nghiệm về các tham số của mô hình thông qua học tăng cường, mang lại tính linh hoạt giữa các tác vụ mạnh nhất nhưng chi phí cập nhật cao (xem Chương 8 để biết chi tiết).
 - **In-Context Learning (học trong ngữ cảnh)**: Điều chỉnh nhanh chóng công thức truy xuất mẫu trong ngữ cảnh thông qua cơ chế chú ý (Cơ chế chú ý, tức là cơ chế mà mô hình quyết định "thông tin nào cần chú ý" khi xử lý đầu vào). Ví dụ: nếu bạn hiển thị cho mô hình một số ví dụ về xử lý các cuộc hội thoại dịch vụ khách hàng bằng các từ gợi ý (chẳng hạn như "Khiếu nại của người dùng → Kế hoạch xoa dịu + bồi thường"), mô hình sẽ có thể xử lý các cuộc hội thoại dịch vụ khách hàng mới theo cách tương tự - đây là In-Context Learning (học trong ngữ cảnh). Thích ứng nhanh chóng nhưng chỉ là tạm thời và biến mất vào cuối phiên. Cần lưu ý rằng mặc dù tên là "học tập" nhưng cơ chế bên trong của nó gần với việc khớp mẫu hơn là học thực sự. Ví dụ: nếu bạn được xem ba câu hỏi và câu trả lời toán cùng loại, sau đó được đưa ra câu hỏi thứ tư, rất có thể bạn sẽ làm theo cùng một khuôn mẫu - đây là điều mà việc In-Context Learning (học trong ngữ cảnh) đang thực hiện. Nhưng nếu câu hỏi thứ tư đòi hỏi một cách giải quyết vấn đề mới thì việc chỉ nhìn vào câu trả lời cho ba câu hỏi đầu tiên là chưa đủ. Nói cách khác, In-Context Learning (học trong ngữ cảnh) cho phép mô hình **áp dụng các mẫu mà nó đã thấy**, nhưng nó không thể **khám phá các quy tắc mới** - điều này về cơ bản khác với post-training (Chương 2 sẽ mở rộng chi tiết về lập luận này từ góc độ của cơ chế chú ý).
 - **External Learning (học bên ngoài tham số mô hình)**: Ngoại hóa kiến thức và quy trình thành cơ sở kiến thức và mã công cụ thực thi, vừa bền vững vừa có thể hiểu được.
 
-Ba mô hình này bổ sung cho nhau ở các khoảng thời gian khác nhau: post-training cung cấp các năng lực nền tảng, In-Context Learning (học trong ngữ cảnh) cho phép thích ứng nhanh chóng và External Learning (học bên ngoài tham số mô hình) đảm bảo độ tin cậy và hiệu quả. Chương 8 sẽ so sánh một cách có hệ thống các mối quan hệ hiệp lực giữa ba mô hình.
+Ba mô hình này bổ sung cho nhau ở các khoảng thời gian khác nhau: post-training cung cấp các năng lực nền tảng, In-Context Learning (học trong ngữ cảnh) cho phép thích ứng nhanh chóng và External Learning (học bên ngoài tham số mô hình) đảm bảo độ tin cậy và hiệu quả. Chương 9 sẽ so sánh một cách có hệ thống các mối quan hệ hiệp lực giữa ba mô hình.
 
 Ví dụ: post-training cũng giống như việc học sách giáo khoa một cách có hệ thống - sau khi học, khả năng được nâng cao vĩnh viễn nhưng chi phí học tập cao; In-Context Learning (học trong ngữ cảnh) cũng giống như tham khảo tài liệu tham khảo ngay tại chỗ - bạn có thể làm điều đó nếu có thông tin và quên nó sau khi đóng lại; External Learning (học bên ngoài tham số mô hình) giống như việc sắp xếp một cuốn sổ cá nhân - thông tin luôn tồn tại và có thể kiểm tra bất cứ lúc nào, nhưng nó cần phải được sắp xếp một cách đặc biệt.
 
@@ -170,9 +170,30 @@ Hãy cùng tìm hiểu trajectory của Agent thông qua một ví dụ cụ th�
 
 ![Hình 1-4: Trajectory tác nhân - Vòng lặp ReAct của nhiệm vụ tóm tắt đa tiền tệ ](images/fig1-4.svg)
 
+Bản phác thảo theo phong cách Python dưới đây là pseudocode mang tính giải thích, không phải mã SDK có thể chạy; marker `python` chỉ dùng để tô sáng cú pháp.
+
+**Vòng lặp điều khiển ReAct:**
+
+```python
+trajectory = [user_request]
+
+repeat:
+    context = stable_prefix + trajectory
+    decision = Model(context)
+    trajectory.append(decision)
+
+    if decision has no tool call:
+        return decision.answer
+
+    for call in decision.tool_calls:       # independent calls may run in parallel
+        validated_call = Harness.validate(call)
+        observation = Environment.execute(validated_call)
+        trajectory.append(observation)
+```
+
 Hãy cùng chúng tôi tìm hiểu cấu trúc trajectory Agent thông qua mã giả:
 
-```
+```text
 trajectory = [
 {role: "user" , content: "Dựa trên doanh thu hàng quý của công ty: Quý 1 2,5 triệu đô la Mỹ, quý 2 2,1 triệu euro, quý 3 1,8 triệu bảng Anh, quý 4 380 triệu yên, tính tổng doanh thu hàng năm và doanh thu trung bình hàng quý của công ty" },
 
@@ -219,7 +240,7 @@ Trajectory không chỉ là bản ghi thực hiện mà còn phản ánh khả n
 
 Sau khi hiểu được vòng lặp đang chạy của Agent, chúng ta hãy sử dụng hai thử nghiệm để cảm nhận xem các mô hình khác nhau điều khiển vòng lặp này như thế nào.
 
-> **Thử nghiệm 1.2 ★: Khả năng Agent gốc của Kimi K3**
+> **Thử nghiệm 1-2 ★: Khả năng Agent gốc của Kimi K3**
 >
 > Thử nghiệm này thể hiện khả năng Agent vốn có của **Kimi K3** và thể hiện mô hình mới của "mô hình là Agent". Kimi K3 là mô hình Mixture of Experts (MoE) với khoảng 2,8 nghìn tỷ thông số - bạn có thể coi MoE như một nhóm chuyên gia: đối mặt với nhiều loại câu hỏi khác nhau, hệ thống sẽ tự động chọn ra các chuyên gia phù hợp nhất để trả lời mà không cần tất cả các chuyên gia đều có mặt tại hiện trường cùng lúc, điều này không chỉ đảm bảo năng lực mà còn nâng cao hiệu quả. Nó có cửa sổ ngữ cảnh gồm 1 triệu mã thông báo, khả năng hiểu trực quan gốc và "chế độ suy nghĩ" luôn bật; thông qua đào tạo học tăng cường, mô hình này nội hóa **chiến lược quyết định** gọi công cụ thành khả năng gốc — khi nào gọi công cụ, gọi công cụ nào, truyền tham số gì đều do mô hình tự quyết định — nhờ đó có thể tự chủ hoàn thành các tác vụ như tìm kiếm trên web. Cần nói rõ rằng thứ được nội hóa là quyết định "khi nào gọi, gọi như thế nào", còn bản thân các công cụ như `web_search`, `code_runner` vẫn được thực thi ở phía máy chủ dưới dạng công cụ tích hợp sẵn ở cấp API (Kimi chạy các công cụ chính thức này thông qua một engine kịch bản phía máy chủ có tên Formula).
 >
@@ -259,6 +280,20 @@ Sử dụng các phương trình để mở rộng thành phần hoàn chỉnh �
 >
 > **Agent ↔ Môi trường**
 
+**Ranh giới Harness production:**
+
+```python
+decision = Model(Harness.build_context(state, trajectory))
+allowed_action = Harness.constrain(decision)
+observation = Environment.apply(allowed_action)
+evidence = Harness.verify(allowed_action, observation)
+
+if evidence passes:
+    trajectory.append(observation)
+else:
+    trajectory.append(Harness.correct(evidence))
+```
+
 Agent hoạt động nhỏ nhất chỉ cần LLM, ngữ cảnh và công cụ để chạy; nhưng để làm cho nó chạy đáng tin cậy trong môi trường sản xuất trong thời gian dài, nó cũng cần hoàn thiện lớp vỏ kỹ thuật ba lớp gồm các ràng buộc, xác minh và sửa chữa - các ràng buộc để ngăn chặn các trường hợp vượt quá giới hạn, xác minh để phát hiện lỗi cũng như sửa chữa và phục hồi các trường hợp ngoại lệ. Nói cách khác, công thức tối thiểu là bối cảnh demo và công thức mở rộng là bối cảnh sản xuất; cái sau hoàn toàn bao gồm cái trước và bổ sung thêm một mạng lưới an toàn xung quanh vùng ngoại vi.
 
 Một ví dụ để giúp hiểu: việc đưa chính sách hoàn tiền vào ngữ cảnh là danh mục "ngữ cảnh", trong khi việc xác minh rằng số tiền hoàn lại không vượt quá số tiền đặt hàng là một "ràng buộc"; việc thực thi công cụ của lệnh gọi API là một danh mục "công cụ" và việc tự động thử lại API sau khi hết thời gian chờ là một "sửa chữa". Các mô hình cung cấp khả năng hiểu biết và lý luận cơ bản, đồng thời Harness hướng dẫn, hạn chế và khuếch đại các khả năng này để thực hiện nhiệm vụ một cách đáng tin cậy. Hoạt động kỹ thuật thiết kế và tối ưu hóa cơ sở hạ tầng bên ngoài mô hình này là Harness Engineering.
@@ -269,13 +304,13 @@ Quay trở lại với phép ẩn dụ về dây nịt được đưa ra ở đ�
 
 Chính xác hơn, Harness không phải là mọi thứ bên ngoài mô hình; đó là **lớp chạy và quản trị nằm trong ranh giới Agent nhưng bên ngoài Model**. Harness trung gian cho tương tác giữa Model và Môi trường nhưng không bao gồm chính Môi trường. Định nghĩa công cụ, bộ chuyển đổi lệnh gọi, quyền sandbox và cơ chế đặt lại thuộc về Harness; các tệp và tiến trình thay đổi trong sandbox, cơ sở dữ liệu bên ngoài, trang web, người dùng và thế giới vật lý thuộc về Môi trường. Vị trí triển khai không làm thay đổi ranh giới khái niệm này. Cốt lõi của Harness là quản lý ngữ cảnh và giao diện công cụ, xung quanh đó ba loại cơ chế đảm bảo kỹ thuật được xây dựng:
 
-| Chức năng | Trách nhiệm trong một câu | Mối quan hệ với ngữ cảnh/công cụ |
-|------|-----------|-------------------|
-|**Ngữ cảnh**| Cung cấp thông tin cảm quan cho mô hình | Năng lực cốt lõi |
-|**Công cụ**| Cung cấp phương tiện hành động cho mô hình | Năng lực cốt lõi |
-|**Hạn chế**| Đặt ra ranh giới hành vi - những gì có thể và không thể làm được | Ranh giới an toàn được xây dựng xung quanh ngữ cảnh và công cụ |
-|**Xác minh**| Tự động xác định kết quả thao tác đúng hay sai | Cơ chế kiểm tra được xây dựng dựa trên kết quả thực thi công cụ |
-|**Sửa lỗi**| Tự động sửa hoặc khôi phục khi phát hiện sự cố | Cơ chế phục hồi được xây dựng xung quanh lỗi gọi công cụ |
+| Chức năng | Trách nhiệm trong một câu / Nguyên tắc cốt lõi | Ví dụ thực tế | Xem chi tiết |
+|---|---|---|---|
+| **Ngữ cảnh** | Cung cấp thông tin cảm quan cho mô hình; Đầy đủ thông tin: Hãy để Agent đưa ra phán đoán dựa trên thông tin đầy đủ tại mỗi thời điểm quyết định | System prompt, cơ sở kiến thức, thanh trạng thái Agent, truy vấn bỏ qua Sidecar | Chương 2 và 3 |
+| **Công cụ** | Cung cấp phương tiện hành động cho mô hình; Giao diện rõ ràng: đặt tên công cụ trực quan, ví dụ về tham số và mô tả ranh giới | Công cụ MCP, trình thông dịch mã, công cụ tìm kiếm | Chương 4 |
+| **Hạn chế** | Đặt ra ranh giới hành vi - những gì có thể và không thể làm được; Giá trị mặc định không an toàn: tất cả các tính năng đều bị tắt theo mặc định và phải được mở một cách rõ ràng (tương tự như quản lý quyền ứng dụng di động) | Theo mặc định, mỗi công cụ trong Claude Code đều yêu cầu ủy quyền của người dùng để thực thi | Chương 4 |
+| **Xác minh** | Tự động xác định kết quả thao tác đúng hay sai; Cách ly đầu vào: Kiểm tra bảo mật chỉ xem xét dữ liệu có cấu trúc (chẳng hạn như trường JSON được công cụ trả về), chứ không phải văn bản do mô hình tạo tự do (vì kẻ tấn công có thể thao túng đầu ra của mô hình thông qua prompt injection) | Kiểm tra linter, hệ thống loại, xác minh kết quả cuộc gọi công cụ | Chương 5 và 6 |
+| **Sửa lỗi** | Tự động sửa hoặc khôi phục khi phát hiện sự cố; Trước khi xác nhận rằng không thể khôi phục, không để lộ trạng thái trung gian (ví dụ: thử lại trong im lặng khi lệnh gọi công cụ không thành công và không hiển thị kết quả bán thành phẩm cho người dùng) | Âm thầm thử lại, tiếp tục tạo và quay lại phán đoán thủ công (cơ chế ngắt mạch) khi xảy ra lỗi liên tục | Chương 2 và 5 |
 
 Ngữ cảnh và công cụ cho phép Agent "làm mọi việc" - hiểu nhiệm vụ và thực hiện hành động; các ràng buộc, xác minh và sửa chữa cho phép Agent "không làm sai" - chúng không phải là những thứ độc lập với ngữ cảnh và công cụ, mà là các thực tiễn kỹ thuật đảm bảo rằng ngữ cảnh và công cụ hoạt động đáng tin cậy trong môi trường sản xuất. Trên đường cong trưởng thành của sản phẩm Agent, tầm quan trọng của cả hai là không đối xứng.
 
@@ -311,21 +346,6 @@ Năm giai đoạn này không thay thế mà được bao gồm từng lớp: Pr
 
 Nhận định này đã được xác minh trong thực tiễn kỹ thuật gần đây - thực tiễn của LangChain trên Terminal Bench 2.0 (một bài kiểm tra điểm chuẩn để đánh giá khả năng Agent hoàn thành các nhiệm vụ phức tạp trong môi trường thiết bị đầu cuối) là một ví dụ điển hình: Coding Agent của họ đã tăng từ 52,8% lên 66,5% (nhảy từ vị trí thứ 30 trong bảng xếp hạng lên top 5). Thứ thay đổi không phải là mô hình mà là Harness: Hãy để Agent tự động kiểm tra kết quả thực thi của chính nó, phát hiện xem liệu nó có bị mắc kẹt trong một vòng lặp lặp đi lặp lại hay không và tối ưu hóa các chiến lược tư duy cũng như các phương pháp kỹ thuật khác.
 
-### Nguyên tắc Harness cốt lõi của năm chức năng
-
-Bảng trên liệt kê năm chức năng của Harness. Bảng sau đây mở rộng thêm về các nguyên tắc thiết kế cốt lõi của từng tính năng và các chương tương ứng trong cuốn sách để giúp người đọc vạch ra các khái niệm để thực hành:
-
-| Tính năng | Nguyên tắc cốt lõi | Ví dụ thực tế | Xem chi tiết |
-|------|---------|---------|------|
-|**Ngữ cảnh**| Đầy đủ thông tin: Hãy để Agent đưa ra phán đoán dựa trên thông tin đầy đủ tại mỗi thời điểm quyết định | System prompt, cơ sở kiến thức, thanh trạng thái Agent, truy vấn bỏ qua Sidecar | Chương 2 và 3 |
-|**Công cụ**| Giao diện rõ ràng: đặt tên công cụ trực quan, ví dụ về tham số và mô tả ranh giới | Công cụ MCP, trình thông dịch mã, công cụ tìm kiếm | Chương 4 |
-|**Ràng buộc**| Giá trị mặc định không an toàn: tất cả các tính năng đều bị tắt theo mặc định và phải được mở một cách rõ ràng (tương tự như quản lý quyền ứng dụng di động) | Theo mặc định, mỗi công cụ trong Claude Code đều yêu cầu ủy quyền của người dùng để thực thi | Chương 4 |
-|**Xác thực**| Cách ly đầu vào: Kiểm tra bảo mật chỉ xem xét dữ liệu có cấu trúc (chẳng hạn như trường JSON được công cụ trả về), chứ không phải văn bản do mô hình tạo tự do (vì kẻ tấn công có thể thao túng đầu ra của mô hình thông qua prompt injection) | Kiểm tra linter, hệ thống loại, xác minh kết quả cuộc gọi công cụ | Chương 5 và 6 |
-|**Chỉnh sửa**| Trước khi xác nhận rằng không thể khôi phục, không để lộ trạng thái trung gian (ví dụ: thử lại trong im lặng khi lệnh gọi công cụ không thành công và không hiển thị kết quả bán thành phẩm cho người dùng) | Âm thầm thử lại, tiếp tục tạo và quay lại phán đoán thủ công (cơ chế ngắt mạch) khi xảy ra lỗi liên tục | Chương 2 và 5 |
-
-Năm chức năng tạo thành một vòng khép kín: ngữ cảnh và công cụ hỗ trợ việc ra quyết định, các ràng buộc ngăn ngừa lỗi, xác minh phát hiện sai lệch và sửa chữa sẽ đóng vòng lặp. Nếu không có bất kỳ liên kết nào, hệ thống sẽ có những khoảng trống về độ tin cậy. Trước khi đi sâu vào các mẫu điều phối và thiết kế guardrails cụ thể, hãy làm rõ các nguyên tắc cốt lõi và chiến lược lựa chọn mô hình để xây dựng Agent—chúng làm cơ sở cho tất cả các quyết định thiết kế tiếp theo.
-
-
 ### Nguyên tắc cốt lõi để xây dựng Agent hiệu quả
 
 Dựa trên trải nghiệm Anthropic, hệ thống Agent thành công tuân theo ba nguyên tắc cốt lõi.
@@ -344,7 +364,7 @@ Trước khi thảo luận về chế độ điều phối, hãy trả lời m�
 
 Mô hình này là cơ sở thông minh của Agent. Việc chọn đúng mô hình thường hiệu quả hơn việc tối ưu hóa lời nhắc. Vì mô hình lặp lại rất nhanh nên phần này không đề xuất một phiên bản mô hình cụ thể nào nhưng cung cấp một số tùy chọn.
 
-**Mô hình nguồn đóng.** Hiện nay, hai nhà cung cấp mô hình nguồn đóng được dùng phổ biến nhất trong phát triển Agent là OpenAI (dòng GPT/o) và Anthropic (dòng Claude). Mô hình nguồn đóng thường dẫn đầu về năng lực, nhưng chi phí cao hơn và chịu giới hạn từ chính sách API của nhà cung cấp. Khi chọn mô hình, đừng chỉ nhìn vào bảng xếp hạng; **hãy đánh giá trên chính nhiệm vụ của bạn** (xem Chương 6).
+**Mô hình nguồn đóng.** Hiện nay, hai nhà cung cấp mô hình nguồn đóng được dùng phổ biến nhất trong phát triển Agent là OpenAI (dòng GPT/o) và Anthropic (dòng Claude). Mô hình nguồn đóng thường dẫn đầu về năng lực, nhưng chi phí cao hơn và chịu giới hạn từ chính sách API của nhà cung cấp. Khi chọn mô hình, đừng chỉ nhìn vào bảng xếp hạng; **hãy đánh giá trên chính nhiệm vụ của bạn** (xem Chương 7).
 
 **Mô hình nguồn mở.** Tại thời điểm viết cuốn sách này, khoảng cách giữa mô hình nguồn mở và nguồn đóng chưa đến sáu tháng, trong khi chi phí của mô hình nguồn mở thấp hơn đáng kể. Nếu bài toán kinh doanh của bạn không đòi hỏi năng lực mô hình quá cao, mô hình nguồn mở là một lựa chọn thực tế. Chúng có chi phí thấp, có thể triển khai riêng, hỗ trợ tinh chỉnh và tùy biến, phù hợp với các tình huống nhạy cảm về chi phí hoặc có yêu cầu tuân thủ dữ liệu. DeepSeek, Kimi và GLM là những mô hình Trung Quốc có năng lực Agent mạnh. Khả năng gọi công cụ khác nhau đáng kể giữa các mô hình, vì vậy cần thử nghiệm trong tình huống cụ thể trước khi lựa chọn.
 
@@ -420,7 +440,7 @@ Mẫu phối hợp đã thảo luận trước đó giải quyết vấn đề t
 
 ### Guardrails và an ninh
 
-Phần này cung cấp cái nhìn tổng quan ở cấp độ cao về guardrails để giúp người đọc có được sự hiểu biết tổng thể; chi tiết triển khai cụ thể và các phương pháp thực tế sẽ được trình bày trong Chương 2 (Bảo vệ prompt injection), Chương 4 (Kiểm soát quyền công cụ) và Chương 5 (Bảo mật thực thi mã). Không cần thiết phải đi sâu vào từng chi tiết khi đọc lần đầu.
+Phần này cung cấp cái nhìn tổng quan ở cấp độ cao về guardrails để giúp người đọc có được sự hiểu biết tổng thể; chi tiết triển khai cụ thể và các phương pháp thực tế sẽ được trình bày trong Chương 2 (tầng ngữ cảnh: bảo vệ prompt injection), Chương 4 (tầng thực thi: kiểm soát quyền công cụ) và Chương 5 (tầng thực thi và tầng dữ liệu: bảo mật thực thi mã và hạ thấp ranh giới tin cậy). Không cần thiết phải đi sâu vào từng chi tiết khi đọc lần đầu.
 
 Guardrails là phương tiện triển khai cốt lõi của cấp độ "kiềm chế, xác minh và sửa chữa" trong Harness - chúng tạo thành một tuyến phòng thủ nhiều lớp để đảm bảo an toàn và khả năng kiểm soát hành vi của Agent. Guardrails được thiết kế tốt giúp quản lý rủi ro về quyền riêng tư dữ liệu (chẳng hạn như ngăn chặn rò rỉ lời nhắc của hệ thống) hoặc rủi ro về danh tiếng (chẳng hạn như đảm bảo hành vi của mô hình nhất quán với hình ảnh thương hiệu). Bạn có thể bắt đầu bằng cách thiết lập các biện pháp bảo vệ chống lại các rủi ro đã xác định và sau đó dần dần thêm các biện pháp bảo vệ mới khi phát hiện ra các lỗ hổng bảo mật mới.
 
@@ -430,15 +450,17 @@ Guardrails cũng có một kiểu thất bại khác: **từ chối nhầm**. Đ
 
 #### Loại guardrails
 
-Nó có thể được chia thành ba loại theo vị trí bảo vệ: phía đầu vào, phía thực hiện và phía đầu ra.
+Theo vị trí phòng vệ, có thể chia thành ba tầng: **tầng ngữ cảnh, tầng thực thi và tầng dữ liệu**. Ba tầng này không xếp theo trình tự trước sau của việc xử lý yêu cầu, mà xếp theo **mức độ khó bị vượt qua** — tầng càng ở dưới càng ít phụ thuộc vào phán đoán của chính mô hình, nên càng khó bị một đòn tấn công thành công xuyên thủng. Mọi thảo luận về an toàn ở phần sau của cuốn sách đều treo trên cái cây này.
 
-**Bên đầu vào** Guardrails chặn các yêu cầu trước khi chúng tới Agent và thường chứa bốn cơ chế. **Trình phân loại mức độ liên quan** gắn cờ các truy vấn lạc đề, chẳng hạn như khi trợ lý lập trình nhận được câu hỏi không liên quan, chẳng hạn như "Tòa nhà Empire State cao bao nhiêu?" **Trình phân loại bảo mật** phát hiện bẻ khóa (nghĩa là khiến mô hình vượt qua các hạn chế bảo mật) và prompt injection (nghĩa là nhúng các hướng dẫn độc hại vào đầu vào). Sự khác biệt chính giữa cả hai là việc bẻ khóa là nỗ lực của chính người dùng nhằm vượt qua các hạn chế bảo mật của mô hình, trong khi prompt injection là thao tác gián tiếp của kẻ tấn công đối với hành vi của mô hình thông qua dữ liệu bên ngoài (chẳng hạn như nội dung web, tài liệu). **Kiểm duyệt nội dung** Gắn cờ thông tin đầu vào có hại hoặc không phù hợp, chẳng hạn như nội dung bạo lực, phân biệt đối xử. **Bảo vệ dựa trên quy tắc** sử dụng các biện pháp xác định bao gồm danh sách đen, giới hạn độ dài đầu vào và bộ lọc biểu thức chính quy để bảo vệ khỏi các mối đe dọa đã biết, chẳng hạn như việc chèn SQL.
+Guardrail **tầng ngữ cảnh** quản cái **mô hình được nhìn thấy gì**, chặn nội dung trước khi nó đi vào ngữ cảnh, thường gồm bốn cơ chế. **Bộ phân loại độ liên quan** đánh dấu các truy vấn lạc đề, chẳng hạn trợ lý lập trình nhận được câu "toà nhà Empire State cao bao nhiêu?". **Bộ phân loại an toàn** phát hiện jailbreak (Jailbreak, tức dụ mô hình vượt qua giới hạn an toàn) và prompt injection (Prompt Injection, tức nhúng chỉ thị độc hại vào đầu vào); khác biệt mấu chốt là jailbreak do chính người dùng tìm cách vượt giới hạn an toàn của mô hình, còn prompt injection là kẻ tấn công thao túng gián tiếp hành vi mô hình thông qua dữ liệu bên ngoài (như nội dung trang web, tài liệu). **Kiểm duyệt nội dung** đánh dấu đầu vào có hại hoặc không phù hợp, như nội dung bạo lực, phân biệt đối xử. **Bảo vệ dựa trên quy tắc** dùng các biện pháp tất định — danh sách đen, giới hạn độ dài đầu vào, bộ lọc biểu thức chính quy — để phòng những mối đe doạ đã biết như SQL injection. Việc gắn nhãn nguồn và tách bạch "chỉ thị / dữ liệu" cũng thuộc tầng này, Chương 2 sẽ triển khai.
 
-**Bên thực thi** guardrails can thiệp khi công cụ được gọi. Cốt lõi của nó là **Xếp hạng rủi ro công cụ**: mỗi công cụ được đánh dấu bằng mức độ rủi ro (thấp/trung bình/cao) dựa trên việc hoạt động có thể đảo ngược hay không, cấp thẩm quyền và tác động tài chính. Các hoạt động có rủi ro cao cần được xem xét bổ sung hoặc xác nhận thủ công.
+Nhưng tầng này có một giới hạn mang tính cấu trúc: **Agent nằm trong cùng một ngữ cảnh rất khó phán đoán bản thân đã bị tiêm nhiễm hay chưa**. Vì thế tầng ngữ cảnh chỉ có thể hạ thấp tỷ lệ tấn công thành công chứ không đưa ra được bảo đảm — đó chính là lý do bắt buộc phải có hai tầng bên dưới.
 
-**Bên đầu ra** Guardrails được kiểm tra trước khi phản hồi được trả về cho người dùng. **Bộ lọc PII** xem xét thông tin nhận dạng cá nhân (chẳng hạn như số ID, số điện thoại di động) ở đầu ra để ngăn chặn việc lộ thông tin không cần thiết; **Xác minh đầu ra** đảm bảo rằng các phản hồi nhất quán với giá trị thương hiệu thông qua việc kiểm tra nội dung.
+Guardrail **tầng thực thi** quản cái **mô hình được làm gì**, kiểm định trước khi hành động thực sự có hiệu lực. Cốt lõi của nó là **xếp hạng rủi ro công cụ**: căn cứ vào thao tác có khả nghịch hay không, cấp quyền và ảnh hưởng tài chính, mỗi công cụ được gán mức rủi ro (thấp/trung bình/cao), thao tác rủi ro cao cần thêm khâu duyệt hoặc xác nhận của con người. Điểm mấu chốt là khâu duyệt lại này phải do một cơ chế **bên ngoài ngữ cảnh** đảm nhiệm — tiến trình duyệt độc lập, thông tin xác thực quyền tối thiểu, cách ly sandbox, người trong vòng lặp — nếu không nó sẽ thất thủ cùng với Agent đã bị tiêm nhiễm. Câu trả lời trả về cho người dùng bản thân cũng là một hành động (Chương 4 xếp nó vào công cụ giao tiếp người dùng), nên **kiểm tra đầu ra** cũng thuộc tầng này: **bộ lọc PII** rà soát thông tin định danh cá nhân trong đầu ra (số căn cước, số điện thoại) để tránh phơi lộ không cần thiết; **kiểm định đầu ra** thì thông qua kiểm tra nội dung để bảo đảm câu trả lời nhất quán với giá trị thương hiệu.
 
-Cần lưu ý rằng một số cơ chế (chẳng hạn như lọc thông thường dựa trên quy tắc) có thể được sử dụng ở cả phía đầu vào và phía đầu ra. Trên đây được phân loại theo các vị trí triển khai phổ biến nhất.
+Guardrail **tầng dữ liệu** quản cái **thế giới rốt cuộc có thể bị đổi thành gì**, giao việc "ai được làm gì với dữ liệu nào" cho một tầng cơ chế ổn định, đã qua con người thẩm định cưỡng chế thi hành: chính sách bảo mật mức hàng của cơ sở dữ liệu, ràng buộc và bộ kiểm tra, khung nhìn có kiểm soát và thủ tục lưu trữ, cùng ngữ cảnh truy cập do runtime đáng tin ràng buộc và không thể giả mạo. Giá trị của tầng này nằm đúng ở chỗ nó không phụ thuộc vào việc hai tầng trên có đúng hay không — dù prompt injection đắc thủ, dù mã sinh ra bỏ sót hoàn toàn phần kiểm tra quyền, thao tác vượt quyền vẫn bị từ chối ở tầng dữ liệu. Chương 5 sẽ lấy phần mềm sinh động làm ví dụ để triển khai tầng này.
+
+Cần lưu ý rằng cùng một cơ chế có thể xuất hiện ở nhiều tầng — chẳng hạn bộ lọc biểu thức chính quy dựa trên quy tắc vừa lọc được đầu vào vừa lọc được đầu ra — cách phân loại ở trên căn cứ vào nơi nó cung cấp bảo đảm. Ba tầng không phải quan hệ thay thế mà là quan hệ chồng lớp: tầng trên lo chặn phần lớn đòn tấn công từ bên ngoài và phản hồi sớm, tầng dưới lo giữ vững ranh giới bất khả xâm phạm khi tầng trên thất thủ.
 
 Một ví dụ điển hình trong công nghiệp về guardrails dựa trên classifier là Constitutional Classifiers của Anthropic[^ch1-3]. Cơ chế cốt lõi gồm ba điểm. Thứ nhất, **điều khiển bằng quy tắc** — một "hiến pháp" viết bằng ngôn ngữ tự nhiên (quy định rõ nội dung nào được phép, nội dung nào bị cấm) được dùng để tạo dữ liệu huấn luyện tổng hợp, huấn luyện các classifier đầu vào và đầu ra; thứ hai, **phán đoán kết hợp theo ngữ cảnh** — hệ thống thế hệ mới kiểm tra câu hỏi của người dùng và câu trả lời của mô hình cùng nhau, vì một số câu trả lời xét riêng hoàn toàn vô hại (như "cách dùng phụ gia thực phẩm"), chỉ khi đối chiếu với câu hỏi mới phát hiện ra "phụ gia thực phẩm" thực chất là từ lóng chỉ hóa chất; thứ ba, **sàng lọc hai tầng** — trước tiên một probe cực kỳ nhẹ (đọc trực tiếp các activation bên trong mô hình, chi phí gần như bằng không) kiểm tra toàn bộ hội thoại, nếu phát hiện điều khả nghi thì chuyển cho classifier mạnh hơn xét duyệt lại thay vì từ chối ngay. Nhờ đó tầng thứ nhất dù có nhiều false positive cũng không ảnh hưởng đến trải nghiệm người dùng, đồng thời chi phí giảm đáng kể.
 
@@ -455,14 +477,18 @@ Thường có hai tình huống chính kích hoạt sự can thiệp thủ công
 **Vượt quá ngưỡng thất bại**
 Đặt giới hạn trên cho số lần thử lại hoặc thao tác cho Agent. Nếu Agent vượt quá các giới hạn này, thì vấn đề này sẽ được chuyển sang can thiệp thủ công.
 
+**Năm mô thức xuyên suốt cuốn sách**: Người đề xuất—Người thẩm định, tiết lộ dần, chỉ thêm không sửa, tập biên + tập giữ lại, diff tối thiểu có thể hoàn tác — tất cả chia sẻ cùng một chủ đề: dời phán quyết từ chính mô hình sang cơ chế bên ngoài nó. Các chương sau gọi theo tên thay vì diễn giải lại.
+
 **Hoạt động rủi ro cao**
 Cần kích hoạt giám sát thủ công khi liên quan đến các hoạt động nhạy cảm, không thể đảo ngược hoặc có rủi ro cao, ít nhất là cho đến khi nhóm có đủ niềm tin vào độ tin cậy của Agent. Các ví dụ điển hình bao gồm cho phép hoàn lại tiền hoặc thanh toán số tiền lớn, v.v.
 
-Quay trở lại chủ đề chính về năm yếu tố của Harness - hãy xem mỗi chương của cuốn sách này diễn ra như thế nào trong khuôn khổ này.
+Trở lại mạch chính của năm yếu tố Harness — hãy xem nó có quan hệ thế nào với cấu trúc cuốn sách.
 
-### Cuốn sách này đóng vai trò là hướng dẫn thực tế về kỹ thuật Harness
+### Năm yếu tố Harness và phần "xây dựng"
 
-Xem xét lại cấu trúc của cuốn sách này từ góc độ Harness Engineering (kỹ thuật Harness), chúng ta có thể thấy rằng mỗi chương xây dựng một cách có hệ thống một thành phần nhất định của Harness. Đồng thời, bảo mật không phải là một chủ đề độc lập trong một chương nhất định mà là mối quan tâm xuyên suốt cuốn sách (cross-cutting concern, tức là một vấn đề ảnh hưởng đến nhiều phần của hệ thống, tương tự như nhu cầu ghi nhật ký để thâm nhập vào mọi mô-đun trong công nghệ phần mềm). Bảng sau đây trình bày các chức năng Harness, các khía cạnh an toàn và các chương tương ứng một cách thống nhất:
+**Trước hết cần nói rõ quan hệ giữa hai công thức, để bạn đọc không phải nhớ hai bộ khung.** Cuốn sách chỉ có một bộ khung cấu trúc duy nhất, chính là cái mà lời mở đầu và lời bạt dùng đi dùng lại: **Agent = LLM + ngữ cảnh + công cụ** — các chương 2 đến 6 xây dựng, các chương 7 đến 9 đánh giá và tiến hoá, chương 10 cộng tác. **Agent = Model + Harness** không phải một cách phân chia song song với nó, mà là cùng một thứ được trải ra ở dạng sản xuất: nó trải "ngữ cảnh" và "công cụ" thành năm trách nhiệm — quản lý ngữ cảnh, giao diện công cụ, ràng buộc, kiểm chứng, sửa chữa. Vì thế nó là **một lăng kính bên trong phần "xây dựng"**, chứ không phải mục lục bao trùm cả mười chương.
+
+Trong phạm vi đó, năm yếu tố Harness tương ứng rõ ràng với các chương 2 đến 5:
 
 | Những điểm chính của Harness | Các chương tương ứng | Nội dung cốt lõi | Mối quan tâm về an toàn |
 |-------------|---------|---------|-----------|
@@ -470,13 +496,51 @@ Xem xét lại cấu trúc của cuốn sách này từ góc độ Harness Engin
 | Mở rộng ngữ cảnh (kiên trì kiến thức) | Chương 3 (cơ sở kiến thức) | Bộ nhớ người dùng, RAG, chỉ mục có cấu trúc, thông minh hóa RAG | Tiếp xúc thông tin nhạy cảm, bảo vệ quyền riêng tư |
 | Thiết kế công cụ và các ràng buộc bảo mật | Chương 4 (Thiết kế công cụ) | Phân loại công cụ, kiểm soát quyền, tiêu chuẩn MCP, kiến trúc không đồng bộ | Hoạt động sai, truy cập trái phép, hoạt động không thể đảo ngược |
 | Kiểm tra và hiệu chỉnh công cụ | Chương 5 (tạo mã) | Harness, test-driven development, quy tắc mã hóa của Coding Agent | Mạo danh danh tính, quy trách nhiệm |
-| Xác minh cấp hệ thống | Chương 6 (Đánh giá) | Môi trường đánh giá, bộ dữ liệu, đánh giá tự động, observability | — |
-| Chỉnh sửa ở cấp độ mô hình | Chương 7 (hậu đào tạo) | SFT (tinh chỉnh có giám sát), học tăng cường - ghi các tín hiệu phản hồi tích lũy trong Harness vào các tham số mô hình có thể được coi là một phần mở rộng của dự án Harness | Độ lệch mục tiêu, căn chỉnh và độ bền |
-| Chỉnh sửa ở cấp hệ thống | Chương 8 (Tự tiến hóa) | External Learning (học bên ngoài tham số mô hình), tạo công cụ và tích lũy kinh nghiệm | — |
-| Ngữ cảnh và công cụ đa phương thức | Chương 9 (Tương tác đa phương thức và thời gian thực) | Giọng nói Agent, Computer Use, vận hành robot | Lọc bảo mật đầu vào đa phương thức, kiểm soát quyền trong tương tác thời gian thực |
-| Các ràng buộc và hiệu chỉnh giữa nhiều Agent | Chương 10 (Hợp tác nhiều Agent) | Kiến trúc cộng tác, chế độ lỗi, xã hội Agent | Sự vi phạm lòng tin và xung đột tài nguyên được chia sẻ giữa Agent |
+
+Chương 6 (tương tác) không thuộc bất kỳ yếu tố nào trong năm yếu tố ấy; cái nó mở rộng là phương thức và thời điểm của chính không gian quan sát và không gian hành động. Các chương 7 đến 9 hỏi **làm sao biết Harness đã được xây đúng, và làm sao khiến nó liên tục tốt lên**. Chương 10 thay Harness của một Agent bằng cấu trúc cộng tác giữa nhiều Agent. Nhét những chương đó vào năm ô chỉ khiến các ô mất khả năng phân biệt.
+
+An toàn cũng không chia theo chương: nó là mối quan tâm xuyên cắt (cross-cutting concern, tức vấn đề ảnh hưởng tới nhiều phần của hệ thống) chạy suốt cuốn sách, được tổ chức theo ba tầng guardrail ở mục trước — tầng ngữ cảnh, tầng thực thi, tầng dữ liệu. Cột "trọng tâm an toàn" trong bảng cho biết mỗi chương chủ yếu rơi vào tầng nào trong ba tầng đó.
 
 Hoạt động thực hành của Anthropic trong việc xây dựng Agent chạy lâu dài cho thấy cách thiết kế Harness giải quyết các vấn đề mà bản thân mô hình không thể giải quyết được. Chúng phân tách các tác vụ phức tạp thành "khởi tạo Agent" (thiết lập môi trường, phân tách danh sách tác vụ) và "thực thi Agent" (tăng dần trong mỗi phiên và để lại các tạo phẩm chuyển giao rõ ràng) đồng thời giải quyết các vấn đề Agent về "cạn kiệt ngữ cảnh" và "tuyên bố hoàn thành sớm" trong các tác vụ dài có cấu trúc thông qua Harness. Các chương tiếp theo sẽ lần lượt đi sâu vào từng thành phần của Harness - Chương 2 bắt đầu với Context Engineering (kỹ thuật ngữ cảnh) cốt lõi và Chương 5 sẽ mở rộng cụ thể về thực hành hoàn chỉnh về Harness Engineering (kỹ thuật Harness) trong Coding Agent.
+
+## Những mô thức thiết kế xuyên suốt cuốn sách
+
+Chín chương phía sau sẽ dùng đi dùng lại cùng một nhóm cấu trúc. Chúng không thuộc riêng chương nào, mà là những lời giải lặp lại dưới cùng một ràng buộc; vì vậy ở đây ta đặt tên một lần và đưa ra định nghĩa chuẩn cho từng cái. Các chương sau chỉ việc gọi theo tên và nói rõ biến thể của riêng chương đó.
+
+**Người đề xuất — Người thẩm định (Proposer-Reviewer)**: việc tạo ra và việc phán xét do hai vai không dùng chung ngữ cảnh đảm nhiệm, và bên phán xét nhìn vào chính sản phẩm — kết quả kết xuất, đầu ra kiểm thử, tham số gọi có cấu trúc — chứ không phải quá trình suy luận của bên tạo ra. Tiền đề của nó là **tự thẩm định không đáng tin**: mô hình nằm trong cùng một ngữ cảnh vừa không nghĩ ra được điều nó đã không nghĩ ra, vừa khó phán đoán bản thân đã bị tiêm nhiễm hay chưa. Chương 3 dùng nó để cập nhật tri thức; Chương 4 dùng cho phê duyệt trước và kiểm chứng sau đối với lệnh gọi công cụ (Sidecar là một biến thể chỉ đọc của nó); ba thử nghiệm ở Chương 5 — slide, video và log — đều lấy nó làm bộ khung; Chương 7 dùng nó để đánh giá giao diện; Chương 9 dùng để thẩm định đề xuất cập nhật; còn Chương 10 bàn về hình thái của nó trong cộng tác ngang hàng, và vì sao không thể để cùng một Agent tự thẩm định.
+
+**Tiết lộ dần (Progressive Disclosure)**: thay vì nhét toàn bộ thông tin vào ngữ cảnh một lần, hãy đưa trước một mục lục có thể tra cứu rồi nạp chi tiết theo nhu cầu. Nó tối ưu đồng thời hai thứ — ngân sách ngữ cảnh và độ chính xác khi lựa chọn. Agent Skills ở Chương 2 là hình thái điển hình nhất (siêu dữ liệu thường trú, phần thân nạp theo nhu cầu); truy hồi phân tầng ở Chương 3, khám phá công cụ chủ động và cắt ngắn theo trang ở Chương 4, cùng việc khám phá Agent ở Chương 10 đều là biến thể của nó.
+
+**Chỉ thêm không sửa (Append-only)**: trạng thái tiến triển bằng cách nối thêm, còn thứ đã viết ra thì không quay lại sửa. Cái đổi lại là khả năng lưu đệm, khả năng phát lại và khả năng kiểm toán. Tính ổn định của tiền tố KV Cache ở Chương 2 là hình thái hiệu năng của nó — thay đổi càng nằm phía trước thì càng nhiều bộ đệm bị vô hiệu; bộ nhớ dạng sự kiện ở Chương 3 và thói quen ở Chương 4 là nối schema công cụ mới vào cuối quỹ đạo thay vì cắm ngược lại tiền tố cũng theo cùng một kỷ luật.
+
+**Tập biên + tập giữ lại (Boundary Set + Retention Set)**: mọi thay đổi đều phải được kiểm chứng đồng thời trên "nhóm mẫu mà nó phải làm thay đổi" và "nhóm mẫu mà nó không được ảnh hưởng". Chỉ đo nhóm đầu sẽ nhầm quá khớp thành tiến bộ; chỉ đo nhóm sau sẽ nhầm một thay đổi vô hiệu thành an toàn. Các nhiệm vụ hồi quy ở Chương 7, việc cách ly huấn luyện với đánh giá ở Chương 8, và việc kiểm chứng đề xuất cập nhật ở Chương 9 đều dựng trên cặp tập hợp này.
+
+**Diff tối thiểu + có thể hoàn tác (Minimal Diff, Reversible)**: mỗi lần sửa cố gắng nhỏ nhất có thể, mang theo nguồn gốc, và hoàn tác được riêng lẻ, thay vì viết lại toàn bộ. Chính điều đó khiến việc quy trách nhiệm trở nên khả thi — khi có sự cố, có thể lần ra đúng lần sửa nào. Việc cập nhật tri thức ở Chương 3, các bản vá mã ở Chương 5, việc cập nhật Prompt và chương trình ở Chương 9 đều tuân theo điều này; và ba con đường cập nhật nêu ở đầu chương này (thích ứng trong ngữ cảnh, cập nhật sản phẩm bên ngoài, cập nhật tham số) chính là được xếp từ dễ hoàn tác nhất đến khó nhất.
+
+Năm mô thức này chia sẻ cùng một chủ đề: **dời phán quyết từ "mô hình tự quyết" sang "cơ chế bên ngoài mô hình quyết"** — người thẩm định ở ngoài ngữ cảnh, mục lục ở ngoài phần thân, bộ đệm ở ngoài thay đổi, tập giữ lại ở ngoài tập biên, việc hoàn tác ở ngoài lần commit. Ba tầng guardrail nêu ở phần trước của chương này chính là chủ đề ấy áp dụng cho an toàn. Khi gặp lại chúng ở phía sau, cuốn sách chỉ nêu tên mô thức và điểm khác biệt của chương đó, không diễn giải lại từ đầu.
+
+## Vòng lặp khám phá: chứng cứ, đề xuất, thực nghiệm, phản hồi
+
+Năm mô thức ở mục trước là những cấu trúc cục bộ. Còn một cấu trúc lớn hơn trải qua ba chương, nhưng vì được dựng thành từng mảnh nên rất dễ bị coi là ba đường ống độc lập.
+
+Chương 7 phải định vị lỗi đầu tiên trong một quỹ đạo thất bại và phân loại nó. Chương 3 phải biến một chứng cứ mới thành thay đổi nhỏ nhất và có căn cứ nhất đối với cơ sở tri thức. Chương 9 phải phán đoán một thay đổi có thật sự làm hệ thống tốt lên hay không, rồi quyết định phát hành hay hoàn tác. Ba việc này dùng những cơ chế hoàn toàn khác nhau — quy trách nhiệm dựa vào rubric và việc định vị lỗi đầu tiên, đề xuất dựa vào Người đề xuất—Người thẩm định, kiểm chứng dựa vào tập biên và tập giữ lại cùng phát hành thăm dò và hoàn tác — nên chúng **không phải ba lần lặp lại của cùng một cơ chế**, và việc gượng ép thống nhất thuật ngữ sẽ che mất chính những khác biệt đáng kể.
+
+Cái thật sự chung là vị trí: mỗi việc chiếm một đoạn của cùng một vòng lặp.
+
+```text
+Chứng cứ (Chương 7): quỹ đạo thất bại → lỗi đầu tiên + loại lỗi
+  → Đề xuất (Chương 3): chứng cứ → một thay đổi tối thiểu, thẩm định được, hoàn tác được
+  → Thực nghiệm (Chương 9): đo trên tập biên và tập giữ lại, phát hành thăm dò
+  → Phản hồi: kết quả đo và các quỹ đạo thất bại mới quay về đoạn chứng cứ
+```
+
+Vòng lặp này gần đây được Discovery Loop — công ty do Jeff Dean cùng các cộng sự sáng lập — đặt tên và đẩy về phía tự động hoá: đề xuất một thực nghiệm, hiện thực những gì nó cần, đánh giá nó, đưa kết quả sang vòng sau, và song song hoá một quá trình vốn chạy tuần tự[^ch1-discovery-loop]. Cần nói rõ: công ty này thành lập tháng 8 năm 2026, đến nay mới chỉ công bố sứ mệnh, chưa có kết quả kỹ thuật công khai; cuốn sách trích dẫn nó vì **cách nó đặt tên cho vòng lặp**, chứ không phải coi nó là chứng cứ — đúng là sự phân biệt mà Chương 7 sẽ nhấn mạnh nhiều lần.
+
+Đặt vòng lặp của hệ thống Agent cạnh một vòng lặp nghiên cứu thuần tuý sẽ thấy cái trước có thêm hai ràng buộc, và chúng chính là những thứ mà phần lớn phần còn lại của cuốn sách xử lý. **Thứ nhất, thực nghiệm phải bám rễ vào quan sát thực.** Trong vòng lặp nghiên cứu, "thực nghiệm" có thể là một lần chạy huấn luyện; trong hệ thống Agent, nó sửa đổi một hệ thống đang phục vụ người dùng, nên phán quyết phải đến từ trạng thái thực của môi trường — kiểm thử có qua không, trạng thái cuối của cơ sở dữ liệu, công cụ trả về gì — chứ không phải từ lời mô tả của chính mô hình về hành vi của nó. **Thứ hai, mỗi thực nghiệm phải trả lời đồng thời "nó sửa được gì" và "nó làm hỏng gì".** Vòng lặp nghiên cứu thường chỉ mong chỉ số đi lên; hệ thống Agent còn phải chứng minh không phá vỡ những hành vi vốn đã đúng. Đó chính là lý do tồn tại của tập biên và tập giữ lại ở mục trước.
+
+Ba chương tiếp theo mỗi chương chỉ bàn đoạn của mình, không thuật lại toàn bộ vòng lặp: Chương 3 bàn thế nào là một đề xuất có căn cứ, Chương 7 bàn thế nào là chứng cứ đáng tin, Chương 9 bàn làm sao để thực nghiệm và phản hồi chạy được lâu dài mà không phân kỳ.
+
+[^ch1-discovery-loop]: Discovery Loop được Jeff Dean, Sanjay Ghemawat, Quoc Le và Oriol Vinyals công bố thành lập ngày 5 tháng 8 năm 2026, là một public benefit corporation với sứ mệnh tự động hoá học máy, khoa học và kỹ thuật; mô tả công khai của họ là tự động hoá trọn vẹn các vòng lặp thực nghiệm và song song hoá ở quy mô lớn những gì vốn chạy tuần tự. Xem https://techcrunch.com/2026/08/05/jeff-dean-and-other-top-ai-researchers-are-leaving-google-to-launch-their-own-startup/ . Tính đến lúc viết cuốn sách này, họ chưa công bố kết quả kỹ thuật có thể tái lập.
 
 ## Tóm tắt chương này
 
@@ -492,13 +556,15 @@ Chương này bắt đầu từ thực tiễn và thiết lập khuôn khổ cơ
 
 **Từ quy trình làm việc đến quyền tự chủ Agent**: Trước tiên hãy tối ưu hóa các từ nhắc nhở, sau đó xem xét quy trình làm việc và cuối cùng là giới thiệu tính tự chủ Agent - đây là trình tự thiết thực nhất để giảm nguy cơ tai nạn. Mỗi chế độ điều phối đều có các kịch bản áp dụng riêng và không có giải pháp tối ưu chung nào.
 
-**Bảo mật là một vấn đề kiến trúc**: rào chắn, sự can thiệp của con người, sự căn chỉnh (alignment, tức là làm cho hành vi của mô hình nhất quán với ý định của con người) - các vấn đề bảo mật cần được xem xét ngay từ dòng mã đầu tiên, thay vì vá lỗi trước khi đưa lên mạng. Các vấn đề bảo mật bao gồm năm cấp độ: mô hình, ngữ cảnh, công cụ, cộng tác và xã hội.
+**Vòng lặp khám phá trải qua ba chương**: chứng cứ (quy trách nhiệm thất bại ở Chương 7) → đề xuất (cập nhật tri thức ở Chương 3) → thực nghiệm và phản hồi (kiểm chứng và phát hành ở Chương 9). Ba đoạn dùng cơ chế vốn đã khác nhau; cái chung là vị trí chứ không phải thuật ngữ. So với vòng lặp nghiên cứu thuần tuý, vòng lặp của hệ thống Agent có thêm hai ràng buộc — thực nghiệm phải bám rễ vào quan sát thực, và mỗi vòng phải trả lời đồng thời đã sửa được gì và đã làm hỏng gì.
+
+**Bảo mật là một vấn đề kiến trúc**: rào chắn, sự can thiệp của con người, sự căn chỉnh (alignment, tức là làm cho hành vi của mô hình nhất quán với ý định của con người) - các vấn đề bảo mật cần được xem xét ngay từ dòng mã đầu tiên, thay vì vá lỗi trước khi đưa lên mạng. Guardrail chia thành ba tầng — ngữ cảnh, thực thi và dữ liệu — xếp theo mức độ khó bị vượt qua, và mọi thảo luận an toàn ở các chương sau đều treo trên bộ khung đó.
 
 Chương tiếp theo sẽ đi sâu vào thành phần cốt lõi nhất của Harness - Context Engineering (kỹ thuật ngữ cảnh). Chúng tôi sẽ mở rộng một cách có hệ thống nguồn gốc học thuật của khái niệm Agent trong học tăng cường, cũng như so sánh chuyên sâu giữa RL truyền thống và LLM Agent hiện đại.
 
 Các câu hỏi phản ánh sau đây được thiết kế để giúp người đọc tìm hiểu sâu hơn về các khái niệm cốt lõi của chương này; không có đáp án chuẩn.
 
-### Câu hỏi tư duy
+## Câu hỏi tư duy
 
 1. ★★ Nếu bạn chỉ có thể thêm một khả năng vào hệ thống Agent—một mô hình mạnh hơn, ngữ cảnh phong phú hơn hoặc nhiều công cụ hơn—bạn sẽ chọn cái nào? Trong những điều kiện nào sự lựa chọn của bạn sẽ thay đổi?
 2. ★★★ Trong vòng lặp ReAct, tổng lượng đọc cache tăng gần theo bậc hai với số vòng. Làm thế nào để giảm mức tăng này?
