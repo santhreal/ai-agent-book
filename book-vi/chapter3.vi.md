@@ -20,7 +20,7 @@ Bản chất của hệ thống bộ nhớ người dùng là một quá trình 
 
 Sử dụng một ví dụ cụ thể để hiểu quá trình này. Giả sử rằng người dùng có cuộc trò chuyện sau với Agent:
 
-```
+```text
 User: Help me book a flight to Tokyo next Friday. I prefer window seats
       and I'm vegetarian, so I'll need a special meal.
 Agent: I'll search for flights to Tokyo for next Friday...
@@ -32,12 +32,27 @@ User: Yes, and use my United MileagePlus number 12345678.
 
 Sau khi cuộc trò chuyện kết thúc, framework Agent sẽ gọi một LLM đặc biệt để phân tích nội dung cuộc trò chuyện và trích xuất thông tin đáng nhớ lâu dài:
 
-```
+```text
 Extracted memories:
 - User prefers window seats (preference)
 - User is vegetarian, needs special meals on flights (dietary restriction)
 - User's United MileagePlus number: 12345678 (loyalty program)
 - User has travel plans to Tokyo (recent activity)
+```
+
+**Vòng đời memory:**
+
+```python
+when answering(user_request):
+    recent_turns = conversation.tail()
+    relevant_memory = memory.search(user_request)
+    answer = LLM(recent_turns + relevant_memory)
+    return answer
+
+after conversation (background job):
+    candidates = extract_memory_candidates(conversation)
+    verified = verify_against_sources_and_policy(candidates, conversation)
+    memory.append_or_update(verified)
 ```
 
 Hãy lưu ý một số đặc điểm chính của quá trình trích xuất này:
@@ -127,50 +142,74 @@ Nó chia quá trình cập nhật bộ nhớ thành hai giai đoạn [^uac]: **g
 
 Dưới đây là một ví dụ đơn giản. Trong giai đoạn có cấu trúc, hộ chiếu và hành trình của người dùng được lưu trữ thành trạng thái có kiểu:
 
-```python
-from datetime import date
+**Log chỉ-ghi-thêm và checkpoint:**
 
-passport = PassportInfo(
-    number="AB1234567", country="US",
-    expiry_date=date(2025, 2, 18),
-)
-trips = [
-    Trip(destination="Tokyo", departure_date=date(2025, 1, 15),
-         is_international=True),
-# ...phần còn lại của hành trình
-]
+```python
+append_only_log += extract_facts(conversation)
+
+if checkpoint_due():
+    proposed_state = rebuild_typed_state(append_only_log)
+    if type_check(proposed_state) and source_review(proposed_state):
+        publish_checkpoint(proposed_state)
+    else:
+        keep_previous_checkpoint()
+```
+
+**Trạng thái người dùng có kiểu:**
+
+```python
+state = {
+    passport: PassportInfo(
+        number = "AB1234567",
+        country = "US",
+        expiry_date = date(2025, 2, 18),
+    ),
+    trips: [
+        Trip(destination = "Tokyo", departure_date = date(2025, 1, 15),
+             is_international = true),
+        ...
+    ],
+}
 ```
 
 Với trạng thái có kiểu, ba việc trước đây chỉ có thể thực hiện được bằng cách "đọc văn bản rồi tính nhẩm" LLM giờ đã trở thành các mã xác định:
 
 Một, **số liệu thống kê tổng hợp**. "Năm ngoái tôi đã đi nước ngoài bao nhiêu lần?"—trong bộ nhớ văn bản, bạn phải gọi lại tất cả hành trình và đếm từng cái; số bản ghi càng nhiều thì lỗi càng dễ xảy ra. Với User as Code, đó chỉ là một biểu thức và độ chính xác gần 100%[^uac]:
 
+**Gộp xác định:**
+
 ```python
->>> sum(1 for t in trips if t.is_international and t.departure_date.year == 2025)
-2
+count(
+    trip for trip in state.trips
+    if trip.is_international and year(trip.departure_date) == 2025
+)
+# => 2
 ```
 
 Thứ hai, **phát hiện xung đột**. Đặt hai trạng thái "thuốc hiện tại" và "tiền sử dị ứng" lại với nhau, một chức năng có thể tham chiếu chéo theo danh mục thuốc và phát hiện ra những mâu thuẫn nằm rải rác trong các cuộc trò chuyện khác nhau và hầu như không thể tự động tương quan dưới dạng văn bản:
 
+**Phát hiện xung đột:**
+
 ```python
 def check_drug_allergy(profile):
-    for med in profile.current_medications:
+    for medication in profile.current_medications:
         for allergy in profile.allergies:
-            if med.drug_class == allergy.drug_class:
-                yield (f"Xung đột về thuốc: {med.name} thuộc lớp {med.drug_class},"
-                       f"và bệnh nhân bị dị ứng nặng với {allergy.allergen}")
+            if medication.drug_class == allergy.drug_class:
+                emit_conflict(medication, allergy)
 ```
 
 Thứ ba, **thực thi ràng buộc**. Agent có thể củng cố chức năng kiểm tra như vậy và tự động kích hoạt nó mỗi khi trạng thái được cập nhật - nó có thể chủ động nhắc nhở người dùng mà không cần phải nói hay tìm kiếm. Ví dụ: hạn chế hiệu lực của hộ chiếu: nếu ngày khởi hành của chuyến đi nước ngoài ít hơn 180 ngày trước khi hộ chiếu hết hạn, cảnh báo sẽ được kích hoạt.
 
+**Thực thi ràng buộc:**
+
 ```python
 def check():
-    for trip in trips:
+    for trip in state.trips:
         if trip.is_international:
-            days = (passport.expiry_date - trip.departure_date).days
+            days = date_difference(state.passport.expiry_date,
+                                   trip.departure_date)
             if days < 180:
-                yield (f"Hộ chiếu {passport.expiry_date} hết hạn, chuyến đi {trip.destination} "
-                       f"chỉ còn {days} ngày, vui lòng gia hạn càng sớm càng tốt")
+                alert("passport expires too soon", trip, days)
 ```
 
 [^uac]: Để có thiết kế và đánh giá hoàn chỉnh về dự án biến bộ nhớ người dùng thành mã thực thi, hãy xem Li, Bojie. *User as Code: Executable Memory for Personalized Agents.* arXiv:2606.16707, 2026.
@@ -238,7 +277,7 @@ Cấp độ thứ ba là trừu tượng hóa và khái quát hóa – trích xu
 
 Phát hiện xung đột sử dụng phương pháp lập phiên bản - giữ lại các phiên bản lịch sử trong khi đánh dấu phiên bản mới nhất. Chỉ phiên bản mới nhất của một số thông tin (chẳng hạn như địa chỉ hiện tại của bạn) được giữ lại và lịch sử đầy đủ của thông tin khác (chẳng hạn như lịch sử việc làm của bạn) được giữ lại.
 
-Cuối cùng, cần vạch ra một ranh giới để tránh nhầm lẫn với các chương khác trong cuốn sách: Phần này thảo luận về thuật toán tổ chức của lớp lưu trữ bộ nhớ - những bộ nhớ nào cần được lọc, phân cụm và trừu tượng hóa thành dạng nào; việc nén ngữ cảnh trong Chương 2 giải quyết vấn đề về cửa sổ trong một phiên duy nhất và hai chức năng ở các cấp độ khác nhau; và cách các thuật toán tổ chức này được kích hoạt trong hệ thống sản xuất - cơ chế kích hoạt và triển khai kỹ thuật tích hợp bộ nhớ ngoại tuyến không đồng bộ, định kỳ - sẽ được mở rộng trong Chương 8.
+Cuối cùng, cần vạch ra một ranh giới để tránh nhầm lẫn với các chương khác trong cuốn sách: Phần này thảo luận về thuật toán tổ chức của lớp lưu trữ bộ nhớ - những bộ nhớ nào cần được lọc, phân cụm và trừu tượng hóa thành dạng nào; việc nén ngữ cảnh trong Chương 2 giải quyết vấn đề về cửa sổ trong một phiên duy nhất và hai chức năng ở các cấp độ khác nhau; và cách các thuật toán tổ chức này được kích hoạt trong hệ thống sản xuất - cơ chế kích hoạt và triển khai kỹ thuật tích hợp bộ nhớ ngoại tuyến không đồng bộ, định kỳ - sẽ được mở rộng trong Chương 9.
 
 ### Bảo vệ quyền riêng tư: Giải mẫn cảm nhật ký
 
@@ -297,6 +336,21 @@ Mẫu của cả hai ví dụ hoàn toàn giống nhau: **Truy xuất các đo�
 
 Chất lượng của trình tìm kiếm trực tiếp xác định tính hiệu quả của RAG - nếu không thể truy xuất được các mảnh liên quan, LLM sẽ vô dụng cho dù nó có mạnh đến đâu. Phần này trước tiên xem xét quy trình đầu tiên của việc nhập tài liệu vào cơ sở tri thức - phân đoạn, sau đó tập trung vào hai tuyến kỹ thuật chính của bộ truy xuất: nhúng dày đặc (dựa trên hiểu biết ngữ nghĩa) và nhúng thưa thớt (dựa trên kết hợp từ khóa) và cách kết hợp cả hai.
 
+**Pipeline RAG lai:**
+
+```python
+offline:
+    chunks = split_documents(documents)
+    dense_index = build_dense_index(chunks)
+    sparse_index = build_sparse_index(chunks)
+
+online(query):
+    dense_hits = dense_search(dense_index, query)
+    sparse_hits = sparse_search(sparse_index, query)
+    candidates = fuse_and_deduplicate(dense_hits, sparse_hits)
+    evidence = rerank(query, candidates)
+    return LLM(query + evidence)
+```
 
 ![Hình 3-5 Quy trình truy vấn RAG: truy xuất, nâng cao và tạo ](images/fig3-5.svg)
 
@@ -378,9 +432,15 @@ Trong đó, `TF(t,d)` là số lần thuật ngữ $t$ xuất hiện trong tài 
 
 Có thể xem BM25 (Okapi BM25) là cách sửa kinh điển cho hai hạn chế này. Nó giữ trọng số IDF dành cho các từ hiếm, đồng thời bổ sung cơ chế bão hòa tần suất và chuẩn hóa độ dài tài liệu:
 
-$$\text{Score}(Q, D) = \sum_{i} \text{IDF}(q_i) \cdot \frac{\text{TF}(q_i, D)\,(k_1+1)}{\text{TF}(q_i, D) + k_1\left(1 - b + b \cdot \frac{|D|}{\text{avgdl}}\right)}$$
+$$\text{Score}(Q, D) = \sum_{i} \text{IDF}_{\text{BM25}}(q_i) \cdot \frac{\text{TF}(q_i, D)\,(k_1+1)}{\text{TF}(q_i, D) + k_1\left(1 - b + b \cdot \frac{|D|}{\text{avgdl}}\right)}$$
 
-Trong đó, $q_i$ là một từ trong truy vấn, $|D|$ là độ dài tài liệu và $\text{avgdl}$ là độ dài tài liệu trung bình của kho ngữ liệu. Như Hình 3-8 minh họa, $k_1$ kiểm soát tốc độ bão hòa của tần suất, khiến mỗi lần lặp thêm mang lại mức tăng nhỏ dần; $b$ kiểm soát cường độ chuẩn hóa độ dài, giúp so sánh công bằng hơn giữa các tài liệu dài ngắn khác nhau. Vì vậy, 10 lần xuất hiện thường đóng góp ít hơn gấp đôi so với 5 lần, và cùng một TF sẽ nhận trọng số thấp hơn trong tài liệu dài hơn. Các giá trị tham số và phép tính cụ thể được trình bày trong Thử nghiệm 3-5.
+Trong đó, $q_i$ là một từ trong truy vấn, $|D|$ là độ dài tài liệu và $\text{avgdl}$ là độ dài tài liệu trung bình của kho ngữ liệu. $\text{IDF}_{\text{BM25}}$ mang chỉ số dưới vì đây không phải cùng một công thức với $\text{IDF}$ của TF-IDF ở trên: BM25 chuyển sang một biến thể ổn định hơn.
+
+$$\text{IDF}_{\text{BM25}}(t) = \ln\frac{N - \text{DF}(t) + 0.5}{\text{DF}(t) + 0.5}$$
+
+Trực giác không đổi—từ càng hiếm thì trọng số càng cao—chỉ có cách đo là khác. Tử số trở thành số tài liệu *không* chứa từ đó, $N - \text{DF}(t)$, thay vì tổng số tài liệu $N$, nên tỷ lệ này cho biết ngay số tài liệu không chứa từ đó gấp bao nhiêu lần số tài liệu có chứa nó; việc cộng thêm 0,5 vào cả tử số và mẫu số giúp làm trơn kết quả, khiến công thức vẫn xác định ở hai trường hợp cực đoan là $\text{DF}(t) = 0$ và $\text{DF}(t) = N$. Cái giá phải trả là một từ xuất hiện trong hơn một nửa số tài liệu ($\text{DF}(t) > N/2$) sẽ nhận trọng số âm, nên các cài đặt thực tế thường đặt cho nó một ngưỡng dưới. Biến thể này bắt nguồn từ mô hình truy hồi xác suất và trong tài liệu chuyên ngành được gọi là trọng số Robertson–Spärck Jones.
+
+Như Hình 3-8 minh họa, $k_1$ kiểm soát tốc độ bão hòa của tần suất, khiến mỗi lần lặp thêm mang lại mức tăng nhỏ dần; $b$ kiểm soát cường độ chuẩn hóa độ dài, giúp so sánh công bằng hơn giữa các tài liệu dài ngắn khác nhau. Vì vậy, 10 lần xuất hiện thường đóng góp ít hơn gấp đôi so với 5 lần, và cùng một TF sẽ nhận trọng số thấp hơn trong tài liệu dài hơn. Các giá trị tham số và phép tính cụ thể được trình bày trong Thử nghiệm 3-5.
 
 
 ![Hình 3-8 Cơ chế tính điểm BM25](images/fig3-8.svg)
@@ -390,7 +450,7 @@ Trong đó, $q_i$ là một từ trong truy vấn, $|D|$ là độ dài tài li�
 >
 > Để khám phá hoạt động bên trong dịch vụ sản xuất thưa thớt, dự án `sparse-embedding` phát triển công cụ tìm kiếm thưa thớt dựa trên kỹ thuật BM25 từ đầu theo cách mang tính giáo dục. Giá trị cốt lõi của dự án không nằm ở việc tối ưu hiệu suất tối đa mà ở tính minh bạch hoàn toàn của quy trình: quan sát rõ toàn bộ quá trình lập chỉ mục tài liệu - tiền xử lý văn bản (tách từ và loại bỏ các từ dừng như "of" và "the" vốn hầu như không mang giá trị truy xuất), xây dựng chỉ mục đảo và tính các giá trị TF và IDF. Cái gọi là chỉ mục đảo ngược là bảng ánh xạ ngược từ sang tài liệu - chỉ mục thông thường là "cho một tài liệu, liệt kê các từ nó chứa", còn chỉ mục đảo thì ngược lại, "cho một từ, tìm ngay tất cả tài liệu chứa nó". Nó giống như trang chỉ mục thuật ngữ ở cuối một cuốn sách: bạn tra cứu "TCP" và bạn biết rằng từ đó được đề cập ở trang 45, 112 và 203.
 >
-> Nhật ký truy vấn hiển thị chi tiết từng bước tính toán của BM25. Vẫn lấy truy vấn "chưng cất mô hình" làm ví dụ - sau đây là nhật ký đang chạy trên kho ngữ liệu mẫu nhỏ (tổng cộng N=10 tài liệu) đi kèm với dự án, do đó số lượt trúng ít hơn nhiều so với kịch bản minh họa 100 bài viết trước đó. Để tạo điều kiện thuận lợi cho người đọc tính toán và sao chép bằng tay, ví dụ này sửa các tham số BM25 k1=1,5, b=0,75 và độ dài tài liệu trung bình avgdl=250 từ; IDF sử dụng dạng chuẩn IDF=ln((N−df+0.5)/(df+0.5)) và df là số lượng tài liệu có chứa từ:
+> Nhật ký truy vấn hiển thị chi tiết từng bước tính toán của BM25. Vẫn lấy truy vấn "chưng cất mô hình" làm ví dụ - sau đây là nhật ký đang chạy trên kho ngữ liệu mẫu nhỏ (tổng cộng N=10 tài liệu) đi kèm với dự án, do đó số lượt trúng ít hơn nhiều so với kịch bản minh họa 100 bài viết trước đó. Để tạo điều kiện thuận lợi cho người đọc tính toán và sao chép bằng tay, ví dụ này sửa các tham số BM25 k1=1,5, b=0,75 và độ dài tài liệu trung bình avgdl=250 từ; IDF sử dụng dạng BM25 nêu trên IDF=ln((N−df+0.5)/(df+0.5)) và df là số lượng tài liệu có chứa từ:
 >
 > ```
 > Phân đoạn từ truy vấn: ["model", "chưng cất"]
@@ -469,9 +529,9 @@ Vấn đề sâu xa hơn là ngay cả khi chúng ta xây dựng hệ thống RA
 
 **Trường hợp 1: Đếm mèo đen và mèo trắng**. Trong Chương 2, chúng tôi đã sử dụng ví dụ đếm mèo đen và mèo trắng để minh họa rằng "sự chú ý là truy xuất mềm và thông tin thống kê cần được tinh chỉnh trước" - ngay cả khi tất cả 100 trường hợp được tải vào cửa sổ ngữ cảnh, mô hình cũng khó có thể hoàn thành việc đếm chính xác. Vấn đề tương tự lại xuất hiện ở quy mô cơ sở tri thức, kèm theo một số trở ngại mới. Giả sử cơ sở tri thức có 100 tài liệu trường hợp độc lập (90 mèo đen, 10 mèo trắng, mỗi tài liệu là một khối văn bản độc lập). Khi người dùng hỏi "Tỷ lệ là gì?": Đầu tiên là **top-k cắt ngắn** - bị giới hạn bởi top-k (chẳng hạn như 20), hầu hết các trường hợp sẽ không được truy xuất; thứ hai, **điểm truy xuất rất đa dạng** - ngay cả khi tăng giá trị k, do các mô tả riêng lẻ khác nhau, điểm tìm kiếm không đồng đều và một số trường hợp vẫn bị bỏ sót; cơ bản nhất là sự sai lệch của **tập hợp nhiều tài liệu** - các bài toán thống kê đòi hỏi phải "xem qua tất cả các tài liệu nhiều lần", trong khi bản chất của việc truy xuất là "tìm những tài liệu phù hợp nhất", cả hai đều mâu thuẫn nhau một cách tự nhiên. Mô hình chỉ có thể đưa ra kết luận sai lầm dựa trên các mẫu không đầy đủ (chẳng hạn như chỉ nhìn thấy 15 con mèo đen và 3 con mèo trắng). Nếu bạn tạo trước và lập chỉ mục tóm tắt "Có 100 con mèo: 90 con mèo đen (90%) và 10 con mèo trắng (10%)", bạn có thể nhận được thông tin chính xác chỉ trong một lần tìm kiếm.
 
-**Trường hợp 2: Suy luận sai về quy tắc chiết khấu Xfinity**. Ba trường hợp lịch sử riêng biệt: John, một cựu chiến binh, đã nộp đơn xin giảm giá thành công, Sarah, một bác sĩ, được giảm giá, và Mike, một giáo viên, được thông báo rằng anh ta không đủ điều kiện. Khi y tá hỏi, bộ truy xuất ưu tiên gọi lại trường hợp B vì "y tá" và "bác sĩ" gần nhau về ngữ nghĩa, và mô hình suy luận sai rằng y tá cũng được hưởng ưu đãi. Bộ truy xuất không gọi lại được trường hợp C cùng lúc (cho biết các ngành nghề khác không đủ điều kiện). Tệ hơn nữa, "y tá" có độ tương đồng về ngữ nghĩa thấp với trường hợp A "cựu chiến binh". Trường hợp này có thể bị xếp hạng thấp và bị bỏ qua, dẫn đến sự hiểu biết một chiều về quy định. Nếu quy tắc "Giảm giá Xfinity chỉ dành cho cựu chiến binh và bác sĩ, các ngành nghề khác không đủ điều kiện" được trích xuất trước và lập chỉ mục, thì bất kể ngành nghề nào được yêu cầu, các quy tắc đầy đủ sẽ có được trong một lần tìm kiếm.
+**Trường hợp 2: Vấn đề ranh giới trong điều kiện hưởng chiết khấu Xfinity**. Lần này cơ sở tri thức là kho phiếu hỗ trợ khách hàng: vài trăm phiếu, mỗi phiếu ghi lại một kết quả xử lý có thật — cựu chiến binh John được duyệt, bác sĩ Sarah nhận được chiết khấu, giáo viên Mike được thông báo rằng anh ta không đủ điều kiện, và cứ thế. Mỗi phiếu chỉ ghi kết luận của một trường hợp riêng lẻ; không phiếu nào ghi phạm vi điều kiện. Khi một y tá hỏi “tôi có đủ điều kiện không?”, các trở ngại chồng lên nhau. Thứ nhất là **thiên lệch láng giềng gần nhất** — “y tá” gần nhất về ngữ nghĩa với “bác sĩ”, nên phiếu của Sarah xếp đầu và mô hình theo đà suy ra rằng y tá cũng đủ điều kiện; nếu phiếu của Mike tình cờ xếp trên, cùng một câu hỏi sẽ nhận câu trả lời ngược lại. **Câu trả lời được quyết định bởi phiếu nào gần truy vấn nhất, chứ không phải bởi chính sách.** Thứ hai là **sự thiếu vắng ngữ nghĩa ranh giới** — trở ngại mà tăng k cũng không giải quyết được: một phát biểu dạng “chỉ ..., mọi ngành nghề khác đều không đủ điều kiện” mang lượng từ toàn xưng và phủ định, không nằm trong bất kỳ phiếu đơn lẻ nào mà chỉ tồn tại trong bao đóng của toàn bộ ngữ liệu. Kho phiếu vốn dĩ chưa từng trả lời “y tá có được tính hay không”, nên buộc mô hình quy nạp một quy tắc toàn xưng từ vài trường hợp riêng lẻ sẽ cho ra kết luận vốn không hề có giá trị. Thứ ba là **sự thiếu vắng tín hiệu về tính đầy đủ** — mô hình không có cách nào biết mình đã thấy trọn quy tắc hay chưa, nên không hỏi lại mà tự tin trả lời dựa trên vài phiếu đang có trong tay. Lời giải vẫn nằm ở giai đoạn lập chỉ mục: đọc ngoại tuyến toàn bộ kho phiếu và lấy chính sách điều kiện chính thức làm chuẩn (chứ không ngoại suy từ vài trường hợp truy xuất được — đó chính là sự ô nhiễm tri thức được cảnh báo ở phần sau), chắt lọc ra một thẻ quy tắc: “Chiết khấu Xfinity áp dụng cho quân nhân tại ngũ và cựu chiến binh, cùng nhân viên y tế có chứng chỉ hành nghề bao gồm y tá; các ngành nghề khác như giáo viên không đủ điều kiện; ngành nghề không được liệt kê cần người xét duyệt.” Khi cả ranh giới lẫn phương án dự phòng đều được ghi rõ, bất kể hỏi về ngành nghề nào, một lần truy xuất là có được quy tắc đầy đủ — mô hình không còn phải quy nạp, chỉ cần đối chiếu.
 
-Hai trường hợp này đã bộc lộ sâu sắc vấn đề cốt lõi: phương pháp RAG đơn giản, tức là đưa các trường hợp hoặc tài liệu gốc trực tiếp vào cơ sở tri thức mà không cần xử lý, là chưa đủ. Cho dù nó được lưu trữ trong cơ sở dữ liệu vectơ bên ngoài và được đưa vào ngữ cảnh thông qua truy xuất hay được đặt trực tiếp trong ngữ cảnh dài, mô hình không thể sử dụng thông tin này một cách hiệu quả và đáng tin cậy nếu không tinh chỉnh kiến thức và tiền xử lý có cấu trúc. Cơ chế chú ý của mô hình thực chất là một hệ thống truy xuất mềm dựa trên sự tương đồng chứ không phải là một cỗ máy tư duy có thể chủ động tổng hợp, trừu tượng hóa và xây dựng các cấp độ kiến thức. Do đó, nguồn lực tính toán phải được đầu tư vào giai đoạn lập chỉ mục để chủ động tinh chỉnh, trừu tượng hóa và cấu trúc kiến thức thô — cô đọng “100 trường hợp riêng lẻ” thành các bản tóm tắt thống kê và chắt lọc “ba trường hợp riêng biệt” thành các quy tắc rõ ràng.
+Hai trường hợp này đã bộc lộ sâu sắc vấn đề cốt lõi: phương pháp RAG đơn giản, tức là đưa các trường hợp hoặc tài liệu gốc trực tiếp vào cơ sở tri thức mà không cần xử lý, là chưa đủ. Cho dù nó được lưu trữ trong cơ sở dữ liệu vectơ bên ngoài và được đưa vào ngữ cảnh thông qua truy xuất hay được đặt trực tiếp trong ngữ cảnh dài, mô hình không thể sử dụng thông tin này một cách hiệu quả và đáng tin cậy nếu không tinh chỉnh kiến thức và tiền xử lý có cấu trúc. Cơ chế chú ý của mô hình thực chất là một hệ thống truy xuất mềm dựa trên sự tương đồng chứ không phải là một cỗ máy tư duy có thể chủ động tổng hợp, trừu tượng hóa và xây dựng các cấp độ kiến thức. Do đó, nguồn lực tính toán phải được đầu tư vào giai đoạn lập chỉ mục để chủ động tinh chỉnh, trừu tượng hóa và cấu trúc kiến thức thô — cô đọng “100 trường hợp riêng lẻ” thành các bản tóm tắt thống kê và chắt lọc “các trường hợp riêng lẻ nằm rải rác trong hàng trăm phiếu” thành quy tắc rõ ràng có nêu cả ranh giới.
 
 ### Lập chỉ mục có cấu trúc: Từ truy xuất thông tin đến mô hình hóa kiến thức
 
@@ -491,9 +551,8 @@ Ví dụ: trong truy xuất tài liệu kỹ thuật, nhiều nút lá về hư�
 
 **GraphRAG** Mô hình hóa kiến thức ghi lại dưới dạng biểu đồ kiến thức bao gồm các thực thể (Entities) và các mối quan hệ (Relationships). Biểu đồ tri thức xây dựng một mạng thông tin thông qua các bộ ba thực thể-mối quan hệ-thực thể. Bộ ba thể hiện một phần kiến thức dưới dạng “chủ thể-quan hệ-đối tượng”, chẳng hạn như (Bắc Kinh, là thủ đô của Trung Quốc), (Trương San, làm việc tại Tencent). Một số lượng lớn các bộ ba được đan xen vào nhau để tạo thành một mạng lưới kiến thức. Những lợi thế cốt lõi của đồ thị tri thức được phản ánh ở hai khía cạnh.
 
-**Lý luận về mối quan hệ nhiều chặng** là khả năng không thể thay thế nhất của đồ thị tri thức. Khi người dùng hỏi "địa chỉ bệnh viện nơi bác sĩ của tôi làm việc", hệ thống cần phân tích chuỗi mối quan hệ "người dùng → bác sĩ → bệnh viện → địa chỉ" theo trình tự. Trong bộ nhớ phẳng, loại truy vấn nhiều bước nhảy này yêu cầu nhiều truy xuất độc lập và sau đó được ghép bởi LLM (hiệu quả thấp và dễ ngắt liên kết) hoặc hoàn toàn không thể biểu thị được. Cấu trúc biểu đồ của biểu đồ tri thức hỗ trợ việc truyền tải dọc theo các cạnh của mối quan hệ một cách tự nhiên, làm cho loại truy vấn này vừa hiệu quả vừa đáng tin cậy.
-
-**Định hướng thực thể** cũng là một điểm mạnh của biểu đồ tri thức. Lưu ý rằng nó khác với "đa nghĩa" được thảo luận trong phần nhúng dày đặc ở trên: Việc xác định xem "bank" trong câu chỉ bờ sông hay ngân hàng là một nhiệm vụ phân biệt nghĩa của từ, có thể được giải quyết bằng cách nhúng nhận biết ngữ cảnh; trong khi việc phân biệt hai "Bác sĩ Zhang" có cùng tên trong thế giới thực là một sự phân định thực thể - đòi hỏi phải duy trì kiến thức về chính thực thể đó. Bạn có còn nhớ rằng Thẻ JSON nâng cao trong phần "Bốn định dạng lưu trữ" dựa trên các trường được thiết kế thủ công như `person` và `relationship` để phân biệt nhiều "Bác sĩ Zhang" của người dùng không? Trong biểu đồ tri thức, sự phân định này trở thành một khả năng vốn có của cấu trúc biểu đồ: (Bác sĩ Zhang-A, Khoa, Nha khoa) và (Bác sĩ Zhang-B, Khoa, Tim mạch) là các nút khác nhau trong biểu đồ, được kết nối với những người và tổ chức khác nhau thông qua các cạnh mối quan hệ tương ứng của họ và quá trình phân định không yêu cầu lý luận bổ sung.
+1. **Lý luận về mối quan hệ nhiều chặng.** Đây là khả năng không thể thay thế nhất của đồ thị tri thức. Khi người dùng hỏi "địa chỉ bệnh viện nơi bác sĩ của tôi làm việc", hệ thống cần phân tích chuỗi mối quan hệ "người dùng → bác sĩ → bệnh viện → địa chỉ" theo trình tự. Trong bộ nhớ phẳng, loại truy vấn nhiều bước nhảy này yêu cầu nhiều truy xuất độc lập và sau đó được ghép bởi LLM (hiệu quả thấp và dễ ngắt liên kết) hoặc hoàn toàn không thể biểu thị được. Cấu trúc biểu đồ của biểu đồ tri thức hỗ trợ việc truyền tải dọc theo các cạnh của mối quan hệ một cách tự nhiên, làm cho loại truy vấn này vừa hiệu quả vừa đáng tin cậy.
+2. **Định hướng thực thể.** Đây cũng là một điểm mạnh của biểu đồ tri thức. Lưu ý rằng nó khác với "đa nghĩa" được thảo luận trong phần nhúng dày đặc ở trên: Việc xác định xem "bank" trong câu chỉ bờ sông hay ngân hàng là một nhiệm vụ phân biệt nghĩa của từ, có thể được giải quyết bằng cách nhúng nhận biết ngữ cảnh; trong khi việc phân biệt hai "Bác sĩ Zhang" có cùng tên trong thế giới thực là một sự phân định thực thể - đòi hỏi phải duy trì kiến thức về chính thực thể đó. Bạn có còn nhớ rằng Thẻ JSON nâng cao trong phần "Bốn định dạng lưu trữ" dựa trên các trường được thiết kế thủ công như `person` và `relationship` để phân biệt nhiều "Bác sĩ Zhang" của người dùng không? Trong biểu đồ tri thức, sự phân định này trở thành một khả năng vốn có của cấu trúc biểu đồ: (Bác sĩ Zhang-A, Khoa, Nha khoa) và (Bác sĩ Zhang-B, Khoa, Tim mạch) là các nút khác nhau trong biểu đồ, được kết nối với những người và tổ chức khác nhau thông qua các cạnh mối quan hệ tương ứng của họ và quá trình phân định không yêu cầu lý luận bổ sung.
 
 GraphRAG trước tiên sử dụng LLM để trích xuất các thực thể chính (con người, địa điểm, khái niệm, thuật ngữ) từ văn bản, sau đó trích xuất các mối quan hệ khác nhau giữa các thực thể. Dựa trên biểu đồ, thuật toán Phát hiện cộng đồng được sử dụng để tìm các cụm thực thể gần gũi về mặt ngữ nghĩa và tạo ra các bản tóm tắt, tự động khám phá các cụm chủ đề được hình thành tự nhiên trong kiến thức và hình thành bản đồ tư duy. Việc biểu diễn tri thức nối mạng này đặc biệt hiệu quả trong việc trả lời các câu hỏi liên quan đến mối quan hệ phức tạp giữa nhiều thực thể.
 
@@ -515,7 +574,7 @@ Do đó, chiến lược được đề xuất trong thực tế là **bổ sung
 
 RAPTOR và GraphRAG đại diện cho hành trình khám phá tổ chức tri thức của cộng đồng học thuật, trong khi [OpenViking](https://github.com/volcengine/OpenViking), có nguồn mở bởi Bytedance Volcano Engine, đề xuất triết lý thứ ba: **Mô hình hệ thống tệp**. Thay vì xử lý các ngữ cảnh như các đoạn vectơ phẳng hoặc các nút biểu đồ, nó ánh xạ tất cả các ngữ cảnh—bộ nhớ, tài nguyên, kỹ năng—dưới dạng thư mục và tệp trong hệ thống tệp ảo, với mỗi mục nhập có một URI duy nhất:
 
-```
+```text
 viking://
 ├── resources/ # Kiến thức bên ngoài: tài liệu, code base, trang web
 ├── user/memories/ # Ký ức người dùng: sở thích, thói quen
@@ -528,7 +587,7 @@ viking://
 
 Thiết kế cốt lõi là **L0/L1/L2 tải ngữ cảnh ba lớp theo yêu cầu**. Khi ghi tài nguyên, hệ thống tự động tinh chỉnh nội dung gốc thành ba mức độ trừu tượng: **L0 (Tóm tắt)** Bản tóm tắt bằng một câu gồm khoảng 100 token, dùng để nhanh chóng xác định mức độ liên quan của thư mục; **L1 (Tổng quan)** Khoảng 2.000 token thông tin cốt lõi và các kịch bản sử dụng cho các quyết định lập kế hoạch Agent; **L2 (Toàn văn)** là nội dung gốc hoàn chỉnh, chỉ được tải theo yêu cầu khi cần thông tin chuyên sâu. Các tệp `.abstract` (L0) và `.overview` (L1) được tạo tự động trong mỗi thư mục, tạo thành cấu trúc tóm tắt phân cấp từ gốc đến lá. Nếu L0 được xác định là không liên quan thì không cần tải L1 và L2 - hầu hết các truy vấn có thể hoàn thành quyết định bằng cách đạt đến L1 và do đó mức tiêu thụ token sẽ giảm đáng kể. Ý tưởng về "tóm tắt thường trú và toàn văn theo yêu cầu" này hoàn toàn giống với việc tiết lộ dần dần các Kỹ năng được giới thiệu trong Chương 2 - trước tiên, hãy để Agent chỉ nhìn thấy thông tin meta nhẹ, sau đó kéo từng lớp nội dung hoàn chỉnh khi cần thiết và dùng token đúng nơi cần thiết nhất.
 
-**Chọn Markdown thuần văn bản thay vì cơ sở dữ liệu chuyên dụng làm biểu diễn nền tảng cho tri thức** là một quyết định kỹ thuật tưởng như ngược đời nhưng được cân nhắc kỹ. Văn bản thuần túy cho phép người dùng trực tiếp đọc, chỉnh sửa và sửa tri thức của Agent; Git cung cấp kiểm soát phiên bản và khôi phục; quan trọng hơn, khi có khả năng `write_file`, Agent có thể tự ghi chép và tổ chức tri thức trên một nhánh làm việc, rồi đề xuất thay đổi để quy trình kiểm duyệt ở phần sau hợp nhất vào kho chính. Khi một phiên kết thúc, hệ thống có thể đề xuất ghi cập nhật sở thích người dùng vào `user/memories/` và ghi lại thao tác vào `agent/memories/`. Phần trước vẫn thuộc quản lý tri thức người dùng của chương này; phần sau chỉ trở thành kinh nghiệm học tập theo nghĩa của Chương 8 sau khi đã được đánh giá kết quả, khái quát qua nhiều trajectory và xác minh tiếp, chứ không phải biến tùy tiện một lần thao tác thành kinh nghiệm đáng tin cậy.
+**Chọn Markdown thuần văn bản thay vì cơ sở dữ liệu chuyên dụng làm biểu diễn nền tảng cho tri thức** là một quyết định kỹ thuật tưởng như ngược đời nhưng được cân nhắc kỹ. Văn bản thuần túy cho phép người dùng trực tiếp đọc, chỉnh sửa và sửa tri thức của Agent; Git cung cấp kiểm soát phiên bản và khôi phục; quan trọng hơn, khi có khả năng `write_file`, Agent có thể tự ghi chép và tổ chức tri thức trên một nhánh làm việc, rồi đề xuất thay đổi để quy trình kiểm duyệt ở phần sau hợp nhất vào kho chính. Khi một phiên kết thúc, hệ thống có thể đề xuất ghi cập nhật sở thích người dùng vào `user/memories/` và ghi lại thao tác vào `agent/memories/`. Phần trước vẫn thuộc quản lý tri thức người dùng của chương này; phần sau chỉ trở thành kinh nghiệm học tập theo nghĩa của Chương 9 sau khi đã được đánh giá kết quả, khái quát qua nhiều trajectory và xác minh tiếp, chứ không phải biến tùy tiện một lần thao tác thành kinh nghiệm đáng tin cậy.
 
 Tuy nhiên, khi sử dụng văn bản thuần túy, tổ chức theo kiểu hệ thống tệp này, có một điều kiện tiên quyết dễ bị bỏ qua nhưng quyết định trực tiếp đến sự thành công hay thất bại của việc truy xuất: **Liên kết và chỉ mục phải được thiết lập giữa các tệp**. `.abstract`/`.overview` được giới thiệu trước đó giải quyết vấn đề trừu tượng hóa phân cấp theo chiều dọc, nhưng điểm nhấn ở đây là liên kết theo chiều ngang - nếu kiến thức chỉ được chia thành một loạt các tệp văn bản độc lập và đặt phẳng trong thư mục mà không có bất kỳ tham chiếu chéo nào với nhau, thì ngoài việc quét toàn văn bản hoặc truy xuất vectơ từng cái một, Agent hầu như không thể điều hướng giữa các mục liên quan; Càng có nhiều kiến thức thì việc tìm kiếm trong bộ sưu tập tài liệu nằm rải rác này càng khó khăn hơn. Cách tiếp cận đúng là tổ chức cơ sở kiến thức giống như Wikipedia: mỗi mục nhập trỏ đến nó bằng một liên kết khi đề cập đến các mục khác, được bổ sung bởi các trang mục nhập và trang chỉ mục, để Agent có thể đi theo các liên kết từ một khái niệm này đến các khái niệm liên quan - điều này tương đương với việc sử dụng các liên kết tệp nhẹ để hiện thực hóa một phần khả năng điều hướng của biểu đồ mối quan hệ thực thể của GraphRAG. Ngoài ra còn có một điểm khác biệt chính trong thực tế: **các mô hình khác nhau có mức độ sẵn sàng và khả năng tích cực thiết lập các liên kết như vậy khác nhau**. Khi viết kiến thức mới, một mô hình có khả năng mạnh sẽ tự động tham chiếu ngược lại các mục đã có và duy trì chỉ mục một cách thuận tiện; trong khi nhiều mô hình sẽ không chủ động thực hiện việc này và chỉ nối thêm các tệp một cách riêng biệt. Do đó, các yêu cầu phải được nêu rõ trong từ nhắc chịu trách nhiệm viết kiến thức - mỗi khi một mục mới được thêm vào, trước tiên nó phải được truy xuất và liên kết với các mục hiện có có liên quan và trang chỉ mục của thư mục chứa nó phải được cập nhật để tạo thành một mạng tham chiếu có thể truy cập hai chiều, thay vì cho phép kiến thức thoái hóa thành các hòn đảo bị ngắt kết nối.
 
@@ -555,7 +614,7 @@ Quy trình này phải tách rõ ba lớp: **lớp bằng chứng thô** lưu cu
 
 #### Tái tổ chức định kỳ bộ nhớ người dùng và cơ sở tri thức
 
-Ưu điểm của cập nhật gia tăng là kịp thời, nhưng mỗi lần chỉ nhìn thấy một phần cục bộ. Sau thời gian dài, nhiều sửa đổi đúng cục bộ vẫn có thể tích tụ thành vấn đề toàn cục: cùng một sự kiện nằm rải rác trong nhiều tệp, phát biểu mới và cũ cùng tồn tại, bản tóm tắt dần lệch khỏi bằng chứng ban đầu, và cấu trúc thư mục không còn phù hợp với quy mô tri thức hiện tại. Vì vậy hệ thống còn cần **tái tổ chức toàn bộ** theo định kỳ. Có thể hiểu đây là một triển khai cụ thể của “học trong khi ngủ” ở Chương 8 đối với quản lý tri thức: trong lúc tương tác trực tiếp, hệ thống tích lũy bằng chứng và cập nhật cục bộ; ở các cửa sổ định kỳ trong nền, nó lùi lại để xem xét lại toàn bộ hệ thống tri thức. Điều này cũng tương ứng với cách bộ nhớ tự động của Claude Code chủ động hợp nhất hoặc chuyển bớt chi tiết khi chỉ mục gần chạm giới hạn dung lượng.
+Ưu điểm của cập nhật gia tăng là kịp thời, nhưng mỗi lần chỉ nhìn thấy một phần cục bộ. Sau thời gian dài, nhiều sửa đổi đúng cục bộ vẫn có thể tích tụ thành vấn đề toàn cục: cùng một sự kiện nằm rải rác trong nhiều tệp, phát biểu mới và cũ cùng tồn tại, bản tóm tắt dần lệch khỏi bằng chứng ban đầu, và cấu trúc thư mục không còn phù hợp với quy mô tri thức hiện tại. Vì vậy hệ thống còn cần **tái tổ chức toàn bộ** theo định kỳ. Có thể hiểu đây là một triển khai cụ thể của “học trong khi ngủ” ở Chương 9 đối với quản lý tri thức: trong lúc tương tác trực tiếp, hệ thống tích lũy bằng chứng và cập nhật cục bộ; ở các cửa sổ định kỳ trong nền, nó lùi lại để xem xét lại toàn bộ hệ thống tri thức. Điều này cũng tương ứng với cách bộ nhớ tự động của Claude Code chủ động hợp nhất hoặc chuyển bớt chi tiết khi chỉ mục gần chạm giới hạn dung lượng.
 
 Quá trình này ít nhất gồm ba công việc cốt lõi:
 
@@ -690,7 +749,7 @@ Quá trình này được chia thành hai giai đoạn:
 >
 > Trọng tâm của thử nghiệm là cách tiếp cận đổi mới đối với kỹ thuật kiến thức dựa trên dữ liệu. Giai đoạn **Trích xuất kiến thức** không sử dụng các mẫu dữ liệu cứng nhắc được xác định trước mà áp dụng chiến lược khám phá nhân tố "từ dưới lên" - bằng cách cho phép LLM phân tích hàng trăm trường hợp mẫu và tự do liệt kê tất cả các yếu tố chính có thể ảnh hưởng đến phán đoán, nhóm dự án đã có thể xây dựng một mẫu dữ liệu mô-đun phù hợp hơn với chính dữ liệu đó thay vì kiến thức trước đây của con người. Mô hình này bao gồm một "mô hình cốt lõi" áp dụng cho tất cả các trường hợp (chẳng hạn như đầu hàng, bồi thường, v.v.) và một "mô hình mở rộng" (chẳng hạn như số tiền liên quan, mức độ thương tích) cho các tội phạm khác nhau (chẳng hạn như trộm cắp, cố ý gây thương tích).
 >
-> Giai đoạn **phân tích nhân tố** không trực tiếp cho AI dự đoán câu (điều đó sẽ tạo ra một "hộp đen" - nó có thể đưa ra câu trả lời nhưng không thể biết tại sao), mà trước tiên chuyển thông tin vụ việc sang định dạng kỹ thuật số mà máy tính có khả năng xử lý tốt. Phương pháp dịch rất trực quan: đối với một trường có nhiều tùy chọn như "Loại tội phạm", hãy cung cấp cho mỗi tùy chọn một bit công tắc độc lập - trộm = [1,0,0], cướp = [0,1,0], gian lận = [0,0,1] (lý do tại sao 1, 2, 3 không được sử dụng là vì kích thước của các con số sẽ khiến thuật toán nhầm tưởng rằng "lừa đảo nghiêm trọng gấp 3 lần so với trộm cắp" và bit công tắc chỉ cho biết "loại nào", mà không ngụ ý mối quan hệ kích thước). Đối với các câu hỏi đúng và sai như “Có nên đầu hàng hay không” và “Có nên đền bù hay không”, 1 nghĩa là có và 0 nghĩa là không. Bằng cách này, mỗi trường hợp sẽ trở thành một chuỗi số và sau đó thuật toán phân cụm được sử dụng để tìm "nguyên mẫu trường hợp" tự nhiên trong dữ liệu. Ví dụ, trong tội cố ý gây thương tích, các mô hình điển hình như "thương tích nhẹ do tay không gây ra bởi các vụ ẩu đả nhỏ" và "thương tích nghiêm trọng do các băng nhóm có vũ trang và có chủ ý gây ra" có thể được tự động nhóm lại. Xây dựng "mô hình phân cấp tầm quan trọng của yếu tố" dựa trên dữ liệu bằng cách phân tích các tính năng chính xác định cụm.
+> Giai đoạn **phân tích nhân tố** không trực tiếp cho AI dự đoán câu (điều đó sẽ tạo ra một "hộp đen" - nó có thể đưa ra câu trả lời nhưng không thể biết tại sao), mà trước tiên chuyển thông tin vụ việc sang định dạng kỹ thuật số mà máy tính có khả năng xử lý tốt. Phương pháp dịch rất trực quan: đối với một trường có nhiều tùy chọn như "Loại tội phạm", hãy cung cấp cho mỗi tùy chọn một bit công tắc độc lập - trộm = [1,0,0], cướp = [0,1,0], gian lận = [0,0,1] (lý do tại sao 1, 2, 3 không được sử dụng là vì kích thước của các con số sẽ khiến thuật toán nhầm tưởng rằng "lừa đảo nghiêm trọng gấp 3 lần so với trộm cắp" và bit công tắc chỉ cho biết "loại nào", mà không ngụ ý mối quan hệ kích thước). Đối với các câu hỏi đúng và sai như “Có nên đầu hàng hay không” và “Có nên đền bù hay không”, 1 nghĩa là có và 0 nghĩa là không. Bằng cách này, mỗi trường hợp sẽ trở thành một chuỗi số và sau đó thuật toán phân cụm được sử dụng để tìm "nguyên mẫu trường hợp" tự nhiên trong dữ liệu. Ví dụ, khi gom toàn bộ các vụ cố ý gây thương tích lại để phân cụm, thuật toán sẽ dựa trên các đặc trưng như nguyên nhân mâu thuẫn, cách thức gây án và mức độ thương tích để chia chúng thành nhiều nhóm vụ án tương tự nhau; mỗi nhóm là một mô hình điển hình, chẳng hạn "mâu thuẫn nhỏ dẫn đến ẩu đả tay không khiến nạn nhân bị thương tích nhẹ" hoặc "băng nhóm có chủ ý từ trước dùng hung khí đánh khiến nạn nhân bị thương tích nặng". Xây dựng "mô hình phân cấp tầm quan trọng của yếu tố" dựa trên dữ liệu bằng cách phân tích các tính năng chính xác định cụm.
 >
 > Cuối cùng, “Mô hình phân cấp tầm quan trọng của yếu tố” này đã trở thành động lực cốt lõi cho việc **thu thập thông tin hội thoại** của Agent. Khi người dùng mô tả trường hợp, Agent sử dụng mô hình này để đặt các câu hỏi hướng dẫn cho người dùng một cách thông minh theo thứ tự tầm quan trọng để hoàn thành tất cả các yếu tố quyết định quan trọng. Sau khi thông tin được thu thập, Agent tìm kiếm cơ sở kiến thức cho nguyên mẫu trường hợp tương tự nhất và cung cấp phân tích và giải thích dựa trên dữ liệu, theo trường hợp cụ thể dựa trên số liệu thống kê của nguyên mẫu đó (chẳng hạn như các phạm vi câu điển hình).
 >
@@ -712,6 +771,8 @@ Diện mạo của một khuôn mặt hay âm sắc giọng nói của một ng�
 
 Chương này xây dựng một cách có hệ thống hệ thống bộ nhớ liên tục của AI Agent từ hai thang đo: bộ nhớ người dùng cho người dùng cá nhân và cơ sở kiến thức dùng chung cho tất cả người dùng.
 
+Xét theo cấu trúc toàn sách, chương này dựng đoạn **đề xuất** trong vòng lặp khám phá của Chương 1: biến một chứng cứ thành một thay đổi tối thiểu, thẩm định được và hoàn tác được, chứ không đảm nhận việc phán đoán hệ thống nói chung có tốt lên hay không.
+
 Ở cấp độ **bộ nhớ người dùng**, chúng tôi khám phá bốn chiến lược tiến bộ từ sự kiện được nguyên tử hóa (Ghi chú đơn giản) đến quản lý kiến thức theo ngữ cảnh (Thẻ JSON nâng cao), cho thấy sự căng thẳng cơ bản giữa tính đơn giản và tính biểu cảm trong cách trình bày thông tin. Các khung như Mem0 và Memobase cung cấp các giải pháp quản lý bộ nhớ được thiết kế, trong khi các cơ chế bảo vệ quyền riêng tư đảm bảo tính bảo mật của thông tin nhạy cảm trong suốt quá trình.
 
 Ở cấp độ **thu thập kiến thức**, nhóm công nghệ cốt lõi là: phân đoạn tài liệu để phân định các đơn vị truy xuất, nhúng dày đặc để nắm bắt ngữ nghĩa, nhúng thưa thớt để khớp từ khóa, tổng hợp kết quả vào nhóm ứng viên, sắp xếp lại thần kinh để sàng lọc cuối cùng và các chỉ số như recall@k để đo lường chất lượng truy xuất.
@@ -720,18 +781,17 @@ Chương này xây dựng một cách có hệ thống hệ thống bộ nhớ l
 
 Ở cấp độ **cập nhật tri thức**, hệ thống cần đồng thời vận hành theo hai nhịp: cập nhật gia tăng để kịp thời tiếp nhận bằng chứng mới, còn tái tổ chức định kỳ quay lại toàn bộ tri thức và dữ liệu gốc để khử trùng lặp, loại bỏ nội dung cũ, hợp nhất, sắp xếp lại cấu trúc, kiểm tra thiếu sót và giới hạn phạm vi áp dụng. Dù tri thức được biểu diễn bằng Markdown hay Python, cả hai đường đều phải để Proposer Agent gửi diff dựa trên bằng chứng thô và một Reviewer Agent khác nguồn kiểm duyệt độc lập; chỉ sau khi được duyệt mới hợp nhất PR và xây dựng lại chỉ mục dẫn xuất.
 
-Chương này và chương trước đều xử lý vấn đề “ngữ cảnh”—một chương trong một phiên, chương kia xuyên nhiều phiên. Phần chính được kết tinh trong chương này là tri thức khai báo về người dùng và thế giới; Chương 8 sẽ dùng lại cùng hạ tầng trích xuất và truy xuất, nhưng đối tượng của nó là tri thức hành vi được nâng đỡ bởi thành công hoặc thất bại khi chạy, tức “trong điều kiện nào thì nên làm gì”. Chương tiếp theo chuyển sang “công cụ”: cách Agent tương tác với thế giới bên ngoài qua công cụ, bao gồm thiết kế công cụ, tiêu chuẩn tương tác MCP và kiến trúc hướng sự kiện.
+Chương này và chương trước đều xử lý vấn đề “ngữ cảnh”—một chương trong một phiên, chương kia xuyên nhiều phiên. Phần chính được kết tinh trong chương này là tri thức khai báo về người dùng và thế giới; Chương 9 sẽ dùng lại cùng hạ tầng trích xuất và truy xuất, nhưng đối tượng của nó là tri thức hành vi được nâng đỡ bởi thành công hoặc thất bại khi chạy, tức “trong điều kiện nào thì nên làm gì”. Chương tiếp theo chuyển sang “công cụ”: cách Agent tương tác với thế giới bên ngoài qua công cụ, bao gồm thiết kế công cụ, tiêu chuẩn tương tác MCP và kiến trúc hướng sự kiện.
 
 ## Câu hỏi tư duy
 
 
 1. ★★ Trong hệ thống bộ nhớ người dùng, khi cùng một người dùng cung cấp thông tin xung đột trong các phiên khác nhau (chẳng hạn như đề cập đến các địa chỉ nhà khác nhau hai lần), hệ thống bộ nhớ nên xử lý xung đột này như thế nào?
 2. ★★ Truy xuất nhận biết ngữ cảnh sẽ gắn ngữ cảnh của tài liệu gốc vào từng đoạn. Nhưng nếu bản thân tài liệu gốc có cấu trúc kém hoặc chứa thông tin mâu thuẫn, cách tiếp cận này có thể lan truyền hoặc thậm chí khuếch đại lỗi. Bạn sẽ giới thiệu các tín hiệu "chất lượng thông tin" như thế nào trong giai đoạn truy xuất?
-3. ★★★ RAG thông minh cho phép Agent chủ động quyết định thời điểm tìm kiếm, nội dung cần tìm kiếm và có tiếp tục tìm kiếm hay không. Nhưng nếu mô hình không biết những gì nó không biết thì nó không thể kích hoạt tìm kiếm một cách chính xác. Làm thế nào để giải quyết vấn đề “siêu nhận thức” này?
-4. ★★ Trích xuất thông tin đa phương thức chuyển đổi biểu đồ thành mô tả văn bản để truy xuất. Quá trình “dịch thuật” này có thể làm mất đi mối quan hệ không gian trong thông tin trực quan. Đưa ra một ví dụ cụ thể về sơ đồ mà một mô tả văn bản đơn giản không thể truyền tải đầy đủ và nghĩ ra cách để lưu giữ thông tin đó.
-5. ★★★ “Bài học cay đắng” của Rich Sutton lập luận rằng cách tiếp cận chung (tìm kiếm và học hỏi) cuối cùng sẽ hoạt động tốt hơn các tính năng được thiết kế thủ công. Toàn bộ hệ thống kiến thức (chiến lược phân đoạn, cấu trúc chỉ mục, đường dẫn truy xuất) được xây dựng trong chương này có phải là "thiết kế thủ công" không? Nếu khả năng của mô hình đủ mạnh, liệu những thiết kế này có được thay thế bằng một "đầu vào đầy đủ" đơn giản không?
-6. ★★★ Khi khả năng của mô hình được cải thiện, bạn có nghĩ nền tảng kiến thức miền vẫn còn quan trọng không? Phải chăng một mô hình cơ sở mạnh mẽ trong tương lai sẽ chứa tất cả thông tin trong cơ sở tri thức miền, từ đó loại bỏ nhu cầu về cơ sở tri thức miền?
-7. ★ RAPTOR xây dựng chỉ mục dạng cây thông qua tóm tắt phân cấp từ dưới lên và GraphRAG xây dựng chỉ mục cấu trúc biểu đồ thông qua các mối quan hệ thực thể. Hai chỉ mục có cấu trúc này có khả năng trả lời tốt những loại truy vấn nào?
-8. ★★ Mô hình hệ thống tệp tổ chức kiến thức thành cấu trúc phân cấp giống như hệ thống tệp. So với cơ sở dữ liệu vectơ truyền thống RAG, phương pháp này có lợi thế trong trường hợp nào?
-9. ★★★ Tự động khám phá “các yếu tố phán đoán” và “mức độ quan trọng của yếu tố” từ dữ liệu có cấu trúc (chẳng hạn như cơ sở dữ liệu quyết định tư pháp), về cơ bản cho phép Agent tóm tắt các quy tắc từ dữ liệu. Liệu việc khai thác kiến thức dựa trên dữ liệu này có thể đạt được chất lượng của các quy tắc viết tay của các chuyên gia con người không?
-10. ★★★ Hãy thiết kế đồng thời quy trình cập nhật gia tăng và tái tổ chức định kỳ cho một kho bộ nhớ người dùng bằng Markdown. Nếu Reviewer và Proposer dùng cùng một mô hình và Reviewer chỉ được xem các đoạn hội thoại do Proposer lựa chọn, hệ thống vẫn có thể hợp nhất những loại lỗi nào? Hãy trình bày cách cải thiện theo ba khía cạnh: tính độc lập của mô hình, độ bao phủ bằng chứng và quyền sử dụng công cụ.
+3. ★★ Trích xuất thông tin đa phương thức chuyển đổi biểu đồ thành mô tả văn bản để truy xuất. Quá trình “dịch thuật” này có thể làm mất đi mối quan hệ không gian trong thông tin trực quan. Đưa ra một ví dụ cụ thể về sơ đồ mà một mô tả văn bản đơn giản không thể truyền tải đầy đủ và nghĩ ra cách để lưu giữ thông tin đó.
+4. ★★★ “Bài học cay đắng” của Rich Sutton lập luận rằng cách tiếp cận chung (tìm kiếm và học hỏi) cuối cùng sẽ hoạt động tốt hơn các tính năng được thiết kế thủ công. Toàn bộ hệ thống kiến thức (chiến lược phân đoạn, cấu trúc chỉ mục, đường dẫn truy xuất) được xây dựng trong chương này có phải là "thiết kế thủ công" không? Nếu khả năng của mô hình đủ mạnh, liệu những thiết kế này có được thay thế bằng một "đầu vào đầy đủ" đơn giản không?
+5. ★★★ Khi khả năng của mô hình được cải thiện, bạn có nghĩ nền tảng kiến thức miền vẫn còn quan trọng không? Phải chăng một mô hình cơ sở mạnh mẽ trong tương lai sẽ chứa tất cả thông tin trong cơ sở tri thức miền, từ đó loại bỏ nhu cầu về cơ sở tri thức miền?
+6. ★ RAPTOR xây dựng chỉ mục dạng cây thông qua tóm tắt phân cấp từ dưới lên và GraphRAG xây dựng chỉ mục cấu trúc biểu đồ thông qua các mối quan hệ thực thể. Hai chỉ mục có cấu trúc này có khả năng trả lời tốt những loại truy vấn nào?
+7. ★★ Mô hình hệ thống tệp tổ chức kiến thức thành cấu trúc phân cấp giống như hệ thống tệp. So với cơ sở dữ liệu vectơ truyền thống RAG, phương pháp này có lợi thế trong trường hợp nào?
+8. ★★★ Tự động khám phá “các yếu tố phán đoán” và “mức độ quan trọng của yếu tố” từ dữ liệu có cấu trúc (chẳng hạn như cơ sở dữ liệu quyết định tư pháp), về cơ bản cho phép Agent tóm tắt các quy tắc từ dữ liệu. Liệu việc khai thác kiến thức dựa trên dữ liệu này có thể đạt được chất lượng của các quy tắc viết tay của các chuyên gia con người không?
+9. ★★★ Hãy thiết kế đồng thời quy trình cập nhật gia tăng và tái tổ chức định kỳ cho một kho bộ nhớ người dùng bằng Markdown. Nếu Reviewer và Proposer dùng cùng một mô hình và Reviewer chỉ được xem các đoạn hội thoại do Proposer lựa chọn, hệ thống vẫn có thể hợp nhất những loại lỗi nào? Hãy trình bày cách cải thiện theo ba khía cạnh: tính độc lập của mô hình, độ bao phủ bằng chứng và quyền sử dụng công cụ.

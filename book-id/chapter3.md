@@ -20,7 +20,7 @@ Intinya, sistem memori pengguna adalah proses belajar aktif berkelanjutan untuk 
 
 Mari kita lihat contoh nyatanya. Bayangkan percakapan pengguna dan Agent berikut:
 
-```
+```text
 User: Tolong pesankan tiket pesawat ke Tokyo untuk Jumat depan. Saya suka kursi dekat jendela dan saya seorang vegetarian, jadi saya butuh makanan khusus.
 Agent: Saya akan mencari penerbangan ke Tokyo untuk Jumat depan...
        [memanggil tool flight_search, mengembalikan 3 opsi]
@@ -30,12 +30,27 @@ User: Ya, dan gunakan nomor United MileagePlus saya 12345678.
 
 Setelah percakapan ini usai, sistem Agent akan memanggil LLM khusus untuk menganalisis dialog dan menyaring informasi yang patut diingat selamanya:
 
-```
+```text
 Memori yang diekstrak:
 - Pengguna suka kursi dekat jendela (preferensi)
 - Pengguna vegetarian, butuh makanan khusus di pesawat (batasan diet)
 - Nomor United MileagePlus pengguna: 12345678 (program loyalitas)
 - Pengguna punya rencana bepergian ke Tokyo (aktivitas terbaru)
+```
+
+**Siklus hidup memori:**
+
+```python
+when answering(user_request):
+    recent_turns = conversation.tail()
+    relevant_memory = memory.search(user_request)
+    answer = LLM(recent_turns + relevant_memory)
+    return answer
+
+after conversation (background job):
+    candidates = extract_memory_candidates(conversation)
+    verified = verify_against_sources_and_policy(candidates, conversation)
+    memory.append_or_update(verified)
 ```
 
 Perhatikan beberapa sifat utama proses ekstraksi ini:
@@ -125,51 +140,74 @@ Konsep tersebut membagi pembaruan memori ke dalam dua tahapan[^uac]: tahap memor
 
 Berikut contoh ringkasnya. Pada fase strukturisasi, sistem menyimpan dokumen perjalanan dan paspor pengguna sebagai state bertipe yang ketat:
 
-```python
-from datetime import date
+**Log append-only dan checkpoint:**
 
-passport = PassportInfo(
-    number="AB1234567", country="US",
-    expiry_date=date(2025, 2, 18),
-)
-trips = [
-    Trip(destination="Tokyo", departure_date=date(2025, 1, 15),
-         is_international=True),
-    # ... remaining trips
-]
+```python
+append_only_log += extract_facts(conversation)
+
+if checkpoint_due():
+    proposed_state = rebuild_typed_state(append_only_log)
+    if type_check(proposed_state) and source_review(proposed_state):
+        publish_checkpoint(proposed_state)
+    else:
+        keep_previous_checkpoint()
+```
+
+**State pengguna bertipe:**
+
+```python
+state = {
+    passport: PassportInfo(
+        number = "AB1234567",
+        country = "US",
+        expiry_date = date(2025, 2, 18),
+    ),
+    trips: [
+        Trip(destination = "Tokyo", departure_date = date(2025, 1, 15),
+             is_international = true),
+        ...
+    ],
+}
 ```
 
 Bersenjata wujud state bertipe (typed state) ini, tiga tugas yang sebelumnya menuntut LLM untuk membaca teks dan melakukan kalkulasi mental (mental arithmetic), kini berubah menjadi kode yang deterministik (deterministic code):
 
 Pertama, **pengumpulan statistik (statistical aggregation)**. "Berapa banyak perjalanan internasional yang saya lakukan pada tahun 2025?"—dengan memori berbasis teks, Anda harus memanggil ulang setiap perjalanan dan menghitungnya satu per satu, dan kesalahan makin mungkin terjadi seiring bertambahnya jumlah catatan; sedangkan dengan User as Code, hal tersebut hanyalah satu ekspresi yang mencapai akurasi hampir 100%[^uac]:
 
+**Agregasi deterministik:**
+
 ```python
->>> sum(1 for t in trips if t.is_international and t.departure_date.year == 2025)
-2
+count(
+    trip for trip in state.trips
+    if trip.is_international and year(trip.departure_date) == 2025
+)
+# => 2
 ```
 
 Kedua, **deteksi konflik (conflict detection)**. Dengan mensejajarkan "pengobatan saat ini" dan "alergi", sebuah fungsi tunggal mampu menyilangkan data tersebut (cross-reference) berdasarkan kelas obat (drug class), serta menyingkap kontradiksi yang tersebar melintasi beragam percakapan berbeda, yang mana hal ini nyaris mustahil untuk dikaitkan secara otomatis dalam format teks:
 
+**Deteksi konflik:**
+
 ```python
 def check_drug_allergy(profile):
-    for med in profile.current_medications:
+    for medication in profile.current_medications:
         for allergy in profile.allergies:
-            if med.drug_class == allergy.drug_class:
-                yield (f"Medication conflict: {med.name} belongs to {med.drug_class} class, "
-                       f"but the patient is severely allergic to {allergy.allergen}")
+            if medication.drug_class == allergy.drug_class:
+                emit_conflict(medication, allergy)
 ```
 
 Ketiga, **penegakan batasan (constraint enforcement)**. Agent dapat menyandikan fungsi pemeriksaan (check functions) semacam itu dan memicunya (trigger) secara otomatis setiap kali statusnya diperbarui (updated)—tanpa mengharuskan pengguna untuk berbicara atau Agent untuk memanggil (retrieve) apa pun. Sebagai contoh, batasan mutlak pada masa kedaluwarsa paspor: bunyikan peringatan (alert) jika paspor tersebut kedaluwarsa dalam kurang dari 180 hari setelah tanggal keberangkatan perjalanan internasional (international trip departure).
 
+**Penegakan constraint:**
+
 ```python
 def check():
-    for trip in trips:
+    for trip in state.trips:
         if trip.is_international:
-            days = (passport.expiry_date - trip.departure_date).days
+            days = date_difference(state.passport.expiry_date,
+                                   trip.departure_date)
             if days < 180:
-                yield (f"Passport expires on {passport.expiry_date}, only {days} days "
-                       f"between the {trip.destination} departure and passport expiry. "
-                       f"Please renew as soon as possible.")
+                alert("passport expires too soon", trip, days)
 ```
 
 [^uac]: Desain lengkap dan evaluasi dalam membangun User Memory sebagai proyek kode yang dapat dieksekusi dapat ditemukan di Li, Bojie. *User as Code: Executable Memory for Personalized Agents.* arXiv:2606.16707, 2026.
@@ -233,7 +271,7 @@ Tingkat ketiga mengabstraksi dan menggeneralisasi—mengekstrak aturan umum dari
 
 Deteksi konflik menggunakan pendekatan pembuatan versi—versi historis dipertahankan sementara versi terbaru ditandai. Untuk informasi tertentu (misalnya, alamat saat ini), hanya versi terbaru yang disimpan; untuk informasi lain (misalnya, riwayat pekerjaan), riwayat lengkapnya dipertahankan.
 
-Terakhir, batas harus ditarik untuk menghindari kebingungan dengan bab-bab lain. Bagian ini membahas algoritma organisasi pada **lapisan penyimpanan** memori—memori mana yang akan dipilih, diklasterisasi, dan diabstraksikan, serta dalam bentuk apa. Kompresi konteks dalam Bab 2 membahas masalah jendela dalam sesi tunggal; kedua mekanisme tersebut beroperasi pada level yang berbeda. Bab ini juga bertanggung jawab atas penyimpanan, pengindeksan, dan pengambilan Knowledge Base. Bab 8 menggeneralisasikan pola dua tahap "tambahkan bukti secara online, konsolidasikan secara offline" ("append evidence online, consolidate it offline") terhadap evolusi perilaku Agent, meneliti bukti operasional apa yang cukup untuk memicu pembaruan yang persisten.
+Terakhir, batas harus ditarik untuk menghindari kebingungan dengan bab-bab lain. Bagian ini membahas algoritma organisasi pada **lapisan penyimpanan** memori—memori mana yang akan dipilih, diklasterisasi, dan diabstraksikan, serta dalam bentuk apa. Kompresi konteks dalam Bab 2 membahas masalah jendela dalam sesi tunggal; kedua mekanisme tersebut beroperasi pada level yang berbeda. Bab ini juga bertanggung jawab atas penyimpanan, pengindeksan, dan pengambilan Knowledge Base. Bab 9 menggeneralisasikan pola dua tahap "tambahkan bukti secara online, konsolidasikan secara offline" ("append evidence online, consolidate it offline") terhadap evolusi perilaku Agent, meneliti bukti operasional apa yang cukup untuk memicu pembaruan yang persisten.
 
 ### Perlindungan Privasi: Pembersihan Log (Log Sanitization)
 
@@ -293,6 +331,22 @@ answer = llm.generate(system="Anda adalah asisten layanan pelanggan.", context=r
 Polanya identik pada kedua contoh: **Retrieve fragmen yang relevan → Suntikkan ke dalam konteks → LLM menghasilkan jawaban berdasarkan konteks**. Nilai inti dari RAG adalah memungkinkan LLM untuk menggunakan pengetahuan yang belum pernah dilihatnya selama pelatihan (konten Wikipedia terbaru, dokumen internal perusahaan) tanpa perlu melatih ulang model tersebut.
 
 Kualitas dari *retriever* secara langsung menentukan keefektifan RAG—jika ia tidak dapat melakukan *retrieve* pada fragmen yang relevan, bahkan LLM terkuat pun tidak memiliki apapun untuk dikerjakan. Bagian ini dimulai dengan langkah pertama untuk memasukkan dokumen ke dalam Knowledge Base—*chunking*—kemudian beralih ke dua pendekatan *retrieval* utama, Dense Embeddings (pemahaman semantik) dan Sparse Embeddings (pencocokan kata kunci), serta bagaimana menggabungkan keduanya.
+
+**Pipeline RAG hibrida:**
+
+```python
+offline:
+    chunks = split_documents(documents)
+    dense_index = build_dense_index(chunks)
+    sparse_index = build_sparse_index(chunks)
+
+online(query):
+    dense_hits = dense_search(dense_index, query)
+    sparse_hits = sparse_search(sparse_index, query)
+    candidates = fuse_and_deduplicate(dense_hits, sparse_hits)
+    evidence = rerank(query, candidates)
+    return LLM(query + evidence)
+```
 
 ![Gambar 3-5: Alur Kueri RAG: Retrieval, Augmentation, dan Generation](images/fig3-5.svg)
 
@@ -368,9 +422,15 @@ Di sini, `TF(t,d)` adalah jumlah kemunculan istilah $t$ dalam dokumen $d$, `DF(t
 
 BM25 (Okapi BM25) dapat dipandang sebagai koreksi klasik terhadap kedua keterbatasan ini. BM25 mempertahankan pembobotan IDF bagi istilah langka sekaligus menambahkan saturasi frekuensi istilah dan normalisasi panjang dokumen:
 
-$$\text{Score}(Q, D) = \sum_{i} \text{IDF}(q_i) \cdot \frac{\text{TF}(q_i, D)\,(k_1+1)}{\text{TF}(q_i, D) + k_1\left(1 - b + b \cdot \frac{|D|}{\text{avgdl}}\right)}$$
+$$\text{Score}(Q, D) = \sum_{i} \text{IDF}_{\text{BM25}}(q_i) \cdot \frac{\text{TF}(q_i, D)\,(k_1+1)}{\text{TF}(q_i, D) + k_1\left(1 - b + b \cdot \frac{|D|}{\text{avgdl}}\right)}$$
 
-Di sini, $q_i$ adalah istilah query, $|D|$ adalah panjang dokumen, dan $\text{avgdl}$ adalah panjang rata-rata dokumen dalam korpus. Seperti ditunjukkan Gambar 3-8, $k_1$ mengendalikan seberapa cepat frekuensi istilah mencapai saturasi sehingga setiap pengulangan tambahan memberi kenaikan yang makin kecil; $b$ mengendalikan kekuatan normalisasi panjang agar dokumen dengan panjang berbeda dapat dibandingkan secara lebih adil. Akibatnya, 10 kemunculan biasanya menyumbang kurang dari dua kali lipat dibandingkan 5 kemunculan, dan frekuensi istilah yang sama mendapat bobot lebih kecil dalam dokumen yang lebih panjang. Nilai parameter spesifik dan perhitungannya dibahas dalam Eksperimen 3-5.
+Di sini, $q_i$ adalah istilah query, $|D|$ adalah panjang dokumen, dan $\text{avgdl}$ adalah panjang rata-rata dokumen dalam korpus. Subskrip pada $\text{IDF}_{\text{BM25}}$ menandakan bahwa rumusnya tidak sama dengan $\text{IDF}$ pada TF-IDF di atas: BM25 beralih ke varian yang lebih tahan banting.
+
+$$\text{IDF}_{\text{BM25}}(t) = \ln\frac{N - \text{DF}(t) + 0.5}{\text{DF}(t) + 0.5}$$
+
+Intuisinya tidak berubah—makin langka sebuah istilah, makin besar bobotnya—yang berubah hanyalah cara mengukurnya. Pembilangnya menjadi jumlah dokumen yang *tidak* memuat istilah tersebut, $N - \text{DF}(t)$, bukan total $N$, sehingga rasio itu langsung menyatakan berapa kali lipat dokumen yang tidak memuat istilah dibandingkan yang memuatnya; penambahan 0,5 pada pembilang dan penyebut memberi efek penghalusan sehingga rumus tetap terdefinisi pada dua kondisi ekstrem, $\text{DF}(t) = 0$ dan $\text{DF}(t) = N$. Harganya adalah istilah yang muncul di lebih dari separuh dokumen ($\text{DF}(t) > N/2$) memperoleh bobot negatif, sehingga implementasi biasanya membatasinya dengan nilai minimum. Varian ini berasal dari model pengambilan probabilistik dan dikenal dalam literatur sebagai bobot Robertson–Spärck Jones.
+
+Seperti ditunjukkan Gambar 3-8, $k_1$ mengendalikan seberapa cepat frekuensi istilah mencapai saturasi sehingga setiap pengulangan tambahan memberi kenaikan yang makin kecil; $b$ mengendalikan kekuatan normalisasi panjang agar dokumen dengan panjang berbeda dapat dibandingkan secara lebih adil. Akibatnya, 10 kemunculan biasanya menyumbang kurang dari dua kali lipat dibandingkan 5 kemunculan, dan frekuensi istilah yang sama mendapat bobot lebih kecil dalam dokumen yang lebih panjang. Nilai parameter spesifik dan perhitungannya dibahas dalam Eksperimen 3-5.
 
 ![Gambar 3-8: Mekanisme Penilaian BM25](images/fig3-8.svg)
 
@@ -379,7 +439,7 @@ Di sini, $q_i$ adalah istilah query, $|D|$ adalah panjang dokumen, dan $\text{av
 
 > Untuk mengungkap cara kerja internal sparse retrieval, proyek `sparse-embedding` mengimplementasikan mesin pencari sparse vector berbasis BM25 dari awal sebagai sarana pembelajaran. Nilainya tidak terletak pada memaksimalkan performa, melainkan pada transparansi penuh. Melalui log yang kaya dan antarmuka visualisasi, kita dapat mengamati dengan jelas seluruh proses indexing dokumen: preprocessing teks (tokenization dan penghapusan stop words bahasa Mandarin seperti "的" dan "了" (kata tugas yang sama umumnya dengan "the" atau "of" dalam bahasa Inggris) yang hampir tidak memiliki nilai retrieval), membangun inverted index, dan menghitung nilai TF dan IDF. Inverted index adalah tabel pemetaan terbalik dari kata ke dokumen—forward index adalah "diberikan sebuah dokumen, sebutkan kata-kata yang dikandungnya," sedangkan inverted index melakukan kebalikannya: "diberikan sebuah kata, segera temukan semua dokumen yang mengandungnya." Ini seperti indeks istilah di bagian belakang buku: Anda mencari "TCP," dan indeks itu memberi tahu Anda bahwa halaman 45, 112, dan 203 menyebutkannya.
 >
-> Selama sebuah query, log merinci setiap langkah perhitungan BM25. Menggunakan query "model distillation" sebagai contoh lagi—log berikut berasal dari korpus sampel kecil (N=10 dokumen) yang disertakan dengan proyek, sehingga jumlah kecocokan jauh lebih sedikit daripada skenario 100 artikel yang disebutkan sebelumnya. Untuk memfasilitasi perhitungan ulang manual, contoh ini menetapkan parameter BM25 k1=1.5, b=0.75, dan panjang dokumen rata-rata avgdl=250 kata; IDF menggunakan bentuk standar IDF=ln((N−df+0.5)/(df+0.5)), di mana df adalah jumlah dokumen yang mengandung kata tersebut:
+> Selama sebuah query, log merinci setiap langkah perhitungan BM25. Menggunakan query "model distillation" sebagai contoh lagi—log berikut berasal dari korpus sampel kecil (N=10 dokumen) yang disertakan dengan proyek, sehingga jumlah kecocokan jauh lebih sedikit daripada skenario 100 artikel yang disebutkan sebelumnya. Untuk memfasilitasi perhitungan ulang manual, contoh ini menetapkan parameter BM25 k1=1.5, b=0.75, dan panjang dokumen rata-rata avgdl=250 kata; IDF menggunakan bentuk BM25 di atas, IDF=ln((N−df+0.5)/(df+0.5)), di mana df adalah jumlah dokumen yang mengandung kata tersebut:
 >
 > ```
 > Query tokens: ["model", "distillation"]
@@ -422,7 +482,7 @@ Mekanisme "joint attention" ini memungkinkan cross-encoder untuk menangkap asosi
 
 **How to Measure Retrieval Quality?** Menyetel pipeline multi-tahap seperti ini membutuhkan metrik yang objektif. Tiga metrik yang paling penting (semuanya dihitung pada sebuah test query set dengan jawaban yang telah dianotasi):
 
-Table 3-3 Three Core Metrics for Retrieval Quality
+Tabel 3-3 Tiga Metrik Inti untuk Kualitas Retrieval
 
 | Metric | Intuitive Explanation |
 |-------------------------------|----------------------------------------------------------------|
@@ -452,9 +512,9 @@ Masalah yang lebih dalam adalah bahwa meskipun kita membangun sistem RAG, sekada
 
 **Kasus 1: Masalah Menghitung Kucing Hitam dan Kucing Putih.** Pada Bab 2, kita menggunakan contoh menghitung kucing hitam dan putih untuk mengilustrasikan bahwa "attention adalah mekanisme soft retrieval, dan informasi statistik perlu diekstraksi sebelumnya"—bahkan jika seluruh 100 kasus dimuat ke dalam jendela konteks, model kesulitan untuk melakukan penghitungan yang akurat. Masalah yang sama muncul kembali pada skala Knowledge Base, diperparah oleh beberapa hambatan baru. Misalkan Knowledge Base memiliki 100 dokumen kasus independen (90 kucing hitam, 10 kucing putih, masing-masing merupakan potongan teks independen), dan pengguna bertanya, "Berapa rasio kucing hitam dan kucing putih?" Pertama, **pemotongan top-k**—dengan nilai top-k yang kecil, seperti 20, sebagian besar kasus tidak akan ditarik sama sekali. Kedua, **skor retrieval yang tidak merata**—bahkan dengan k yang lebih besar, kasus individu dideskripsikan secara berbeda, skornya sangat bervariasi, dan beberapa masih terlewatkan. Yang paling mendasar, terdapat **ketidaksesuaian dalam agregasi lintas dokumen**—pertanyaan statistik memerlukan "penghitungan di seluruh dokumen," sementara sifat dasar retrieval adalah "menemukan beberapa yang paling relevan," menciptakan kontradiksi yang melekat. Model hanya dapat menarik kesimpulan yang salah berdasarkan sampel yang tidak lengkap (misalnya, hanya melihat 15 kucing hitam dan 3 kucing putih). Jika ringkasan yang dihasilkan sebelumnya seperti "Total 100 kucing: 90 kucing hitam (90%) dan 10 kucing putih (10%)" diindeks, satu kali retrieval akan menghasilkan informasi yang akurat.
 
-**Kasus 2: Penalaran Keliru tentang Aturan Diskon Xfinity.** Tiga kasus historis yang terisolasi: Veteran John berhasil mengajukan diskon, Dokter Sarah menerima diskon, Guru Mike diberitahu bahwa ia tidak memenuhi syarat. Ketika seorang perawat bertanya, retriever, karena kesamaan semantik antara "perawat" dan "dokter," memprioritaskan kasus dokter Sarah, dan model secara keliru menyimpulkan bahwa perawat juga memenuhi syarat. Retriever gagal untuk secara bersamaan menarik kasus guru Mike (yang menunjukkan profesi lain tidak memenuhi syarat). Lebih buruk lagi, "perawat" memiliki kesamaan semantik yang rendah dengan kasus veteran John, sehingga kasus tersebut mungkin berada di peringkat rendah dan diabaikan, yang mengarah pada pemahaman aturan yang tidak lengkap. Jika aturan yang diekstraksi sebelumnya seperti "Diskon Xfinity hanya tersedia untuk veteran dan dokter; profesi lain tidak memenuhi syarat" diindeks, satu kali retrieval akan memberikan aturan lengkap terlepas dari profesi yang ditanyakan.
+**Kasus 2: Masalah Batas pada Kelayakan Diskon Xfinity.** Kali ini Knowledge Base-nya adalah arsip tiket dukungan pelanggan: beberapa ratus tiket, masing-masing mencatat satu hasil penanganan nyata—Veteran John lolos verifikasi, Dokter Sarah mendapat diskon, Guru Mike diberitahu bahwa ia tidak memenuhi syarat, dan seterusnya. Setiap tiket hanya menuliskan kesimpulan satu kasus individual; tidak satu pun menuliskan cakupan kelayakan itu sendiri. Ketika seorang perawat bertanya "apakah saya memenuhi syarat?", beberapa rintangan menumpuk. Pertama, **bias tetangga terdekat**—"perawat" paling dekat secara semantik dengan "dokter," sehingga tiket Sarah menempati peringkat teratas dan model pun menyimpulkan bahwa perawat juga memenuhi syarat; seandainya tiket Mike yang kebetulan berperingkat lebih tinggi, pertanyaan yang sama akan mendapat jawaban sebaliknya. **Jawabannya ditentukan oleh tiket mana yang kebetulan paling dekat dengan kueri, bukan oleh kebijakannya.** Kedua, **hilangnya semantik batas**—rintangan yang tidak bisa diatasi dengan memperbesar k: pernyataan berbentuk "hanya ..., profesi lain tidak memenuhi syarat" mengandung kuantor universal dan negasi, dan tidak berada di satu tiket mana pun, melainkan hanya pada ketertutupan (closure) seluruh korpus. Arsip tiket sejak awal tidak pernah menjawab "apakah perawat termasuk," sehingga memaksa model menginduksi aturan universal dari segelintir kasus individual menghasilkan kesimpulan yang memang tidak pernah sahih. Ketiga, **hilangnya sinyal kelengkapan**—model tidak punya cara untuk tahu apakah ia sudah melihat seluruh aturan, jadi ia tidak bertanya balik dan langsung menjawab dengan percaya diri dari beberapa tiket yang ada di tangan. Perbaikannya kembali berada di tahap pengindeksan: bacalah seluruh arsip tiket secara offline dan, dengan menjadikan kebijakan kelayakan resmi sebagai acuan (bukan mengekstrapolasi dari beberapa kasus yang berhasil di-retrieve—yang justru merupakan polusi pengetahuan yang diperingatkan nanti), sarikan satu kartu aturan: "Diskon Xfinity berlaku untuk anggota militer aktif dan veteran, serta tenaga medis berlisensi termasuk perawat; profesi lain seperti guru tidak memenuhi syarat; profesi yang tidak tercantum memerlukan peninjauan manusia." Setelah batas dan penanganan cadangannya sama-sama tertulis, satu kali retrieval memberikan aturan lengkap terlepas dari profesi yang ditanyakan—model tidak perlu lagi menginduksi, cukup mencocokkan.
 
-Kedua kasus menunjuk pada kesimpulan yang sama: **naive RAG—memasukkan kasus atau dokumen mentah ke dalam Knowledge Base tanpa diproses—sama sekali tidak cukup.** Baik disimpan dalam database vektor eksternal dan disuntikkan ke dalam konteks melalui retrieval, atau ditempatkan secara langsung dalam konteks yang panjang, tanpa ekstraksi pengetahuan dan prapemrosesan terstruktur, model tidak dapat menggunakan informasi ini secara efisien dan andal. Mekanisme attention model pada dasarnya adalah sistem soft retrieval berbasis kesamaan, bukan mesin berpikir yang secara aktif meringkas, menggeneralisasi, dan membangun hierarki pengetahuan. Jadi komputasi harus diinvestasikan pada tahap pengindeksan untuk secara aktif mengekstrak, mengabstraksi, dan menyusun pengetahuan mentah—mengompresi "100 kasus individu" menjadi ringkasan statistik, menyaring "tiga kasus terisolasi" menjadi aturan eksplisit.
+Kedua kasus menunjuk pada kesimpulan yang sama: **naive RAG—memasukkan kasus atau dokumen mentah ke dalam Knowledge Base tanpa diproses—sama sekali tidak cukup.** Baik disimpan dalam database vektor eksternal dan disuntikkan ke dalam konteks melalui retrieval, atau ditempatkan secara langsung dalam konteks yang panjang, tanpa ekstraksi pengetahuan dan prapemrosesan terstruktur, model tidak dapat menggunakan informasi ini secara efisien dan andal. Mekanisme attention model pada dasarnya adalah sistem soft retrieval berbasis kesamaan, bukan mesin berpikir yang secara aktif meringkas, menggeneralisasi, dan membangun hierarki pengetahuan. Jadi komputasi harus diinvestasikan pada tahap pengindeksan untuk secara aktif mengekstrak, mengabstraksi, dan menyusun pengetahuan mentah—mengompresi "100 kasus individu" menjadi ringkasan statistik, menyaring "kasus-kasus individual yang tersebar di ratusan tiket" menjadi aturan eksplisit yang menyatakan batasnya sendiri.
 
 ### Pengindeksan Terstruktur: Dari Information Retrieval ke Knowledge Modeling
 
@@ -474,9 +534,8 @@ Dalam retrieval dokumen teknis, misalnya, beberapa node daun tentang instruksi S
 
 **GraphRAG** memodelkan pengetahuan dokumen sebagai grafik pengetahuan (knowledge graph) yang terdiri dari entitas dan hubungan. Grafik pengetahuan membangun jaringan informasi menggunakan tripel entitas-hubungan-entitas. Sebuah tripel mengekspresikan sepotong pengetahuan dalam bentuk "subjek-predikat-objek," misalnya, (Beijing, adalah ibu kota dari, Cina), (Zhang San, bekerja di, Tencent). Gabungkan cukup banyak tripel dan Anda akan mendapatkan sebuah jaring pengetahuan. Keuntungan inti dari grafik pengetahuan muncul di dua tempat.
 
-**Penalaran relasional multi-hop** adalah kemampuan yang paling tidak tergantikan dari grafik pengetahuan. Ketika pengguna bertanya "Apa alamat rumah sakit dokter saya?", sistem perlu menyelesaikan rantai hubungan "pengguna → dokter → rumah sakit → alamat" secara berurutan. Dalam penyimpanan memori yang datar, kueri multi-hop semacam itu memerlukan beberapa retrieval independen yang diikuti oleh penyatuan LLM (tidak efisien dan rentan terhadap rantai yang terputus) atau sama sekali tidak dapat diekspresikan. Struktur grafik dari grafik pengetahuan secara alami mendukung penjelajahan di sepanjang tepi hubungan, membuat kueri semacam itu menjadi efisien dan andal.
-
-**Disambiguasi Entitas** (Entity Disambiguation) adalah kekuatan lain dari grafik pengetahuan. Perhatikan bahwa ini berbeda dengan "polisemi" yang dibahas sebelumnya di bagian dense embedding: menentukan apakah "bank" merujuk ke tepi sungai atau institusi keuangan dalam sebuah kalimat adalah tugas Disambiguasi Makna Kata (Word Sense Disambiguation), yang dapat diselesaikan dengan context-aware embeddings. Sebaliknya, membedakan antara dua individu di dunia nyata yang keduanya bernama "Dr. Zhang" adalah disambiguasi entitas—ini membutuhkan pemeliharaan pengetahuan tentang entitas itu sendiri. Ingat "Advanced JSON Cards" pada bagian "Empat Format Penyimpanan", yang menggunakan bidang yang dirancang secara manual seperti `person` dan `relationship` untuk membedakan beberapa kontak "Dr. Zhang" bagi seorang pengguna? Dalam grafik pengetahuan, disambiguasi ini menjadi kemampuan bawaan (native) dari struktur grafik: (Dr. Zhang-A, Departemen, Kedokteran Gigi) dan (Dr. Zhang-B, Departemen, Kardiologi) adalah node yang berbeda dalam grafik, terhubung ke orang dan institusi yang berbeda melalui tepi hubungan masing-masing. Proses disambiguasi ini tidak memerlukan penalaran tambahan.
+1. **Penalaran relasional multi-hop.** Ini adalah kemampuan yang paling tidak tergantikan dari grafik pengetahuan. Ketika pengguna bertanya "Apa alamat rumah sakit dokter saya?", sistem perlu menyelesaikan rantai hubungan "pengguna → dokter → rumah sakit → alamat" secara berurutan. Dalam penyimpanan memori yang datar, kueri multi-hop semacam itu memerlukan beberapa retrieval independen yang diikuti oleh penyatuan LLM (tidak efisien dan rentan terhadap rantai yang terputus) atau sama sekali tidak dapat diekspresikan. Struktur grafik dari grafik pengetahuan secara alami mendukung penjelajahan di sepanjang tepi hubungan, membuat kueri semacam itu menjadi efisien dan andal.
+2. **Disambiguasi Entitas (Entity Disambiguation).** Ini adalah kekuatan lain dari grafik pengetahuan. Perhatikan bahwa ini berbeda dengan "polisemi" yang dibahas sebelumnya di bagian dense embedding: menentukan apakah "bank" merujuk ke tepi sungai atau institusi keuangan dalam sebuah kalimat adalah tugas Disambiguasi Makna Kata (Word Sense Disambiguation), yang dapat diselesaikan dengan context-aware embeddings. Sebaliknya, membedakan antara dua individu di dunia nyata yang keduanya bernama "Dr. Zhang" adalah disambiguasi entitas—ini membutuhkan pemeliharaan pengetahuan tentang entitas itu sendiri. Ingat "Advanced JSON Cards" pada bagian "Empat Format Penyimpanan", yang menggunakan bidang yang dirancang secara manual seperti `person` dan `relationship` untuk membedakan beberapa kontak "Dr. Zhang" bagi seorang pengguna? Dalam grafik pengetahuan, disambiguasi ini menjadi kemampuan bawaan (native) dari struktur grafik: (Dr. Zhang-A, Departemen, Kedokteran Gigi) dan (Dr. Zhang-B, Departemen, Kardiologi) adalah node yang berbeda dalam grafik, terhubung ke orang dan institusi yang berbeda melalui tepi hubungan masing-masing. Proses disambiguasi ini tidak memerlukan penalaran tambahan.
 
 GraphRAG pertama-tama menggunakan LLM untuk mengekstrak entitas utama (orang, tempat, konsep, istilah) dari teks, dan kemudian mengekstrak berbagai hubungan antara entitas-entitas ini. Berdasarkan grafik tersebut, ia menggunakan algoritma deteksi komunitas untuk menemukan kelompok entitas yang erat secara semantik dan menghasilkan ringkasan, secara otomatis menemukan pengelompokan tematik alami di dalam pengetahuan dan membentuk sebuah peta pikiran (mind map). Representasi pengetahuan berjaringan ini sangat mahir dalam menjawab pertanyaan yang melibatkan hubungan kompleks di antara banyak entitas.
 
@@ -498,7 +557,7 @@ Oleh karena itu, strategi yang direkomendasikan dalam praktiknya adalah **desain
 
 RAPTOR dan GraphRAG mewakili eksplorasi komunitas akademis terhadap organisasi pengetahuan; [OpenViking](https://github.com/volcengine/OpenViking), yang bersifat open-source oleh Volcano Engine dari ByteDance, mengusulkan filosofi ketiga: **paradigma sistem file**. Ia memperlakukan konteks bukan sebagai fragmen vektor datar ataupun node grafik. Alih-alih, ia memetakan seluruh konteks—memori, sumber daya, keterampilan—ke dalam direktori dan file di dalam sistem file virtual, masing-masing dengan URI unik:
 
-```
+```text
 viking://
 ├── resources/          # Pengetahuan eksternal: dokumen, basis kode, halaman web
 ├── user/memories/      # User Memory: preferensi, kebiasaan
@@ -511,7 +570,7 @@ Di sini, `viking://` adalah **URI virtual**—secara formal mirip dengan `http:/
 
 Desain intinya adalah **pemuatan berdasarkan permintaan (on-demand loading) konteks tiga lapis L0/L1/L2**. Ketika sebuah sumber daya ditulis, sistem secara otomatis menyaring konten asli menjadi tiga tingkat abstraksi: **L0 (Summary)** adalah gambaran umum satu kalimat dari sekitar 100 token, yang digunakan untuk menilai relevansi direktori dengan cepat; **L1 (Overview)** berisi informasi inti dan skenario penggunaan dalam sekitar 2.000 token, untuk perencanaan dan pengambilan keputusan Agent; **L2 (Full Text)** adalah konten asli yang lengkap, yang dimuat berdasarkan permintaan hanya ketika analisis mendalam diperlukan. Setiap direktori secara otomatis menghasilkan file `.abstract` (L0) dan `.overview` (L1), yang membentuk struktur ringkasan hierarkis dari akar (root) ke daun (leaf). Jika L0 dianggap tidak relevan, L1 dan L2 tidak perlu dimuat—sebagian besar kueri dapat diselesaikan di L1, yang secara signifikan mengurangi konsumsi token. Pendekatan "ringkasan dipertahankan (resident), teks lengkap berdasarkan permintaan" ini sangat mirip dengan pengungkapan progresif dari Agent Skills yang diperkenalkan di Bab 2—keduanya memungkinkan Agent untuk hanya melihat metadata ringan terlebih dahulu, menarik konten lengkap lapis demi lapis hanya jika diperlukan, menghabiskan token di tempat yang paling penting.
 
-**Memilih teks biasa Markdown alih-alih database khusus sebagai representasi dasar pengetahuan** merupakan keputusan rekayasa yang tampaknya berlawanan dengan intuisi tetapi dipertimbangkan dengan cermat. Teks biasa memungkinkan pengguna membaca, mengedit, dan mengoreksi pengetahuan Agent secara langsung; Git menyediakan version control dan rollback; dan yang lebih penting, dengan kemampuan `write_file`, Agent dapat mencatat serta mengatur pengetahuan secara otonom di working branch sebelum menggabungkannya ke basis utama melalui proses review yang dijelaskan nanti. Pada akhir sesi, sistem dapat mengusulkan pembaruan preferensi pengguna ke `user/memories/` dan catatan operasional ke `agent/memories/`. Yang pertama tetap merupakan manajemen pengetahuan pengguna dalam bab ini; yang kedua baru menjadi experience learning dalam pengertian Bab 8 setelah outcome evaluation, generalisasi lintas trajectory, dan validasi berikutnya—bukan dengan memperlakukan operasi sembarang sebagai pengalaman yang andal.
+**Memilih teks biasa Markdown alih-alih database khusus sebagai representasi dasar pengetahuan** merupakan keputusan rekayasa yang tampaknya berlawanan dengan intuisi tetapi dipertimbangkan dengan cermat. Teks biasa memungkinkan pengguna membaca, mengedit, dan mengoreksi pengetahuan Agent secara langsung; Git menyediakan version control dan rollback; dan yang lebih penting, dengan kemampuan `write_file`, Agent dapat mencatat serta mengatur pengetahuan secara otonom di working branch sebelum menggabungkannya ke basis utama melalui proses review yang dijelaskan nanti. Pada akhir sesi, sistem dapat mengusulkan pembaruan preferensi pengguna ke `user/memories/` dan catatan operasional ke `agent/memories/`. Yang pertama tetap merupakan manajemen pengetahuan pengguna dalam bab ini; yang kedua baru menjadi experience learning dalam pengertian Bab 9 setelah outcome evaluation, generalisasi lintas trajectory, dan validasi berikutnya—bukan dengan memperlakukan operasi sembarang sebagai pengalaman yang andal.
 
 Namun, mengadopsi organisasi bergaya sistem file teks biasa ini memiliki prasyarat yang mudah diabaikan tetapi secara langsung menentukan keberhasilan retrieval: **tautan dan indeks harus dibuat di antara file-file**. File `.abstract`/`.overview` yang disebutkan sebelumnya menangani peringkasan hierarkis yang vertikal. Apa yang ditekankan di sini adalah asosiasi horizontal—jika pengetahuan sekadar dipisah menjadi tumpukan file teks independen yang ditata datar di dalam sebuah direktori tanpa referensi silang di antara mereka, maka, selain dari memindai semua file secara berurutan atau menggunakan vektor retrieval, Agent hampir tidak memiliki cara untuk menavigasi di antara entri-entri yang terkait. Semakin banyak pengetahuannya, semakin sulit tumpukan file yang tersebar ini untuk ditarik. Pendekatan yang tepat adalah mengatur Knowledge Base seperti Wikipedia: setiap kali sebuah entri menyebutkan entri lain, ia menautkan ke entri tersebut, dilengkapi dengan halaman entri dan halaman indeks, sehingga Agent dapat berjalan dari satu konsep ke tetangganya—tautan file ringan memberikan beberapa kekuatan navigasi dari grafik entitas-hubungan milik GraphRAG. Ada juga perbedaan praktis yang krusial di sini: **model bervariasi dalam seberapa andal mereka membuat dan memelihara tautan tersebut**. Model yang lebih kuat, saat menulis pengetahuan baru, secara spontan akan merujuk kembali ke entri yang ada dan memelihara indeks. Namun, banyak model tidak melakukan ini secara proaktif, dan hanya menambahkan (append) file secara terisolasi. Oleh karena itu, prompt penulisan pengetahuan harus secara eksplisit mewajibkan hal ini—untuk setiap entri baru yang ditambahkan, sistem harus terlebih dahulu menarik dan menautkan ke entri yang sudah ada yang relevan, dan memperbarui halaman indeks dari direktori tempatnya berada, membentuk jaringan referensi yang dapat dijangkau secara dua arah, alih-alih membiarkan pengetahuan tersebut menjadi entri yang terputus.
 
@@ -538,7 +597,7 @@ Pipeline ini harus memisahkan tiga lapisan dengan jelas: **lapisan bukti mentah*
 
 #### Penataan Berkala User Memory dan Knowledge Base
 
-Pembaruan inkremental bersifat cepat, tetapi setiap pembaruan hanya melihat area lokal. Dalam jangka panjang, rangkaian perubahan yang masing-masing benar secara lokal tetap dapat menimbulkan masalah global: fakta yang sama tersebar di banyak file, klaim lama dan baru hidup berdampingan, ringkasan menjauh dari bukti, dan struktur direktori tidak lagi sesuai dengan skala pengetahuan. Karena itu, sistem juga membutuhkan **penataan menyeluruh** secara berkala. Ini dapat dipahami sebagai bentuk konkret "sleep learning" Bab 8 untuk manajemen pengetahuan: bukti dan pembaruan lokal menumpuk selama interaksi aktif, sementara jendela latar berkala mengambil jarak untuk meninjau kembali seluruh sistem. Hal ini juga serupa dengan memori otomatis Claude Code yang menggabungkan atau memindahkan detail ketika indeks mendekati kapasitas.
+Pembaruan inkremental bersifat cepat, tetapi setiap pembaruan hanya melihat area lokal. Dalam jangka panjang, rangkaian perubahan yang masing-masing benar secara lokal tetap dapat menimbulkan masalah global: fakta yang sama tersebar di banyak file, klaim lama dan baru hidup berdampingan, ringkasan menjauh dari bukti, dan struktur direktori tidak lagi sesuai dengan skala pengetahuan. Karena itu, sistem juga membutuhkan **penataan menyeluruh** secara berkala. Ini dapat dipahami sebagai bentuk konkret "sleep learning" Bab 9 untuk manajemen pengetahuan: bukti dan pembaruan lokal menumpuk selama interaksi aktif, sementara jendela latar berkala mengambil jarak untuk meninjau kembali seluruh sistem. Hal ini juga serupa dengan memori otomatis Claude Code yang menggabungkan atau memindahkan detail ketika indeks mendekati kapasitas.
 
 Prosesnya mencakup setidaknya tiga tugas inti:
 
@@ -585,7 +644,7 @@ Agentic RAG menggabungkan retrieval dan penalaran melalui keputusan Agent itu se
 
 > Perbandingan ini memberikan argumen kuat bahwa nilai dari agentic RAG terletak pada "memecahkan masalah," bukan hanya "menjawab pertanyaan". Agentic RAG menukar kecepatan respons demi ketahanan dan kualitas jawaban pada masalah-masalah sulit—dan dalam skenario penjatuhan hukuman pada eksperimen ini, pergeseran dari *passive pipeline* menjadi *active explorer* terlihat secara langsung sebagai peningkatan signifikan dalam akurasi *multi-hop*.
 
-Bab ini dan bab sebelumnya keduanya membahas Context—satu di dalam *single session*, yang lainnya melintasi *multiple sessions*. Apa yang terutama dikonsolidasikan oleh bab ini adalah pengetahuan deklaratif tentang pengguna dan dunia. Bab 8 menggunakan kembali infrastruktur ekstraksi dan *retrieval* yang sama, tetapi menerapkannya pada pengetahuan perilaku yang didukung oleh keberhasilan dan kegagalan operasional: "di bawah kondisi apa Agent harus melakukan apa?" Bab berikutnya beralih ke Tools: bagaimana Agents berinteraksi dengan dunia luar melalui desain *tool*, standar interoperabilitas MCP, dan arsitektur *event-driven*.
+Bab ini dan bab sebelumnya keduanya membahas Context—satu di dalam *single session*, yang lainnya melintasi *multiple sessions*. Apa yang terutama dikonsolidasikan oleh bab ini adalah pengetahuan deklaratif tentang pengguna dan dunia. Bab 9 menggunakan kembali infrastruktur ekstraksi dan *retrieval* yang sama, tetapi menerapkannya pada pengetahuan perilaku yang didukung oleh keberhasilan dan kegagalan operasional: "di bawah kondisi apa Agent harus melakukan apa?" Bab berikutnya beralih ke Tools: bagaimana Agents berinteraksi dengan dunia luar melalui desain *tool*, standar interoperabilitas MCP, dan arsitektur *event-driven*.
 
 > **Eksperimen 3-9 ★★: Membangun Memori Pengguna dengan Agentic RAG**
 >
@@ -665,7 +724,7 @@ Proses ini terdiri dari dua fase:
 >
 > Inti dari eksperimen ini terletak pada pendekatan *knowledge engineering* berbasis data yang inovatif. Daripada menggunakan skema data kaku yang ditentukan sebelumnya, fase ***knowledge extraction*** menggunakan strategi penemuan faktor "dari bawah ke atas" (*bottom-up*)—dengan meminta LLM menganalisis ratusan kasus sampel dan secara bebas mendaftar semua kemungkinan faktor kunci yang memengaruhi penilaian, tim proyek mampu menyusun skema data modular yang lebih sesuai dengan data itu sendiri, alih-alih pada pengetahuan yang dimiliki manusia sebelumnya (*human prior knowledge*). Skema ini mencakup "skema inti" yang berlaku untuk semua kasus (keadaan seperti penyerahan diri secara sukarela dan kompensasi) ditambah "skema yang diperluas" untuk tuduhan spesifik seperti pencurian atau cedera yang disengaja (*field* seperti jumlah yang terlibat dan tingkat cedera).
 >
-> Pada fase ***factor analysis***, daripada menyuruh AI memprediksi masa hukuman penjara secara langsung (yang akan menciptakan "kotak hitam"—ia memberikan jawaban tetapi tidak bisa menjelaskan alasannya), informasi kasus pertama-tama diterjemahkan ke dalam format numerik yang dapat diproses oleh komputer secara efektif. Metode terjemahannya intuitif: untuk *field* dengan banyak opsi seperti "jenis kejahatan," opsinya dikodekan sebagai *one-hot indicator vector*—Pencurian = [1,0,0], Perampokan = [0,1,0], Penipuan = [0,0,1] (alasan untuk tidak menggunakan angka 1, 2, 3 adalah besaran angka dapat menyiratkan pada banyak algoritme bahwa "penipuan" lebih serius hanya karena kode numeriknya lebih besar, sedangkan *one-hot indicator* hanya menyandikan "kategori yang mana," tanpa menyiratkan hubungan besaran). Untuk pertanyaan ya/tidak seperti "penyerahan diri secara sukarela" atau "kompensasi," 1 berarti ya, 0 berarti tidak. Oleh karena itu, setiap kasus menjadi vektor fitur numerik, dan algoritme *clustering* kemudian digunakan untuk menemukan "prototipe kasus" yang natural dalam data tersebut. Misalnya, dalam kasus cedera yang disengaja, pola tipikal seperti "cedera ringan yang disebabkan oleh perkelahian tanpa senjata" atau "kelompok bersenjata yang terencana dan menyebabkan cedera parah" dapat dikelompokkan secara otomatis. Dengan menganalisis fitur-fitur kunci yang menentukan klaster-klaster ini, "Factor Importance Hierarchy Model" berbasis data pun dibangun.
+> Pada fase ***factor analysis***, daripada menyuruh AI memprediksi masa hukuman penjara secara langsung (yang akan menciptakan "kotak hitam"—ia memberikan jawaban tetapi tidak bisa menjelaskan alasannya), informasi kasus pertama-tama diterjemahkan ke dalam format numerik yang dapat diproses oleh komputer secara efektif. Metode terjemahannya intuitif: untuk *field* dengan banyak opsi seperti "jenis kejahatan," opsinya dikodekan sebagai *one-hot indicator vector*—Pencurian = [1,0,0], Perampokan = [0,1,0], Penipuan = [0,0,1] (alasan untuk tidak menggunakan angka 1, 2, 3 adalah besaran angka dapat menyiratkan pada banyak algoritme bahwa "penipuan" lebih serius hanya karena kode numeriknya lebih besar, sedangkan *one-hot indicator* hanya menyandikan "kategori yang mana," tanpa menyiratkan hubungan besaran). Untuk pertanyaan ya/tidak seperti "penyerahan diri secara sukarela" atau "kompensasi," 1 berarti ya, 0 berarti tidak. Oleh karena itu, setiap kasus menjadi vektor fitur numerik, dan algoritme *clustering* kemudian digunakan untuk menemukan "prototipe kasus" yang natural dalam data tersebut. Misalnya, ketika seluruh kasus penganiayaan dikelompokkan bersama, algoritme membaginya berdasarkan ciri seperti pemicu konflik, cara penyerangan, dan tingkat keparahan luka menjadi beberapa kelompok kasus yang saling mirip; setiap kelompok adalah satu pola tipikal, misalnya "perkelahian tangan kosong yang dipicu pertengkaran kecil dan membuat korban mengalami luka ringan" atau "penyerangan terencana oleh kelompok bersenjata yang membuat korban mengalami luka berat". Dengan menganalisis fitur-fitur kunci yang menentukan klaster-klaster ini, "Factor Importance Hierarchy Model" berbasis data pun dibangun.
 >
 > Pada akhirnya, "Factor Importance Hierarchy Model" ini menjadi penggerak utama bagi ***conversational information gathering*** dari Agent. Saat pengguna mendeskripsikan suatu kasus, Agent menggunakan model ini untuk secara cerdas mengajukan pertanyaan panduan berdasarkan urutan tingkat kepentingannya, demi mengisi semua faktor penilaian kunci. Setelah pengumpulan informasi selesai, Agent me-*retrieve* prototipe kasus yang paling mirip dari Knowledge Base dan memberikan analisis berbasis data serta penjelasan yang didukung oleh preseden yang luas, berdasarkan data statistik prototipe tersebut (misalnya, rentang hukuman tipikal).
 >
@@ -687,6 +746,8 @@ Rupa wajah atau suara seseorang sulit dijelaskan dengan kata-kata dan tidak dapa
 
 Bab ini membangun sistem memori persisten AI Agent pada dua skala: User Memory untuk individu, dan Knowledge Base bersama untuk semua orang.
 
+Dilihat dari struktur buku secara keseluruhan, bab ini membangun ruas **usulan** dalam lingkar penemuan Bab 1: mengubah satu bukti menjadi satu perubahan yang minimal, dapat ditinjau, dan dapat dibalik—bukan menilai apakah sistem secara keseluruhan membaik.
+
 Untuk **User Memory**, kita telah mengeksplorasi empat strategi progresif, dari fakta atomik (Simple Notes) ke manajemen pengetahuan yang dikontekstualisasikan (Advanced JSON Cards), mengungkap ketegangan fundamental pada representasi informasi antara kesederhanaan dan ekspresifitas. Kerangka kerja (*frameworks*) seperti Mem0 dan Memobase menyediakan manajemen memori yang direkayasa, dan perlindungan privasi menjaga agar informasi sensitif tetap aman di seluruh prosesnya.
 
 Untuk ***knowledge acquisition***, tumpukan intinya adalah: *document chunking* menentukan unit *retrieval*, *dense embeddings* menangkap semantik, *sparse embeddings* mencocokkan kata kunci, *result fusion* menggabungkan kandidat ke dalam *pool* tunggal, *neural reranking* menyempurnakan urutan akhir, dan metrik seperti recall@k mengukur kualitas *retrieval*.
@@ -695,17 +756,16 @@ Untuk ***knowledge understanding***, kita bergerak melampaui *flat document chun
 
 Untuk ***knowledge updating***, sistem memerlukan dua ritme: pembaruan inkremental segera menyerap bukti baru, sedangkan penataan berkala kembali ke seluruh pengetahuan dan data mentah untuk melakukan deduplicasi, penonaktifan, penggabungan, restrukturisasi, pemeriksaan kelalaian, serta pembatasan skenario. Baik pengetahuan direpresentasikan sebagai Markdown maupun Python, Proposer Agent harus mengajukan diff yang didukung bukti dan Reviewer Agent heterogen harus mengauditnya secara independen. PR baru boleh di-merge dan indeks turunan dibangun ulang setelah disetujui.
 
-Bab ini dan bab sebelumnya keduanya membahas masalah "*context*"—satu di dalam *single session*, yang lainnya melintasi *multiple sessions*. Bab ini terutama menyaring pengetahuan deklaratif tentang pengguna dan dunia. Bab 8 akan menggunakan kembali infrastruktur ekstraksi dan retrieval yang sama untuk pengetahuan perilaku yang didukung oleh eksekusi berhasil dan gagal: apa yang harus dilakukan dalam kondisi tertentu. Bab berikutnya beralih pada "*tools*": bagaimana Agents berinteraksi dengan dunia eksternal melalui alat-alat, termasuk desain *tool*, standar interoperabilitas MCP, dan arsitektur *event-driven*.
+Bab ini dan bab sebelumnya keduanya membahas masalah "*context*"—satu di dalam *single session*, yang lainnya melintasi *multiple sessions*. Bab ini terutama menyaring pengetahuan deklaratif tentang pengguna dan dunia. Bab 9 akan menggunakan kembali infrastruktur ekstraksi dan retrieval yang sama untuk pengetahuan perilaku yang didukung oleh eksekusi berhasil dan gagal: apa yang harus dilakukan dalam kondisi tertentu. Bab berikutnya beralih pada "*tools*": bagaimana Agents berinteraksi dengan dunia eksternal melalui alat-alat, termasuk desain *tool*, standar interoperabilitas MCP, dan arsitektur *event-driven*.
 
 ## Pertanyaan Pemikiran
 
 1.  ★★ Dalam sistem User Memory, ketika pengguna yang sama memberikan informasi yang kontradiktif di sesi yang berbeda (misalnya, menyebutkan dua alamat rumah yang berbeda), bagaimana seharusnya sistem memori menangani konflik ini?
 2.  ★★ Contextual Retrieval menambahkan *context* dari dokumen asli ke setiap *chunk*. Namun, jika dokumen aslinya sendiri secara struktural berantakan atau mengandung informasi yang saling bertentangan, metode ini dapat menyebarkan atau bahkan memperbesar kesalahan. Bagaimana Anda akan memperkenalkan sinyal "kualitas informasi" pada fase *retrieval*?
-3.  ★★★ Agentic RAG memungkinkan Agent untuk secara aktif memutuskan kapan harus mencari, apa yang harus dicari, dan apakah akan melanjutkan pencarian. Tetapi jika model tidak tahu apa yang tidak diketahuinya, ia tidak dapat memicu pencarian dengan benar. Bagaimana masalah "metakognisi" ini dapat dipecahkan?
-4.  ★★ Ekstraksi informasi multimodal mengubah bagan menjadi deskripsi teks sebelum *retrieval*. Proses "terjemahan" ini dapat menghilangkan hubungan spasial dalam informasi visual. Berikan contoh spesifik informasi bagan yang tidak dapat disampaikan sepenuhnya oleh deskripsi teks murni, dan rancang sebuah skema untuk melestarikan informasi tersebut.
-5.  ★★★ "Bitter Lesson" dari Rich Sutton berpendapat bahwa metode umum (pencarian dan pembelajaran) pada akhirnya akan mengungguli fitur-fitur buatan tangan (*hand-crafted features*). Apakah seluruh sistem pengetahuan yang dibangun dalam bab ini (strategi *chunking*, struktur indeks, jalur *retrieval*) itu sendiri merupakan bentuk "*hand-crafted design*"? Jika kapabilitas model menjadi cukup kuat, dapatkah desain ini digantikan dengan sekadar "memasukkan semuanya"?
-6.  ★★★ Seiring meningkatnya kemampuan model, menurut Anda apakah Knowledge Base khusus domain masih akan penting? Mungkinkah sebuah *foundation model* yang kuat di masa depan berpotensi mengandung semua informasi dalam Knowledge Base sebuah domain, sehingga menghilangkan kebutuhan akan hal tersebut?
-7.  ★ RAPTOR membangun indeks pohon melalui ringkasan hierarkis *bottom-up*, sementara GraphRAG membangun indeks terstruktur-graf melalui hubungan entitas. Jenis kueri seperti apa yang dapat dijawab dengan baik oleh masing-masing dari kedua indeks terstruktur ini?
-8.  ★★ Paradigma *filesystem* mengatur pengetahuan ke dalam struktur hierarkis yang mirip dengan *file system*. Dibandingkan dengan RAG *vector database* tradisional, dalam skenario apa pendekatan ini memiliki keunggulan?
-9.  ★★★ Secara otomatis menemukan "faktor penilaian" dan "hierarki tingkat kepentingan faktor" dari data terstruktur (misalnya, basis data putusan pengadilan) pada dasarnya melibatkan Agent yang menginduksi aturan dari data. Dapatkah *knowledge extraction* berbasis data ini mencapai kualitas aturan yang dibuat secara manual oleh para pakar manusia?
-10. ★★★ Rancang workflow pembaruan inkremental dan penataan berkala untuk pustaka User Memory Markdown. Jika Reviewer dan Proposer memakai model yang sama dan hanya dapat melihat fragmen percakapan yang dipilih Proposer, kesalahan apa yang masih dapat di-merge? Jelaskan perbaikannya dari sisi independensi model, cakupan bukti, dan izin tool.
+3.  ★★ Ekstraksi informasi multimodal mengubah bagan menjadi deskripsi teks sebelum *retrieval*. Proses "terjemahan" ini dapat menghilangkan hubungan spasial dalam informasi visual. Berikan contoh spesifik informasi bagan yang tidak dapat disampaikan sepenuhnya oleh deskripsi teks murni, dan rancang sebuah skema untuk melestarikan informasi tersebut.
+4.  ★★★ "Bitter Lesson" dari Rich Sutton berpendapat bahwa metode umum (pencarian dan pembelajaran) pada akhirnya akan mengungguli fitur-fitur buatan tangan (*hand-crafted features*). Apakah seluruh sistem pengetahuan yang dibangun dalam bab ini (strategi *chunking*, struktur indeks, jalur *retrieval*) itu sendiri merupakan bentuk "*hand-crafted design*"? Jika kapabilitas model menjadi cukup kuat, dapatkah desain ini digantikan dengan sekadar "memasukkan semuanya"?
+5.  ★★★ Seiring meningkatnya kemampuan model, menurut Anda apakah Knowledge Base khusus domain masih akan penting? Mungkinkah sebuah *foundation model* yang kuat di masa depan berpotensi mengandung semua informasi dalam Knowledge Base sebuah domain, sehingga menghilangkan kebutuhan akan hal tersebut?
+6.  ★ RAPTOR membangun indeks pohon melalui ringkasan hierarkis *bottom-up*, sementara GraphRAG membangun indeks terstruktur-graf melalui hubungan entitas. Jenis kueri seperti apa yang dapat dijawab dengan baik oleh masing-masing dari kedua indeks terstruktur ini?
+7.  ★★ Paradigma *filesystem* mengatur pengetahuan ke dalam struktur hierarkis yang mirip dengan *file system*. Dibandingkan dengan RAG *vector database* tradisional, dalam skenario apa pendekatan ini memiliki keunggulan?
+8.  ★★★ Secara otomatis menemukan "faktor penilaian" dan "hierarki tingkat kepentingan faktor" dari data terstruktur (misalnya, basis data putusan pengadilan) pada dasarnya melibatkan Agent yang menginduksi aturan dari data. Dapatkah *knowledge extraction* berbasis data ini mencapai kualitas aturan yang dibuat secara manual oleh para pakar manusia?
+9. ★★★ Rancang workflow pembaruan inkremental dan penataan berkala untuk pustaka User Memory Markdown. Jika Reviewer dan Proposer memakai model yang sama dan hanya dapat melihat fragmen percakapan yang dipilih Proposer, kesalahan apa yang masih dapat di-merge? Jelaskan perbaikannya dari sisi independensi model, cakupan bukti, dan izin tool.

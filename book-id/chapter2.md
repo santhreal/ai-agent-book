@@ -148,6 +148,8 @@ Kedua panggilan dalam gambar sama-sama merujuk pada **pemanggilan API model**, b
 }
 ```
 
+Daftar `tools` ini adalah metadata tool statis yang sudah didaftarkan developer sejak awal: nama tool, deskripsi, dan schema parameternya tertulis di dalam kode dan tidak ada kaitannya dengan apa yang ditanyakan pengguna kali ini. Baik pengguna menanyakan cuaca di Vancouver maupun meminta Agent memesan tiket pesawat, daftar yang dikirim tetap sama; contoh ini hanya mencantumkan dua tool yang relevan agar request-nya lebih pendek, sedangkan Agent nyata kerap mendeklarasikan puluhan tool sekaligus. **Bukan berarti Agent lebih dulu memecah input pengguna menjadi dua subtugas, “cari waktu” dan “cari cuaca”, lalu menghasilkan deskripsi tool yang sesuai** — pemecahan itu terjadi di sisi model, dan justru berupa `tool_calls` pada response di bawah.
+
 **Model mengembalikan tool call request (bukan balasan akhir):**
 
 ```javascript
@@ -335,7 +337,7 @@ Loop ini memiliki satu percabangan utama: **jika model mengembalikan `tool_calls
 Daftar `messages` berubah antarputaran sebagai berikut:
 
 **Keadaan awal (sebelum panggilan pertama):**
-```
+```text
 messages = [
   { role: "system",  content: "You are a helpful assistant..." },     # Ditulis oleh developer
   { role: "user",    content: "What's the current time and weather in Vancouver?" },  # Input pengguna
@@ -343,7 +345,7 @@ messages = [
 ```
 
 **Setelah panggilan pertama (model mengembalikan panggilan tool):**
-```
+```text
 messages = [
   { role: "system",    content: "..." },
   { role: "user",      content: "What's the current time..." },
@@ -354,7 +356,7 @@ messages = [
 ```
 
 **Setelah panggilan kedua (model mengembalikan balasan akhir, loop berakhir):**
-```
+```text
 messages = [
   { role: "system",    content: "..." },
   { role: "user",      content: "What's the current time..." },
@@ -376,6 +378,25 @@ Contoh di atas menunjukkan komposisi lengkap dari context setiap kali Agent mema
 Bagian atas (System Prompt + Tool Definitions) tetap tidak berubah di sepanjang percakapan, sementara bagian bawah (riwayat percakapan, yaitu **trajectory** yang didefinisikan di Bab 1) terus membesar seiring berjalannya interaksi. Beginilah rupa kelima komponen context dari Bab 1 saat tampil di tingkat API: system prompt dan tool definitions membentuk prefix statis (awalan statis), sementara user messages, model replies, dan hasil eksekusi tool membentuk riwayat pesan (message history) yang tumbuh secara dinamis. Struktur "prefix statis + trajectory" inilah yang menjadi landasan bagi pembahasan berikutnya terkait optimasi KV Cache, kompresi context, dan teknik-teknik sejenis: bagian prefix harus tetap stabil, sementara segmen trajectory yang datang kemudian dapat dirangkum (summarized) atau diganti bila trade-off-nya memang sepadan.
 
 Sisa bab ini membedah tiap lapisan struktur tersebut: bagaimana menggunakan prefix statis yang stabil untuk mempercepat inferensi (KV Cache), bagaimana merancang System Prompt yang efektif (prompt engineering), bagaimana mencegah konten eksternal membajak context (pertahanan terhadap prompt injection), bagaimana memuat pengetahuan terspesialisasi on-demand (Agent Skills), bagaimana menyuntikkan state (keadaan) dinamis di akhir percakapan (Agent Status Bar), dan bagaimana mengompresi conversation history saat membesar terlalu besar (strategi kompresi).
+
+**Konstruksi konteks sebelum setiap permintaan:**
+
+```python
+stable_prefix = system_message
+stable_tools = core_tool_schemas
+trajectory = load_message_history(session)
+status_message = make_status_message(derive_current_state(trajectory))
+
+if estimated_tokens(stable_prefix, trajectory, status_message) > budget:
+    trajectory = compress_old_evidence(
+        trajectory,
+        preserve = [decisions, constraints, failures, citations]
+    )
+
+request.messages = [stable_prefix] + trajectory + [status_message]
+request.tools = stable_tools
+response = call_model(request)
+```
 
 > **Eksperimen 2-1 ★: Deployment Layanan LLM Lokal dan Pemanggilan Tool**
 >
@@ -597,7 +618,7 @@ Metode yang mengurangi beban kognitif manusia juga membantu LLM. Bayangkan anggo
 
 Sebaliknya, prompt berorientasi proses berfungsi seperti manual pelatihan yang baik dengan Standard Operating Procedure (SOP) yang jelas:
 
-```
+```text
 Prosedur Operasi Standar Pemrosesan File:
 
 Langkah 1: Validasi
@@ -783,7 +804,7 @@ Sebuah kesalahpahaman umum perlu diklarifikasi: “ramah KV Cache” tidak berar
 
 ### Hubungan Antara Skills dan Tool
 
-Dari perspektif pengelolaan context, mekanisme Skills sangat ramah terhadap KV Cache. Jika semua definisi tool kode khusus ditempatkan di dalam system prompt, pertambahan jumlahnya akan menghabiskan banyak token dan mengganggu perhatian model. Sebaliknya, dalam pola Skill + eksekutor umum, jumlah tool tetap sedikit (seperti ditunjukkan pada Bab 5, hanya dibutuhkan tujuh tool inti), sedangkan konten Skill dimuat sesuai kebutuhan melalui mekanisme progressive disclosure di atas tanpa memengaruhi prefix yang telah di-cache. Bab 4 menyajikan perbandingan terperinci dan kerangka pemilihannya, sementara Bab 8 membahas bagaimana Agent yang terus berevolusi menentukan apakah suatu pengalaman perlu ditulis sebagai pengetahuan, instruksi, program, atau parameter model.
+Dari perspektif pengelolaan context, mekanisme Skills sangat ramah terhadap KV Cache. Jika semua definisi tool kode khusus ditempatkan di dalam system prompt, pertambahan jumlahnya akan menghabiskan banyak token dan mengganggu perhatian model. Sebaliknya, dalam pola Skill + eksekutor umum, jumlah tool tetap sedikit (seperti ditunjukkan pada Bab 5, hanya dibutuhkan tujuh tool inti), sedangkan konten Skill dimuat sesuai kebutuhan melalui mekanisme progressive disclosure di atas tanpa memengaruhi prefix yang telah di-cache. Bab 4 menyajikan perbandingan terperinci dan kerangka pemilihannya, sementara Bab 9 membahas bagaimana Agent yang terus berevolusi menentukan apakah suatu pengalaman perlu ditulis sebagai pengetahuan, instruksi, program, atau parameter model.
 
 > **Eksperimen 2-6 ★★: Hasilkan Presentasi dari Paper Menggunakan Agent Skills**
 >
@@ -799,6 +820,14 @@ Dari perspektif pengelolaan context, mekanisme Skills sangat ramah terhadap KV C
 >
 > **Kriteria Penerimaan**: PowerPoint yang dihasilkan mencakup konten utama paper (halaman judul, latar belakang masalah, tinjauan metode, hasil utama, kesimpulan), menyertakan setidaknya 3 gambar yang diekstrak dari paper yang konsisten dengan deskripsi teks, dan memiliki format yang benar yang terbuka dengan baik di PowerPoint atau perangkat lunak yang kompatibel.
 >
+
+> **Eksperimen 2-7 ★★: Membuat Skill Menulis "Bebas Rasa AI" dari Contoh Tulisan Pribadi**
+>
+> **Tujuan Eksperimen**: menghasilkan sebuah Skill menulis yang dapat dimuat dan diperiksa dari sedikit contoh tulisan manusia, lalu mengamati apakah Skill itu mampu mereproduksi preferensi ekspresi utama penulis pada artikel baru.
+>
+> **Deskripsi Eksperimen**: siapkan tiga sampai lima artikel orisinal, lalu biarkan runtime yang mendukung Agent Skills menghasilkan `SKILL.md` versi pertama; pilih topik baru dan susun draf artikel, setelah penulis menyuntingnya secara manual, bandingkan sebelum/sesudah dan tuliskan kembali pola yang stabil ke dalam Skill. Kriteria penerimaan hanya menuntut Skill memiliki kondisi pemicu yang jelas, tiga sampai lima prinsip beserta contoh, cakupan, dan pengecualian — tanpa menjadikan satu penilaian subjektif sebagai aturan umum.
+>
+> **Apa yang Ditunjukkan Eksperimen Ini**: nilai sebuah Skill terletak pada mengeksternalkan pengalaman pribadi menjadi instruksi yang dimuat sesuai kebutuhan. Versi pertama yang singkat, mudah dibaca, dan lolos uji tugas nyata adalah titik awal iterasi yang lebih baik daripada mendaftar puluhan aturan sejak awal.
 
 ## Agent Status Bar: Mengelola Trajectories dengan Informasi Meta
 
@@ -831,7 +860,7 @@ Dalam skenario context yang panjang, sumber daya atensi model itu terbatas. Seir
 
 Agent Status Bar memecahkan masalah ini dengan sengaja menempatkan informasi meta kunci dalam format terstruktur di bagian akhir context. Karena informasi ini dekat dengan token yang akan segera dihasilkan model, ia lebih mungkin untuk menerima atensi. Ini adalah bentuk pengendalian atensi (attention steering) melalui penempatan.
 
-> **Eksperimen 2-7 ★★: Memverifikasi Efek Agent Status Bar via Visualisasi Atensi (Attention Visualization)**
+> **Eksperimen 2-8 ★★: Memverifikasi Efek Agent Status Bar via Visualisasi Atensi (Attention Visualization)**
 >
 > Berdasarkan proyek `attention_visualization`, kami merancang eksperimen terkontrol di mana Agent customer service menangani permintaan pengembalian dana. Agent tersebut telah menelepon Xfinity sebanyak 3 kali, diselingi dengan pencarian web. Pengguna bertanya: "Bisakah kamu menelepon mereka lagi untuk menindaklanjutinya?"
 >
@@ -850,7 +879,7 @@ Agent Status Bar memecahkan masalah ini dengan sengaja menempatkan informasi met
 > Atensi sangat terkonsentrasi pada informasi status bar. Proses penalaran secara langsung menggunakan informasi yang sudah disuling, tidak lagi menghitung statistik dari data mentah. Untuk model kecil seperti Qwen3-0.6B, Kelompok Kontrol A sering kali melanggar batasan dan terus menelepon, sementara Kelompok Kontrol B secara konsisten mematuhi batasan tersebut.
 >
 
-Eksperimen 2-7 adalah demonstrasi kualitatif kecil yang memberi intuisi. Untuk mengukur seberapa berguna pendekatan “hitung lebih dahulu, lalu lihat langsung” ini dan di mana batasnya, penulis dan kolaborator memakai benchmark khusus[^ch2-7] (pendekatan ini bernama **Context Distillation**; Agent Status Bar adalah bentuknya yang paling umum). Kesimpulan:
+Eksperimen 2-8 adalah demonstrasi kualitatif kecil yang memberi intuisi. Untuk mengukur seberapa berguna pendekatan “hitung lebih dahulu, lalu lihat langsung” ini dan di mana batasnya, penulis dan kolaborator memakai benchmark khusus[^ch2-8] (pendekatan ini bernama **Context Distillation**; Agent Status Bar adalah bentuknya yang paling umum). Kesimpulan:
 
 - Dengan **status bar yang telah dihitung**, **model yang lemah memulihkan akurasinya**. Model-model terlemah meningkat 40 hingga 54 poin persentase, dan pada tugas ini model lokal 2B bahkan menyamai model frontier tanpa status bar.
 - **Model kuat sudah menjawab dengan benar; yang dihemat adalah efisiensi.** Status bar yang sama menurunkan penalaran, latensi, dan biaya per kueri kira-kira satu orde besaran (memangkas 80–90% atau lebih token penalaran).
@@ -865,7 +894,7 @@ Namun, prakomputasi yang dilakukan dengan benar dan salah memberikan hasil yang 
 
 **3. Pantau akurasi status bar sebagai metrik produksi utama.** Eksperimen menemukan bahwa **model hampir selalu memercayai status bar**: jika tertulis “dipanggil 3 kali”, model menerimanya sebagai tiga kali tanpa memeriksa atau menghitung ulang. Inilah alasan status bar efektif, tetapi kesalahan di dalamnya juga akan diteruskan **apa adanya** ke jawaban akhir. Karena itu, risiko **peracunan status bar** yang disebutkan sebelumnya perlu ditanggapi serius.
 
-[^ch2-7]: Li, Bojie dan Noah Shi. *Distill, Don't Retrieve: Inference-Time Context Distillation for LLM Agent Reasoning.* 2026. https://01.me/research/context-distillation
+[^ch2-8]: Li, Bojie dan Noah Shi. *Distill, Don't Retrieve: Inference-Time Context Distillation for LLM Agent Reasoning.* 2026. https://01.me/research/context-distillation
 
 ### Komposisi Agent Status Bar
 
@@ -889,7 +918,7 @@ Detail implementasi yang penting adalah bahwa Agent Status Bar disisipkan pada a
 
 Berikut adalah daftar pesan sesungguhnya yang disusun oleh kerangka kerja Agent selama panggilan API ke-N:
 
-```
+```text
 messages: [
   { role: "system",    content: "Anda adalah asisten layanan pelanggan..." }  ← Tetap (tersimpan di KV Cache)
   { role: "user",      content: "Tolong batalkan paket Xfinity saya" }  ← Permintaan asli pengguna
@@ -916,13 +945,15 @@ Desain ini menerapkan prinsip inti dari bagian KV Cache pada status bar: tambahk
 
 "Menambahkan tidak merusak cache" hanya berlaku untuk satu penyisipan (single injection). Status secara alami berubah seiring berjalannya waktu: item TODO diselesaikan, jumlah tool meningkat, dan pesan status sebelumnya menjadi usang. Ada dua cara untuk memperbarui status bar, masing-masing dengan biaya cache yang berbeda:
 
-**Implementasi 1: Mengganti setiap putaran.** Sebelum setiap panggilan API, hapus pesan status putaran sebelumnya dari daftar pesan dan tambahkan status terbaru di akhir. Hal ini hanya menyisakan satu status saat ini di dalam context. Biayanya adalah penghapusan status lama tersebut akan membatalkan semua konten cache setelah posisinya, yang merupakan mekanisme pembatalan (invalidation mechanism) yang sama seperti yang dibahas di bagian "stempel waktu dinamis (dynamic timestamp)" bab ini. Perbedaannya adalah karena pesan status berada di dekat bagian akhir context, rentang pembatalan terbatas pada beberapa putaran pesan terbaru alih-alih keseluruhan awalan.
+**Implementasi 1: Mengganti setiap putaran.** Sebelum setiap panggilan API, hapus pesan status putaran sebelumnya dari daftar pesan dan tambahkan status terbaru di akhir. Hal ini hanya menyisakan satu status saat ini di dalam context. Biayanya adalah penghapusan status lama tersebut akan membatalkan semua konten cache setelah posisinya, yang merupakan mekanisme pembatalan (invalidation mechanism) yang sama seperti yang dibahas di bagian "stempel waktu dinamis (dynamic timestamp)" bab ini. Perbedaannya adalah karena pesan status berada di dekat bagian akhir context, rentang pembatalan terbatas pada pesan yang ditambahkan sejak penyisipan status sebelumnya—biasanya satu putaran—alih-alih keseluruhan awalan.
 
 **Implementasi 2: Penambahan persisten (Persistent appending).** Setelah diinjeksi, pesan status akan tetap berada di trajectory secara permanen, dan status baru akan ditambahkan di bagian akhir setiap putaran. `<system-reminder>` dari Claude Code menggunakan pendekatan ini: pesan-pesan status historis tetap berada di dalam transkrip dan tidak pernah dihapus atau dimodifikasi. Metode ini sepenuhnya ramah-cache karena pesan-pesan hanya ditambahkan, tidak pernah diubah, sehingga awalan tetap stabil. Biayanya adalah status-status usang akan terakumulasi di dalam context, menghabiskan token dan mengharuskan model untuk mengandalkan status terbaru sambil mengabaikan status yang sudah usang.
 
-Aturan praktisnya adalah: **ketika pembaruan status terjadi secara sering dan trajectory-nya panjang, pilih Implementasi 2**. Mengganti status setiap putaran akan berulang kali membatalkan entri cache pada trajectory yang panjang, yang bisa lebih memakan biaya ketimbang membawa pesan status yang sudah usang. **Ketika trajectory-nya pendek atau satu pesan statusnya besar** (misalnya, daftar TODO lengkap plus snapshot lingkungan), **pilih Implementasi 1**. Pembatalan cache selama beberapa putaran terakhir tidaklah mahal, dan context tetap bersih dan tidak ambigu.
+Pilihan bergantung pada panjang trajectory, ukuran status, panjang akhiran yang ditambahkan di antara pembaruan, dan jumlah pembaruan yang diperkirakan. **Pilih Implementasi 2 ketika statusnya kecil, banyak pesan dihasilkan di antara pembaruan, dan panjang sesi dibatasi**—mempertahankan status lama biasanya lebih murah daripada berulang kali menghitung ulang akhiran yang panjang. **Pilih Implementasi 1 ketika statusnya besar, pembaruan sering terjadi, atau trajectory-nya panjang**—cara ini biasanya hanya membatalkan akhiran pendek setelah penyisipan sebelumnya sekaligus mencegah penumpukan status usang.
 
-> **Eksperimen 2-8 ★★: Beberapa Teknik Agent Status Bar yang Berguna**
+Model perkiraan dapat menunjukkan titik impas. Misalkan setiap status berisi $S$ token, sebanyak $R$ token ditambahkan di antara pembaruan, jumlah pembaruan yang diperkirakan adalah $N$, dan biaya input cache adalah $\alpha$ kali biaya input biasa. Dengan mengabaikan biaya yang sama pada kedua pendekatan, $C_{\text{ganti}} \approx (N-1)(1-\alpha)R$ dan $C_{\text{tambah}} \approx \alpha S N(N-1)/2$. Jadi, pilih Implementasi 2 ketika $\alpha SN/2 < (1-\alpha)R$; jika tidak, pilih Implementasi 1. Perkiraan ini tidak mencakup penggunaan context dan ambiguitas akibat status usang, sehingga pilihan akhir juga harus mempertimbangkan tarif cache penyedia dan tingkat hit yang terukur.
+
+> **Eksperimen 2-9 ★★: Beberapa Teknik Agent Status Bar yang Berguna**
 >
 > Kerangka kerja eksperimental `agent-status-bar` mengimplementasikan lima teknik status bar, yang masing-masing dapat diaktifkan atau dinonaktifkan secara independen:
 >
@@ -1000,7 +1031,7 @@ Kuncinya adalah memahami **waktu dan lokasi** kompresi. Kompresi tidak memodifik
 
 ![Gambar 2-16: Perbandingan Strategi Kompresi Context](images/fig2-16.svg)
 
-> **Eksperimen 2-9 ★★★: Perbandingan Strategi Kompresi Context**
+> **Eksperimen 2-10 ★★★: Perbandingan Strategi Kompresi Context**
 >
 > Kami merancang tugas riset untuk mengidentifikasi dan melacak status pekerjaan para pendiri OpenAI. Tugas ini memerlukan agregasi informasi multi-langkah, panjang hasil pencariannya sangat bervariasi (dari beberapa ribu hingga lebih dari seratus ribu karakter), dan kriteria keberhasilannya jelas. Dengan Kimi K3—model penalaran yang memiliki context native sekitar satu juta token, tetapi sengaja dibatasi pada 128K token dalam eksperimen ini—kami menerapkan enam strategi:
 >
@@ -1034,7 +1065,7 @@ Eksperimen di atas menunjukkan perbedaan kinerja antarstrategi kompresi. Dalam p
 
 ### Prinsip Desain untuk Strategi Kompresi
 
-Kita telah membahas alasan kompresi—membatasi panjang dan meningkatkan penalaran—serta sifat dasar in-context learning sebagai "pencarian (retrieval)". Kita dapat menyimpulkan empat prinsip desain kompresi. Kompresi melayani tugas saat ini; jika riwayat dari berbagai tugas digabungkan secara offline, ini disebut evolusi berkelanjutan (Bab 8).
+Kita telah membahas alasan kompresi—membatasi panjang dan meningkatkan penalaran—serta sifat dasar in-context learning sebagai "pencarian (retrieval)". Kita dapat menyimpulkan empat prinsip desain kompresi. Kompresi melayani tugas saat ini; jika riwayat dari berbagai tugas digabungkan secara offline, ini disebut evolusi berkelanjutan (Bab 9).
 
 - **Distribusi Nilai Informasi Tidak Seragam**: Titik keputusan kunci seperti daftar personil lebih penting daripada detail berita. Detail berita lebih penting daripada noise seperti bar navigasi.
 - **Integritas Semantik**: "Sutskever meninggalkan OpenAI pada Mei 2024" tak boleh disingkat jadi "Sutskever pergi". Waktu dan nama adalah hal mutlak.
